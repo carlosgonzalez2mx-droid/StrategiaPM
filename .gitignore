@@ -19,7 +19,9 @@ executable/
 !debug-simple.html
 !fix-user-role.html
 !fix-role-safari.html
+!transfer-projects.sql
 *.sql
+!transfer-projects.sql
 *.md
 *.txt
 .DS_Store
