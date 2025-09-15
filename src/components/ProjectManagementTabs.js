@@ -647,7 +647,14 @@ const ProjectManagementTabs = ({
                   </span>
                 </h2>
                 <div className="space-y-4 max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-                  {projectTasks?.filter(task => task.isMilestone).map((milestone, index) => (
+                  {projectTasks?.filter(task => task.isMilestone)
+                    .sort((a, b) => {
+                      // Ordenar por wbsCode (campo #) si existe, sino por nombre
+                      const aCode = a.wbsCode || a.name;
+                      const bCode = b.wbsCode || b.name;
+                      return aCode.localeCompare(bCode, 'es', { numeric: true });
+                    })
+                    .map((milestone, index) => (
                     <div key={milestone.id} className="bg-gradient-to-r from-gray-50 to-gray-100 p-4 rounded-lg border border-gray-200">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-4">
