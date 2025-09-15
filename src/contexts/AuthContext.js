@@ -179,44 +179,17 @@ export const AuthProvider = ({ children }) => {
     return ROLE_PERMISSIONS[user.role] || null;
   };
 
-  // Crear nuevo usuario (solo para Project Managers)
-  const createUser = (userData) => {
-    if (!hasPermission("users:create")) {
-      throw new Error('No tienes permisos para crear usuarios');
-    }
-    
-    const newUser = {
-      ...userData,
-      id: Date.now().toString(),
-      isActive: true
-    };
-    
-    setUsers(prev => {
-      const newUsers = prev.slice();
-      newUsers.push(newUser);
-      return newUsers;
-    });
-    return newUser;
+  // Funciones de gestión de usuarios eliminadas - Solo Supabase
+  const createUser = () => {
+    throw new Error('Gestión de usuarios manejada por Supabase');
   };
 
-  // Actualizar usuario
-  const updateUser = (userId, updates) => {
-    if (!hasPermission("users:update")) {
-      throw new Error('No tienes permisos para actualizar usuarios');
-    }
-    
-    setUsers(prev => prev.map(u => 
-      u.id === userId ? Object.assign({}, u, updates) : u
-    ));
+  const updateUser = () => {
+    throw new Error('Gestión de usuarios manejada por Supabase');
   };
 
-  // Eliminar usuario
-  const deleteUser = (userId) => {
-    if (!hasPermission("users:delete")) {
-      throw new Error('No tienes permisos para eliminar usuarios');
-    }
-    
-    setUsers(prev => prev.filter(u => u.id !== userId));
+  const deleteUser = () => {
+    throw new Error('Gestión de usuarios manejada por Supabase');
   };
 
   const value = {
