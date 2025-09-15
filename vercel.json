@@ -22,10 +22,6 @@
     }
   ],
   "env": {
-    "NODE_ENV": "production",
-    "CI": "false",
-    "ESLINT_NO_DEV_ERRORS": "true",
-    "GENERATE_SOURCEMAP": "false"
-  },
-  "buildCommand": "CI=false npm run build"
+    "NODE_ENV": "production"
+  }
 }
