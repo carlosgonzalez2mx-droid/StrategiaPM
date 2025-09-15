@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Verificar Estructura de Tabla Projects</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h2>Verificar Estructura de Tabla Projects</h2>
+    <button onclick="verificarEstructura()">Verificar Estructura</button>
+    <div id="resultado"></div>
+
+    <script>
+        const supabaseUrl = 'https://ogqpsrsssrrytrqoyyph.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ncXBzcnNzc3JyeXRycW95eXBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc3Nzc5NjAsImV4cCI6MjA3MzM1Mzk2MH0.EqXjG1iefYMZ84Tw-4po98gBV7uRuPoz0idQgJ03pzg';
+
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        async function verificarEstructura() {
+            try {
+                // Intentar hacer una consulta simple para ver qué campos existen
+                const { data, error } = await supabase
+                    .from('projects')
+                    .select('*')
+                    .limit(1);
+
+                if (error) {
+                    document.getElementById('resultado').innerHTML = `
+                        <h3>Error:</h3>
+                        <pre>${JSON.stringify(error, null, 2)}</pre>
+                    `;
+                    return;
+                }
+
+                if (data && data.length > 0) {
+                    const campos = Object.keys(data[0]);
+                    document.getElementById('resultado').innerHTML = `
+                        <h3>Campos disponibles en la tabla projects:</h3>
+                        <ul>
+                            ${campos.map(campo => `<li><strong>${campo}</strong></li>`).join('')}
+                        </ul>
+                        <h3>Primer registro:</h3>
+                        <pre>${JSON.stringify(data[0], null, 2)}</pre>
+                    `;
+                } else {
+                    document.getElementById('resultado').innerHTML = '<p>No hay datos en la tabla projects</p>';
+                }
+            } catch (err) {
+                document.getElementById('resultado').innerHTML = `
+                    <h3>Error de conexión:</h3>
+                    <p>${err.message}</p>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

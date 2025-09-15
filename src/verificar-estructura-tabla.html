@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verificar Estructura de Tabla Supabase</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .step {
+            margin: 20px 0;
+            padding: 15px;
+            border-left: 4px solid #007bff;
+            background: #f8f9fa;
+        }
+        .success { border-left-color: #28a745; background: #d4edda; }
+        .error { border-left-color: #dc3545; background: #f8d7da; }
+        .warning { border-left-color: #ffc107; background: #fff3cd; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        .log {
+            background: #000;
+            color: #0f0;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+        input {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 200px;
+        }
+        .table-info {
+            background: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Verificar Estructura de Tabla Supabase</h1>
+        <p>Este script te ayudará a verificar la estructura de la tabla de proyectos en Supabase.</p>
+        
+        <div class="step">
+            <h3>1. Autenticación</h3>
+            <input type="email" id="email" placeholder="Email" value="">
+            <input type="password" id="password" placeholder="Contraseña">
+            <button onclick="iniciarSesion()">Iniciar Sesión</button>
+            <button onclick="verificarUsuario()">Verificar Usuario</button>
+        </div>
+        
+        <div class="step">
+            <h3>2. Verificar Estructura de Tabla</h3>
+            <button onclick="verificarEstructuraProyectos()">Verificar Estructura de Proyectos</button>
+            <button onclick="verificarOrganizaciones()">Verificar Organizaciones</button>
+            <button onclick="crearProyectoPrueba()">Crear Proyecto de Prueba</button>
+        </div>
+        
+        <div class="step">
+            <h3>3. Información de la Tabla</h3>
+            <div id="tableInfo" class="table-info">
+                <p>Haz clic en "Verificar Estructura de Proyectos" para ver la información</p>
+            </div>
+        </div>
+        
+        <div class="step">
+            <h3>4. Log de Resultados</h3>
+            <button onclick="limpiarLog()">Limpiar Log</button>
+            <div id="log" class="log"></div>
+        </div>
+    </div>
+
+    <script>
+        // Configuración de Supabase
+        const SUPABASE_URL = 'https://ogqpsrsssrrytrqoyyph.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ncXBzcnNzc3JyeXRycW95eXBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc3Nzc5NjAsImV4cCI6MjA3MzM1Mzk2MH0.EqXjG1iefYMZ84Tw-4po98gBV7uRuPoz0idQgJ03pzg';
+        
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        let currentUser = null;
+        let currentOrganization = null;
+        
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? '#ff6b6b' : type === 'success' ? '#51cf66' : type === 'warning' ? '#ffd43b' : '#0f0';
+            logDiv.innerHTML += `<div style="color: ${color}">[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        function limpiarLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+        
+        async function verificarUsuario() {
+            try {
+                log('🔍 Verificando usuario actual...');
+                const { data: { user }, error } = await supabase.auth.getUser();
+                
+                if (error) {
+                    log(`❌ Error: ${error.message}`, 'error');
+                    return;
+                }
+                
+                if (user) {
+                    currentUser = user;
+                    log(`✅ Usuario autenticado: ${user.email}`, 'success');
+                    log(`   ID: ${user.id}`);
+                } else {
+                    log('⚠️ No hay usuario autenticado', 'warning');
+                }
+            } catch (error) {
+                log(`❌ Error general: ${error.message}`, 'error');
+            }
+        }
+        
+        async function iniciarSesion() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            if (!email || !password) {
+                log('❌ Por favor ingresa email y contraseña', 'error');
+                return;
+            }
+            
+            try {
+                log(`🔐 Iniciando sesión con ${email}...`);
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email,
+                    password
+                });
+                
+                if (error) {
+                    log(`❌ Error de autenticación: ${error.message}`, 'error');
+                    return;
+                }
+                
+                currentUser = data.user;
+                log(`✅ Sesión iniciada exitosamente`, 'success');
+                log(`   Usuario: ${data.user.email}`);
+                
+                await verificarOrganizaciones();
+                
+            } catch (error) {
+                log(`❌ Error general: ${error.message}`, 'error');
+            }
+        }
+        
+        async function verificarOrganizaciones() {
+            try {
+                log('🏢 Verificando organizaciones...');
+                const { data: organizations, error } = await supabase
+                    .from('organizations')
+                    .select('*');
+                
+                if (error) {
+                    log(`❌ Error accediendo a organizaciones: ${error.message}`, 'error');
+                    return;
+                }
+                
+                log(`✅ Organizaciones encontradas: ${organizations?.length || 0}`, 'success');
+                
+                if (organizations && organizations.length > 0) {
+                    organizations.forEach((org, index) => {
+                        log(`   ${index + 1}. ${org.name} (ID: ${org.id})`);
+                        log(`      Owner: ${org.owner_id}`);
+                    });
+                    
+                    // Buscar organización del usuario actual
+                    if (currentUser) {
+                        const userOrg = organizations.find(org => org.owner_id === currentUser.id);
+                        if (userOrg) {
+                            currentOrganization = userOrg;
+                            log(`✅ Organización del usuario encontrada: ${userOrg.name}`, 'success');
+                        } else {
+                            log('⚠️ No se encontró organización para el usuario actual', 'warning');
+                        }
+                    }
+                } else {
+                    log('⚠️ No hay organizaciones en la base de datos', 'warning');
+                }
+                
+            } catch (error) {
+                log(`❌ Error general: ${error.message}`, 'error');
+            }
+        }
+        
+        async function verificarEstructuraProyectos() {
+            try {
+                log('📋 Verificando estructura de tabla de proyectos...');
+                
+                // Intentar diferentes variaciones de la consulta
+                const queries = [
+                    { name: 'Consulta básica (sin filtros)', query: () => supabase.from('projects').select('*').limit(1) },
+                    { name: 'Con order by created_at', query: () => supabase.from('projects').select('*').order('created_at', { ascending: false }).limit(1) },
+                    { name: 'Con order by createdAt', query: () => supabase.from('projects').select('*').order('createdAt', { ascending: false }).limit(1) },
+                    { name: 'Con order by created_at (snake_case)', query: () => supabase.from('projects').select('*').order('created_at', { ascending: false }).limit(1) },
+                    { name: 'Solo count', query: () => supabase.from('projects').select('count') },
+                    { name: 'Con filtro organization_id', query: () => supabase.from('projects').select('*').eq('organization_id', currentOrganization?.id).limit(1) }
+                ];
+                
+                for (const { name, query } of queries) {
+                    try {
+                        log(`   Probando: ${name}...`);
+                        const { data, error } = await query();
+                        
+                        if (error) {
+                            log(`   ❌ ${name}: ${error.message}`, 'error');
+                        } else {
+                            log(`   ✅ ${name}: Éxito`, 'success');
+                            if (data && data.length > 0) {
+                                log(`      Datos encontrados: ${data.length}`);
+                                log(`      Estructura del primer registro:`);
+                                Object.keys(data[0]).forEach(key => {
+                                    log(`        - ${key}: ${typeof data[0][key]}`);
+                                });
+                            }
+                        }
+                    } catch (err) {
+                        log(`   ❌ ${name}: Error - ${err.message}`, 'error');
+                    }
+                }
+                
+                // Mostrar información de la tabla
+                const tableInfoDiv = document.getElementById('tableInfo');
+                tableInfoDiv.innerHTML = `
+                    <h4>Información de la Tabla de Proyectos</h4>
+                    <p><strong>Estado:</strong> Verificando estructura...</p>
+                    <p><strong>Usuario:</strong> ${currentUser ? currentUser.email : 'No autenticado'}</p>
+                    <p><strong>Organización:</strong> ${currentOrganization ? currentOrganization.name : 'No encontrada'}</p>
+                `;
+                
+            } catch (error) {
+                log(`❌ Error general: ${error.message}`, 'error');
+            }
+        }
+        
+        async function crearProyectoPrueba() {
+            if (!currentUser) {
+                log('❌ No hay usuario autenticado. Inicia sesión primero.', 'error');
+                return;
+            }
+            
+            if (!currentOrganization) {
+                log('❌ No hay organización. Crea una organización primero.', 'error');
+                return;
+            }
+            
+            try {
+                log('📋 Creando proyecto de prueba...');
+                
+                // Intentar diferentes estructuras de proyecto
+                const projectVariations = [
+                    {
+                        name: 'Variación 1 (camelCase)',
+                        data: {
+                            id: `test-${Date.now()}`,
+                            name: 'Proyecto de Prueba',
+                            description: 'Proyecto creado para verificar la conexión',
+                            status: 'active',
+                            priority: 'medium',
+                            startDate: new Date().toISOString().split('T')[0],
+                            endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                            budget: 50000,
+                            manager: currentUser.email,
+                            sponsor: 'Sistema',
+                            organization_id: currentOrganization.id,
+                            owner_id: currentUser.id,
+                            createdAt: new Date().toISOString(),
+                            updatedAt: new Date().toISOString()
+                        }
+                    },
+                    {
+                        name: 'Variación 2 (snake_case)',
+                        data: {
+                            id: `test-${Date.now()}`,
+                            name: 'Proyecto de Prueba 2',
+                            description: 'Proyecto creado para verificar la conexión',
+                            status: 'active',
+                            priority: 'medium',
+                            start_date: new Date().toISOString().split('T')[0],
+                            end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                            budget: 50000,
+                            manager: currentUser.email,
+                            sponsor: 'Sistema',
+                            organization_id: currentOrganization.id,
+                            owner_id: currentUser.id,
+                            created_at: new Date().toISOString(),
+                            updated_at: new Date().toISOString()
+                        }
+                    }
+                ];
+                
+                for (const variation of projectVariations) {
+                    try {
+                        log(`   Probando: ${variation.name}...`);
+                        const { data: newProject, error } = await supabase
+                            .from('projects')
+                            .insert(variation.data)
+                            .select('*')
+                            .single();
+                        
+                        if (error) {
+                            log(`   ❌ ${variation.name}: ${error.message}`, 'error');
+                        } else {
+                            log(`   ✅ ${variation.name}: Éxito`, 'success');
+                            log(`      Proyecto creado: ${newProject.name} (ID: ${newProject.id})`);
+                            break; // Si una variación funciona, no probar las demás
+                        }
+                    } catch (err) {
+                        log(`   ❌ ${variation.name}: Error - ${err.message}`, 'error');
+                    }
+                }
+                
+            } catch (error) {
+                log(`❌ Error general: ${error.message}`, 'error');
+            }
+        }
+        
+        // Verificar usuario al cargar la página
+        window.onload = function() {
+            verificarUsuario();
+        };
+    </script>
+</body>
+</html>

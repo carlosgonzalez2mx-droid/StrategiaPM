@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Probar Guardado de Riesgos - Versión Simple</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #333;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+        }
+        .test-section h3 {
+            margin-top: 0;
+            color: #2c3e50;
+        }
+        .button {
+            background-color: #3498db;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        .button:hover {
+            background-color: #2980b9;
+        }
+        .button.success {
+            background-color: #27ae60;
+        }
+        .button.error {
+            background-color: #e74c3c;
+        }
+        .log {
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .input-group {
+            margin: 10px 0;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .input-group input, .input-group select, .input-group textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧪 Probar Guardado de Riesgos - Versión Simple</h1>
+            <p>Herramienta simplificada para probar el guardado de riesgos en Supabase</p>
+        </div>
+
+        <div class="test-section">
+            <h3>⚙️ Configuración de Supabase</h3>
+            <div id="configStatus" class="status info">
+                Configuración de Supabase requerida
+            </div>
+            <div class="input-group">
+                <label for="supabaseUrl">URL del Proyecto:</label>
+                <input type="text" id="supabaseUrl" placeholder="https://tu-proyecto.supabase.co">
+            </div>
+            <div class="input-group">
+                <label for="supabaseKey">Clave Anónima:</label>
+                <input type="text" id="supabaseKey" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+            </div>
+            <button class="button" onclick="saveConfig()">Guardar Configuración</button>
+            <button class="button" onclick="loadConfig()">Cargar Configuración</button>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Estado de la Conexión</h3>
+            <div id="connectionStatus" class="status info">
+                Verificando conexión a Supabase...
+            </div>
+            <button class="button" onclick="checkConnection()">Verificar Conexión</button>
+        </div>
+
+        <div class="test-section">
+            <h3>🧪 Probar Guardado de Riesgo</h3>
+            <div id="testStatus" class="status info">
+                Listo para probar guardado de riesgo
+            </div>
+            
+            <div class="input-group">
+                <label for="riskName">Nombre del Riesgo:</label>
+                <input type="text" id="riskName" value="Riesgo de Prueba" placeholder="Nombre del riesgo">
+            </div>
+            
+            <div class="input-group">
+                <label for="riskDescription">Descripción:</label>
+                <textarea id="riskDescription" rows="3" placeholder="Descripción del riesgo">Riesgo creado para probar el guardado en Supabase</textarea>
+            </div>
+            
+            <div class="input-group">
+                <label for="riskPriority">Prioridad:</label>
+                <select id="riskPriority">
+                    <option value="low">Baja</option>
+                    <option value="medium">Media</option>
+                    <option value="high" selected>Alta</option>
+                    <option value="critical">Crítica</option>
+                </select>
+            </div>
+            
+            <div class="input-group">
+                <label for="riskProbability">Probabilidad (0-1):</label>
+                <input type="number" id="riskProbability" value="0.7" min="0" max="1" step="0.1">
+            </div>
+            
+            <div class="input-group">
+                <label for="riskImpact">Impacto (0-1):</label>
+                <input type="number" id="riskImpact" value="0.8" min="0" max="1" step="0.1">
+            </div>
+            
+            <button class="button" onclick="testRiskSave()">Probar Guardado de Riesgo</button>
+            <button class="button" onclick="testRiskSaveMinimal()">Probar Guardado Mínimo</button>
+        </div>
+
+        <div class="test-section">
+            <h3>📋 Riesgos Existentes</h3>
+            <div id="risksStatus" class="status info">
+                Cargando riesgos...
+            </div>
+            <button class="button" onclick="loadRisks()">Cargar Riesgos</button>
+            <div id="risksList"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>📝 Log de Actividad</h3>
+            <div id="log" class="log"></div>
+            <button class="button" onclick="clearLog()">Limpiar Log</button>
+        </div>
+    </div>
+
+    <!-- Cargar la librería de Supabase desde CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <script>
+        // Configuración de Supabase
+        let SUPABASE_URL = 'https://your-project.supabase.co';
+        let SUPABASE_ANON_KEY = 'your-anon-key';
+        
+        let supabase;
+
+        // Guardar configuración
+        function saveConfig() {
+            const url = document.getElementById('supabaseUrl').value.trim();
+            const key = document.getElementById('supabaseKey').value.trim();
+            
+            if (!url || !key) {
+                alert('Por favor ingresa tanto la URL como la clave de Supabase');
+                return;
+            }
+            
+            SUPABASE_URL = url;
+            SUPABASE_ANON_KEY = key;
+            
+            // Guardar en localStorage
+            localStorage.setItem('supabase-config', JSON.stringify({ url, key }));
+            
+            document.getElementById('configStatus').className = 'status success';
+            document.getElementById('configStatus').textContent = '✅ Configuración guardada correctamente';
+            
+            log('✅ Configuración de Supabase guardada');
+            log(`   URL: ${url}`);
+        }
+
+        // Cargar configuración guardada
+        function loadConfig() {
+            const savedConfig = localStorage.getItem('supabase-config');
+            if (savedConfig) {
+                const config = JSON.parse(savedConfig);
+                if (config.url && config.key) {
+                    document.getElementById('supabaseUrl').value = config.url;
+                    document.getElementById('supabaseKey').value = config.key;
+                    
+                    document.getElementById('configStatus').className = 'status success';
+                    document.getElementById('configStatus').textContent = '✅ Configuración cargada desde el almacenamiento local';
+                    
+                    log('✅ Configuración cargada desde localStorage');
+                } else {
+                    document.getElementById('configStatus').className = 'status warning';
+                    document.getElementById('configStatus').textContent = '⚠️ No hay configuración válida guardada';
+                }
+            } else {
+                document.getElementById('configStatus').className = 'status warning';
+                document.getElementById('configStatus').textContent = '⚠️ No hay configuración guardada';
+            }
+        }
+
+        // Inicializar Supabase
+        async function initSupabase() {
+            try {
+                // Verificar que la librería de Supabase esté cargada
+                if (typeof window.supabase === 'undefined') {
+                    throw new Error('La librería de Supabase no está cargada. Verifica la conexión a internet.');
+                }
+
+                // Cargar desde el localStorage si está disponible
+                const savedConfig = localStorage.getItem('supabase-config');
+                if (savedConfig) {
+                    const config = JSON.parse(savedConfig);
+                    if (config.url && config.key) {
+                        SUPABASE_URL = config.url;
+                        SUPABASE_ANON_KEY = config.key;
+                    }
+                }
+
+                // Si no hay configuración guardada, mostrar mensaje
+                if (SUPABASE_URL === 'https://your-project.supabase.co' || SUPABASE_ANON_KEY === 'your-anon-key') {
+                    document.getElementById('configStatus').className = 'status warning';
+                    document.getElementById('configStatus').textContent = '⚠️ Configuración de Supabase requerida. Usa el formulario de arriba.';
+                    return false;
+                }
+
+                // Crear cliente Supabase
+                supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                log('✅ Supabase inicializado correctamente');
+                log(`   URL: ${SUPABASE_URL}`);
+                return true;
+            } catch (error) {
+                log('❌ Error inicializando Supabase: ' + error.message);
+                return false;
+            }
+        }
+
+        // Verificar conexión
+        async function checkConnection() {
+            const statusDiv = document.getElementById('connectionStatus');
+            statusDiv.className = 'status info';
+            statusDiv.textContent = 'Verificando conexión...';
+            
+            try {
+                if (!supabase) {
+                    await initSupabase();
+                }
+
+                // Intentar obtener datos de la tabla projects
+                const { data, error } = await supabase
+                    .from('projects')
+                    .select('id, name')
+                    .limit(1);
+
+                if (error) {
+                    throw error;
+                }
+
+                statusDiv.className = 'status success';
+                statusDiv.textContent = '✅ Conexión exitosa a Supabase';
+                log('✅ Conexión verificada correctamente');
+                return true;
+            } catch (error) {
+                statusDiv.className = 'status error';
+                statusDiv.textContent = '❌ Error de conexión: ' + error.message;
+                log('❌ Error de conexión: ' + error.message);
+                return false;
+            }
+        }
+
+        // Probar guardado de riesgo completo
+        async function testRiskSave() {
+            const statusDiv = document.getElementById('testStatus');
+            statusDiv.className = 'status info';
+            statusDiv.textContent = 'Probando guardado de riesgo completo...';
+            
+            try {
+                if (!supabase) {
+                    await initSupabase();
+                }
+
+                const riskName = document.getElementById('riskName').value || 'Riesgo de Prueba';
+                const riskDescription = document.getElementById('riskDescription').value || 'Descripción del riesgo';
+                const riskPriority = document.getElementById('riskPriority').value || 'high';
+                const riskProbability = parseFloat(document.getElementById('riskProbability').value) || 0.7;
+                const riskImpact = parseFloat(document.getElementById('riskImpact').value) || 0.8;
+
+                // Crear un riesgo de prueba con todas las columnas
+                const testRisk = {
+                    id: `test-risk-${Date.now()}`,
+                    project_id: 'demo-001',
+                    name: riskName,
+                    description: riskDescription,
+                    code: `TEST-${Date.now()}`,
+                    category: 'technical',
+                    phase: 'planning',
+                    probability: riskProbability,
+                    impact: riskImpact,
+                    risk_score: riskProbability * riskImpact,
+                    priority: riskPriority,
+                    status: 'active',
+                    owner: 'Sistema de Pruebas',
+                    identified_date: new Date().toISOString().split('T')[0],
+                    review_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                    response: 'mitigate',
+                    response_plan: 'Implementar medidas preventivas',
+                    contingency_plan: 'Plan de contingencia activado',
+                    trigger_conditions: 'Condiciones de activación',
+                    cost_impact: 50000,
+                    schedule_impact: 30,
+                    residual_probability: 0.3,
+                    residual_impact: 0.4,
+                    monitoring_frequency: 'weekly',
+                    early_warnings: [],
+                    actual_occurred: false,
+                    stakeholders: [],
+                    assumptions: [],
+                    constraints: [],
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                };
+
+                log('🧪 Intentando guardar riesgo completo...');
+                log(`   Nombre: ${testRisk.name}`);
+                log(`   Prioridad: ${testRisk.priority}`);
+                log(`   Probabilidad: ${testRisk.probability}`);
+                log(`   Impacto: ${testRisk.impact}`);
+
+                // Guardar en Supabase
+                const { data, error } = await supabase
+                    .from('risks')
+                    .insert([testRisk])
+                    .select();
+
+                if (error) {
+                    throw error;
+                }
+
+                statusDiv.className = 'status success';
+                statusDiv.textContent = '✅ Riesgo guardado exitosamente (completo)';
+                log('✅ Riesgo de prueba guardado correctamente (completo)');
+                log(`   ID: ${data[0].id}`);
+                log(`   Nombre: ${testRisk.name}`);
+                
+                // Recargar la lista de riesgos
+                await loadRisks();
+                
+            } catch (error) {
+                statusDiv.className = 'status error';
+                statusDiv.textContent = '❌ Error guardando riesgo: ' + error.message;
+                log('❌ Error guardando riesgo: ' + error.message);
+                log('   Detalles: ' + JSON.stringify(error, null, 2));
+            }
+        }
+
+        // Probar guardado de riesgo mínimo
+        async function testRiskSaveMinimal() {
+            const statusDiv = document.getElementById('testStatus');
+            statusDiv.className = 'status info';
+            statusDiv.textContent = 'Probando guardado de riesgo mínimo...';
+            
+            try {
+                if (!supabase) {
+                    await initSupabase();
+                }
+
+                const riskName = document.getElementById('riskName').value || 'Riesgo Mínimo';
+
+                // Crear un riesgo de prueba con solo campos básicos
+                const testRisk = {
+                    id: `test-minimal-${Date.now()}`,
+                    project_id: 'demo-001',
+                    name: riskName,
+                    description: 'Riesgo mínimo para probar',
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                };
+
+                log('🧪 Intentando guardar riesgo mínimo...');
+                log(`   Nombre: ${testRisk.name}`);
+                log(`   Campos: ${Object.keys(testRisk).join(', ')}`);
+
+                // Guardar en Supabase
+                const { data, error } = await supabase
+                    .from('risks')
+                    .insert([testRisk])
+                    .select();
+
+                if (error) {
+                    throw error;
+                }
+
+                statusDiv.className = 'status success';
+                statusDiv.textContent = '✅ Riesgo guardado exitosamente (mínimo)';
+                log('✅ Riesgo de prueba guardado correctamente (mínimo)');
+                log(`   ID: ${data[0].id}`);
+                log(`   Nombre: ${testRisk.name}`);
+                
+                // Recargar la lista de riesgos
+                await loadRisks();
+                
+            } catch (error) {
+                statusDiv.className = 'status error';
+                statusDiv.textContent = '❌ Error guardando riesgo mínimo: ' + error.message;
+                log('❌ Error guardando riesgo mínimo: ' + error.message);
+                log('   Detalles: ' + JSON.stringify(error, null, 2));
+            }
+        }
+
+        // Cargar riesgos
+        async function loadRisks() {
+            const statusDiv = document.getElementById('risksStatus');
+            const risksListDiv = document.getElementById('risksList');
+            
+            statusDiv.className = 'status info';
+            statusDiv.textContent = 'Cargando riesgos...';
+            
+            try {
+                if (!supabase) {
+                    await initSupabase();
+                }
+
+                // Obtener riesgos del proyecto demo
+                const { data: risks, error } = await supabase
+                    .from('risks')
+                    .select('*')
+                    .eq('project_id', 'demo-001')
+                    .order('created_at', { ascending: false });
+
+                if (error) {
+                    throw error;
+                }
+
+                statusDiv.className = 'status success';
+                statusDiv.textContent = `✅ Cargados ${risks.length} riesgos`;
+                
+                // Mostrar riesgos
+                risksListDiv.innerHTML = '';
+                if (risks.length === 0) {
+                    risksListDiv.innerHTML = '<p>No hay riesgos en este proyecto</p>';
+                } else {
+                    risks.forEach(risk => {
+                        const riskDiv = document.createElement('div');
+                        riskDiv.style.cssText = 'background: white; padding: 15px; margin: 10px 0; border-left: 4px solid #3498db; border-radius: 0 5px 5px 0;';
+                        riskDiv.innerHTML = `
+                            <h4>${risk.name || 'Sin nombre'}</h4>
+                            <p><strong>ID:</strong> ${risk.id}</p>
+                            <p><strong>Proyecto:</strong> ${risk.project_id}</p>
+                            <p><strong>Prioridad:</strong> ${risk.priority || 'No definida'}</p>
+                            <p><strong>Probabilidad:</strong> ${risk.probability || 'No definida'}</p>
+                            <p><strong>Impacto:</strong> ${risk.impact || 'No definido'}</p>
+                            <p><strong>Estado:</strong> ${risk.status || 'No definido'}</p>
+                            <p><strong>Creado:</strong> ${new Date(risk.created_at).toLocaleString()}</p>
+                        `;
+                        risksListDiv.appendChild(riskDiv);
+                    });
+                }
+
+                log(`✅ Cargados ${risks.length} riesgos del proyecto demo-001`);
+                return risks;
+            } catch (error) {
+                statusDiv.className = 'status error';
+                statusDiv.textContent = '❌ Error cargando riesgos: ' + error.message;
+                log('❌ Error cargando riesgos: ' + error.message);
+                return [];
+            }
+        }
+
+        // Función de logging
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${timestamp}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        // Limpiar log
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        // Inicializar al cargar la página
+        window.onload = async function() {
+            log('🚀 Iniciando prueba de guardado de riesgos...');
+            
+            // Cargar configuración guardada si existe
+            loadConfig();
+            
+            // Intentar inicializar Supabase
+            await initSupabase();
+        };
+    </script>
+</body>
+</html>

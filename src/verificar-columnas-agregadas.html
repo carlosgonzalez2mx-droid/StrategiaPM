@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Verificar Columnas Agregadas</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h2>Verificar Columnas Agregadas</h2>
+    <button onclick="verificarColumnas()">Verificar Columnas</button>
+    <div id="resultado"></div>
+
+    <script>
+        const supabaseUrl = 'https://ogqpsrsssrrytrqoyyph.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ncXBzcnNzc3JyeXRycW95eXBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc3Nzc5NjAsImV4cCI6MjA3MzM1Mzk2MH0.EqXjG1iefYMZ84Tw-4po98gBV7uRuPoz0idQgJ03pzg';
+
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        async function verificarColumnas() {
+            try {
+                const { data, error } = await supabase
+                    .from('projects')
+                    .select('*')
+                    .limit(1);
+
+                if (error) {
+                    document.getElementById('resultado').innerHTML = `
+                        <h3>Error:</h3>
+                        <pre>${JSON.stringify(error, null, 2)}</pre>
+                    `;
+                    return;
+                }
+
+                if (data && data.length > 0) {
+                    const campos = Object.keys(data[0]);
+                    const camposEsperados = [
+                        'sponsor', 'objective', 'business_case', 'irr', 'roi',
+                        'contingency_reserve', 'management_reserve', 'kickoff_date',
+                        'stakeholders', 'team', 'progress', 'version'
+                    ];
+                    
+                    const camposFaltantes = camposEsperados.filter(campo => !campos.includes(campo));
+                    const camposAgregados = camposEsperados.filter(campo => campos.includes(campo));
+
+                    document.getElementById('resultado').innerHTML = `
+                        <h3>Estado de las Columnas:</h3>
+                        <h4>✅ Columnas Agregadas (${camposAgregados.length}):</h4>
+                        <ul>
+                            ${camposAgregados.map(campo => `<li style="color: green;">${campo}</li>`).join('')}
+                        </ul>
+                        ${camposFaltantes.length > 0 ? `
+                        <h4>❌ Columnas Faltantes (${camposFaltantes.length}):</h4>
+                        <ul>
+                            ${camposFaltantes.map(campo => `<li style="color: red;">${campo}</li>`).join('')}
+                        </ul>
+                        ` : '<h4 style="color: green;">¡Todas las columnas están presentes!</h4>'}
+                        <h4>📋 Todos los Campos Disponibles:</h4>
+                        <ul>
+                            ${campos.map(campo => `<li>${campo}</li>`).join('')}
+                        </ul>
+                    `;
+                } else {
+                    document.getElementById('resultado').innerHTML = '<p>No hay datos en la tabla projects</p>';
+                }
+            } catch (err) {
+                document.getElementById('resultado').innerHTML = `
+                    <h3>Error de conexión:</h3>
+                    <p>${err.message}</p>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

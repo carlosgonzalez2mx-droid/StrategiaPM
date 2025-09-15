@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verificador de Conexión Supabase</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .step {
+            margin: 20px 0;
+            padding: 15px;
+            border-left: 4px solid #007bff;
+            background: #f8f9fa;
+        }
+        .success { border-left-color: #28a745; background: #d4edda; }
+        .error { border-left-color: #dc3545; background: #f8d7da; }
+        .warning { border-left-color: #ffc107; background: #fff3cd; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        .log {
+            background: #000;
+            color: #0f0;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+        input {
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 200px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Verificador de Conexión Supabase</h1>
+        <p>Este script te ayudará a diagnosticar y solucionar problemas de conexión con Supabase.</p>
+        
+        <div class="step">
+            <h3>1. Configuración de Supabase</h3>
+            <p>URL: <code>https://ogqpsrsssrrytrqoyyph.supabase.co</code></p>
+            <p>Clave: <code>eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...</code></p>
+        </div>
+        
+        <div class="step">
+            <h3>2. Autenticación</h3>
+            <input type="email" id="email" placeholder="Email" value="">
+            <input type="password" id="password" placeholder="Contraseña">
+            <button onclick="iniciarSesion()">Iniciar Sesión</button>
+            <button onclick="registrarUsuario()">Registrar Usuario</button>
+            <button onclick="verificarUsuario()">Verificar Usuario Actual</button>
+        </div>
+        
+        <div class="step">
+            <h3>3. Verificación de Datos</h3>
+            <button onclick="verificarOrganizaciones()">Verificar Organizaciones</button>
+            <button onclick="verificarProyectos()">Verificar Proyectos</button>
+            <button onclick="verificarProyectosUsuario()">Verificar Proyectos del Usuario</button>
+        </div>
+        
+        <div class="step">
+            <h3>4. Solución de Problemas</h3>
+            <button onclick="crearOrganizacion()">Crear Organización</button>
+            <button onclick="crearProyectoPrueba()">Crear Proyecto de Prueba</button>
+            <button onclick="sincronizarDatos()">Sincronizar Datos</button>
+        </div>
+        
+        <div class="step">
+            <h3>5. Log de Resultados</h3>
+            <button onclick="limpiarLog()">Limpiar Log</button>
+            <div id="log" class="log"></div>
+        </div>
+    </div>
+
+    <script>
+        // Configuración de Supabase
+        const SUPABASE_URL = 'https://ogqpsrsssrrytrqoyyph.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ncXBzcnNzc3JyeXRycW95eXBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc3Nzc5NjAsImV4cCI6MjA3MzM1Mzk2MH0.EqXjG1iefYMZ84Tw-4po98gBV7uRuPoz0idQgJ03pzg';
+        
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        let currentUser = null;
+        let currentOrganization = null;
+        
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? '#ff6b6b' : type === 'success' ? '#51cf66' : type === 'warning' ? '#ffd43b' : '#0f0';
+            logDiv.innerHTML += `<div style="color: ${color}">[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+        
+        function limpiarLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+        
+        async function verificarUsuario() {
+            try {
+                log('🔍 Verificando usuario actual...');
+                const { data: { user }, error } = await supabase.auth.getUser();
+                
+                if (error) {
+                    log(`❌ Error: ${error.message}`, 'error');
+                    return;
+                }
+                
+                if (user) {
+                    currentUser = user;
+                    log(`✅ Usuario autenticado: ${user.email}`, 'success');
+                    log(`   ID: ${user.id}`);
+                    log(`   Creado: ${new Date(user.created_at).toLocaleString()}`);
+                } else {
+                    log('⚠️ No hay usuario autenticado', 'warning');
+                }
+            } catch (error) {
+                log(`❌ Error general: ${error.message}`, 'error');
+            }
+        }
+        
+        async function iniciarSesion() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            if (!email || !password) {
+                log('❌ Por favor ingresa email y contraseña', 'error');
+                return;
+            }
+            
+            try {
+                log(`🔐 Iniciando sesión con ${email}...`);
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email,
+                    password
+                });
+                
+                if (error) {
+                    log(`❌ Error de autenticación: ${error.message}`, 'error');
+                    return;
+                }
+                
+                currentUser = data.user;
+                log(`✅ Sesión iniciada exitosamente`, 'success');
+                log(`   Usuario: ${data.user.email}`);
+                log(`   ID: ${data.user.id}`);
+                
+                // Verificar organización después del login
+                await verificarOrganizaciones();
+                
+            } catch (error) {
+                log(`❌ Error general: ${error.message}`, 'error');
+            }
+        }
+        
+        async function registrarUsuario() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            if (!email || !password) {
+                log('❌ Por favor ingresa email y contraseña', 'error');
+                return;
+            }
+            
+            try {
+                log(`📝 Registrando usuario ${email}...`);
+                const { data, error } = await supabase.auth.signUp({
+                    email,
+                    password,
+                    options: {
+                        data: {
+                            name: email.split('@')[0]
+                        }
+                    }
+                });
+                
+                if (error) {
+                    log(`❌ Error de registro: ${error.message}`, 'error');
+                    return;
+                }
+                
+                log(`✅ Usuario registrado exitosamente`, 'success');
+                log(`   Email: ${data.user.email}`);
+                log(`   ID: ${data.user.id}`);
+                log(`   Verifica tu email para activar la cuenta`);
+                
+            } catch (error) {
+                log(`❌ Error general: ${error.message}`, 'error');
+            }
+        }
+        
+        async function verificarOrganizaciones() {
+            try {
+                log('🏢 Verificando organizaciones...');
+                const { data: organizations, error } = await supabase
+                    .from('organizations')
+                    .select('*');
+                
+                if (error) {
+                    log(`❌ Error accediendo a organizaciones: ${error.message}`, 'error');
+                    return;
+                }
+                
+                log(`✅ Organizaciones encontradas: ${organizations?.length || 0}`, 'success');
+                
+                if (organizations && organizations.length > 0) {
+                    organizations.forEach((org, index) => {
+                        log(`   ${index + 1}. ${org.name} (ID: ${org.id})`);
+                        log(`      Owner: ${org.owner_id}`);
+                        log(`      Creado: ${new Date(org.created_at).toLocaleString()}`);
+                    });
+                    
+                    // Buscar organización del usuario actual
+                    if (currentUser) {
+                        const userOrg = organizations.find(org => org.owner_id === currentUser.id);
+                        if (userOrg) {
+                            currentOrganization = userOrg;
+                            log(`✅ Organización del usuario encontrada: ${userOrg.name}`, 'success');
+                        } else {
+                            log('⚠️ No se encontró organización para el usuario actual', 'warning');
+                        }
+                    }
+                } else {
+                    log('⚠️ No hay organizaciones en la base de datos', 'warning');
+                }
+                
+            } catch (error) {
+                log(`❌ Error general: ${error.message}`, 'error');
+            }
+        }
+        
+        async function verificarProyectos() {
+            try {
+                log('📋 Verificando todos los proyectos...');
+                const { data: projects, error } = await supabase
+                    .from('projects')
+                    .select('*');
+                
+                if (error) {
+                    log(`❌ Error accediendo a proyectos: ${error.message}`, 'error');
+                    return;
+                }
+                
+                log(`✅ Proyectos encontrados: ${projects?.length || 0}`, 'success');
+                
+                if (projects && projects.length > 0) {
+                    projects.forEach((project, index) => {
+                        log(`   ${index + 1}. ${project.name}`);
+                        log(`      - ID: ${project.id}`);
+                        log(`      - Organización: ${project.organization_id}`);
+                        log(`      - Owner: ${project.owner_id}`);
+                        log(`      - Estado: ${project.status}`);
+                        log(`      - Presupuesto: $${project.budget}`);
+                        log(`      - Creado: ${new Date(project.created_at).toLocaleString()}`);
+                    });
+                } else {
+                    log('⚠️ No hay proyectos en la base de datos', 'warning');
+                }
+                
+            } catch (error) {
+                log(`❌ Error general: ${error.message}`, 'error');
+            }
+        }
+        
+        async function verificarProyectosUsuario() {
+            if (!currentUser) {
+                log('❌ No hay usuario autenticado. Inicia sesión primero.', 'error');
+                return;
+            }
+            
+            try {
+                log('👤 Verificando proyectos del usuario actual...');
+                
+                // Buscar organización del usuario
+                const { data: userOrg, error: orgError } = await supabase
+                    .from('organizations')
+                    .select('id')
+                    .eq('owner_id', currentUser.id)
+                    .single();
+                
+                if (orgError) {
+                    log(`❌ Error buscando organización: ${orgError.message}`, 'error');
+                    return;
+                }
+                
+                if (!userOrg) {
+                    log('⚠️ No se encontró organización para el usuario', 'warning');
+                    return;
+                }
+                
+                // Buscar proyectos de la organización
+                const { data: userProjects, error: projectsError } = await supabase
+                    .from('projects')
+                    .select('*')
+                    .eq('organization_id', userOrg.id);
+                
+                if (projectsError) {
+                    log(`❌ Error buscando proyectos: ${projectsError.message}`, 'error');
+                    return;
+                }
+                
+                log(`✅ Proyectos del usuario: ${userProjects?.length || 0}`, 'success');
+                
+                if (userProjects && userProjects.length > 0) {
+                    userProjects.forEach((project, index) => {
+                        log(`   ${index + 1}. ${project.name}`);
+                        log(`      - ID: ${project.id}`);
+                        log(`      - Estado: ${project.status}`);
+                        log(`      - Presupuesto: $${project.budget}`);
+                    });
+                } else {
+                    log('⚠️ No hay proyectos para este usuario', 'warning');
+                }
+                
+            } catch (error) {
+                log(`❌ Error general: ${error.message}`, 'error');
+            }
+        }
+        
+        async function crearOrganizacion() {
+            if (!currentUser) {
+                log('❌ No hay usuario autenticado. Inicia sesión primero.', 'error');
+                return;
+            }
+            
+            try {
+                log('🏢 Creando organización para el usuario...');
+                
+                const { data: newOrg, error } = await supabase
+                    .from('organizations')
+                    .insert({
+                        name: `${currentUser.email.split('@')[0]}'s Organization`,
+                        owner_id: currentUser.id
+                    })
+                    .select('*')
+                    .single();
+                
+                if (error) {
+                    log(`❌ Error creando organización: ${error.message}`, 'error');
+                    return;
+                }
+                
+                currentOrganization = newOrg;
+                log(`✅ Organización creada exitosamente`, 'success');
+                log(`   Nombre: ${newOrg.name}`);
+                log(`   ID: ${newOrg.id}`);
+                
+            } catch (error) {
+                log(`❌ Error general: ${error.message}`, 'error');
+            }
+        }
+        
+        async function crearProyectoPrueba() {
+            if (!currentUser || !currentOrganization) {
+                log('❌ No hay usuario autenticado o organización. Crea una organización primero.', 'error');
+                return;
+            }
+            
+            try {
+                log('📋 Creando proyecto de prueba...');
+                
+                const testProject = {
+                    id: `test-${Date.now()}`,
+                    name: 'Proyecto de Prueba',
+                    description: 'Proyecto creado para verificar la conexión',
+                    status: 'active',
+                    priority: 'medium',
+                    start_date: new Date().toISOString().split('T')[0],
+                    end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                    budget: 50000,
+                    manager: currentUser.email,
+                    sponsor: 'Sistema',
+                    organization_id: currentOrganization.id,
+                    owner_id: currentUser.id,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                };
+                
+                const { data: newProject, error } = await supabase
+                    .from('projects')
+                    .insert(testProject)
+                    .select('*')
+                    .single();
+                
+                if (error) {
+                    log(`❌ Error creando proyecto: ${error.message}`, 'error');
+                    return;
+                }
+                
+                log(`✅ Proyecto de prueba creado exitosamente`, 'success');
+                log(`   Nombre: ${newProject.name}`);
+                log(`   ID: ${newProject.id}`);
+                log(`   Estado: ${newProject.status}`);
+                
+            } catch (error) {
+                log(`❌ Error general: ${error.message}`, 'error');
+            }
+        }
+        
+        async function sincronizarDatos() {
+            if (!currentUser) {
+                log('❌ No hay usuario autenticado. Inicia sesión primero.', 'error');
+                return;
+            }
+            
+            try {
+                log('🔄 Sincronizando datos...');
+                
+                // Verificar organización
+                await verificarOrganizaciones();
+                
+                // Verificar proyectos
+                await verificarProyectosUsuario();
+                
+                log('✅ Sincronización completada', 'success');
+                log('💡 Ahora recarga tu aplicación para ver los cambios');
+                
+            } catch (error) {
+                log(`❌ Error general: ${error.message}`, 'error');
+            }
+        }
+        
+        // Verificar usuario al cargar la página
+        window.onload = function() {
+            verificarUsuario();
+        };
+    </script>
+</body>
+</html>

@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧹 Limpiar Duplicados en Supabase</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+        }
+        .container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            background: #f8f9fa;
+        }
+        .section h3 {
+            color: #34495e;
+            margin-top: 0;
+        }
+        button {
+            background: linear-gradient(45deg, #e74c3c, #c0392b);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(231, 76, 60, 0.3);
+        }
+        .success {
+            background: linear-gradient(45deg, #27ae60, #229954);
+        }
+        .warning {
+            background: linear-gradient(45deg, #f39c12, #e67e22);
+        }
+        .info {
+            background: linear-gradient(45deg, #3498db, #2980b9);
+        }
+        .result {
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+            font-size: 11px;
+        }
+        .success-result {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error-result {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info-result {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .warning-result {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .stat-number {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #e74c3c;
+        }
+        .stat-label {
+            color: #7f8c8d;
+            margin-top: 5px;
+        }
+        .project-list {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 10px;
+            background: white;
+        }
+        .project-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .project-item:last-child {
+            border-bottom: none;
+        }
+        .duplicate-count {
+            background: #e74c3c;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧹 Limpiar Duplicados en Supabase</h1>
+        
+        <div class="stats" id="stats">
+            <!-- Las estadísticas se llenarán dinámicamente -->
+        </div>
+
+        <div class="section">
+            <h3>🔍 Análisis de Duplicados</h3>
+            <button onclick="analyzeDuplicates()" class="info">📊 Analizar Duplicados</button>
+            <button onclick="getProjectList()" class="warning">📁 Listar Proyectos</button>
+            <button onclick="checkSupabaseConnection()" class="success">🔗 Verificar Conexión</button>
+        </div>
+
+        <div class="section">
+            <h3>🧹 Limpieza de Duplicados</h3>
+            <button onclick="cleanAllDuplicates()" class="error">🗑️ Limpiar Todos los Duplicados</button>
+            <button onclick="cleanProjectDuplicates()" class="warning">📁 Limpiar por Proyecto</button>
+            <button onclick="backupBeforeCleanup()" class="info">💾 Crear Backup Antes</button>
+        </div>
+
+        <div class="section">
+            <h3>📁 Proyectos Detectados</h3>
+            <div id="projectList" class="project-list">
+                Haz clic en "Listar Proyectos" para ver los proyectos...
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>📝 Resultados</h3>
+            <div id="results" class="result info-result">
+                Haz clic en "Analizar Duplicados" para comenzar...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuración de Supabase
+        const SUPABASE_URL = 'https://ogqpsrsssrrytrqoyyph.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ncXBzcnNzc3JyeXRycW95eXBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc3Nzc5NjAsImV4cCI6MjA3MzM1Mzk2MH0.EqXjG1iefYMZ84Tw-4po98gBV7uRuPoz0idQgJ03pzg';
+        
+        let supabase = null;
+        let currentUser = null;
+        let organizationId = null;
+        let projects = [];
+        let duplicatesFound = 0;
+        let totalTasks = 0;
+
+        // Inicializar Supabase
+        async function initializeSupabase() {
+            try {
+                const { createClient } = await import('https://cdn.skypack.dev/@supabase/supabase-js');
+                supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                
+                const { data: { user } } = await supabase.auth.getUser();
+                currentUser = user;
+                
+                if (user) {
+                    console.log('✅ Usuario autenticado:', user.email);
+                    await loadOrganization();
+                    return true;
+                } else {
+                    console.warn('⚠️ No hay usuario autenticado');
+                    return false;
+                }
+            } catch (error) {
+                console.error('❌ Error inicializando Supabase:', error);
+                return false;
+            }
+        }
+
+        // Cargar organización
+        async function loadOrganization() {
+            if (!currentUser) return null;
+            
+            try {
+                const { data: organization, error } = await supabase
+                    .from('organizations')
+                    .select('id')
+                    .eq('owner_id', currentUser.id)
+                    .single();
+                
+                if (error) {
+                    console.error('❌ Error cargando organización:', error);
+                    return null;
+                }
+                
+                organizationId = organization.id;
+                console.log('✅ Organización cargada:', organizationId);
+                return organization.id;
+            } catch (error) {
+                console.error('❌ Error cargando organización:', error);
+                return null;
+            }
+        }
+
+        // Verificar conexión a Supabase
+        async function checkSupabaseConnection() {
+            const results = document.getElementById('results');
+            results.className = 'result info-result';
+            results.textContent = '🔗 Verificando conexión a Supabase...';
+
+            try {
+                if (!supabase) {
+                    const initialized = await initializeSupabase();
+                    if (!initialized) {
+                        results.className = 'result error-result';
+                        results.textContent = '❌ No se pudo inicializar Supabase';
+                        return;
+                    }
+                }
+
+                // Verificar conexión
+                const { data, error } = await supabase
+                    .from('projects')
+                    .select('count')
+                    .limit(1);
+
+                if (error) {
+                    results.className = 'result error-result';
+                    results.textContent = `❌ Error de conexión: ${error.message}`;
+                } else {
+                    results.className = 'result success-result';
+                    results.textContent = `✅ Conexión exitosa a Supabase\n`;
+                    results.textContent += `👤 Usuario: ${currentUser?.email || 'No autenticado'}\n`;
+                    results.textContent += `🏢 Organización: ${organizationId || 'No encontrada'}\n`;
+                    results.textContent += `📊 Estado: Conectado y funcionando`;
+                }
+            } catch (error) {
+                results.className = 'result error-result';
+                results.textContent = `❌ Error verificando conexión: ${error.message}`;
+            }
+        }
+
+        // Obtener lista de proyectos
+        async function getProjectList() {
+            const results = document.getElementById('results');
+            const projectList = document.getElementById('projectList');
+            
+            results.className = 'result info-result';
+            results.textContent = '📁 Cargando proyectos...';
+
+            try {
+                if (!supabase) {
+                    await initializeSupabase();
+                }
+
+                const { data: projectsData, error } = await supabase
+                    .from('projects')
+                    .select('*')
+                    .order('name');
+
+                if (error) {
+                    results.className = 'result error-result';
+                    results.textContent = `❌ Error cargando proyectos: ${error.message}`;
+                    return;
+                }
+
+                projects = projectsData || [];
+                
+                if (projects.length === 0) {
+                    results.className = 'result warning-result';
+                    results.textContent = '⚠️ No se encontraron proyectos';
+                    projectList.innerHTML = 'No hay proyectos disponibles';
+                    return;
+                }
+
+                let projectListHTML = '';
+                let totalTasksCount = 0;
+                let totalDuplicatesCount = 0;
+
+                for (const project of projects) {
+                    // Contar tareas del proyecto
+                    const { data: tasks, error: tasksError } = await supabase
+                        .from('tasks')
+                        .select('id')
+                        .eq('project_id', project.id);
+
+                    if (tasksError) {
+                        console.warn(`Error contando tareas para ${project.name}:`, tasksError);
+                        continue;
+                    }
+
+                    const taskCount = tasks ? tasks.length : 0;
+                    totalTasksCount += taskCount;
+
+                    // Detectar duplicados
+                    const taskIds = new Set();
+                    const duplicates = [];
+                    if (tasks) {
+                        tasks.forEach(task => {
+                            if (taskIds.has(task.id)) {
+                                duplicates.push(task.id);
+                            } else {
+                                taskIds.add(task.id);
+                            }
+                        });
+                    }
+
+                    const duplicateCount = duplicates.length;
+                    totalDuplicatesCount += duplicateCount;
+
+                    projectListHTML += `
+                        <div class="project-item">
+                            <div>
+                                <strong>${project.name}</strong><br>
+                                <small>ID: ${project.id}</small><br>
+                                <small>Tareas: ${taskCount}</small>
+                            </div>
+                            <div>
+                                ${duplicateCount > 0 ? `<span class="duplicate-count">${duplicateCount} duplicados</span>` : '<span style="color: green;">✅ Sin duplicados</span>'}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                projectList.innerHTML = projectListHTML;
+
+                results.className = totalDuplicatesCount > 0 ? 'result error-result' : 'result success-result';
+                results.textContent = `📊 ANÁLISIS DE PROYECTOS COMPLETADO\n`;
+                results.textContent += `=====================================\n\n`;
+                results.textContent += `📁 Total proyectos: ${projects.length}\n`;
+                results.textContent += `📋 Total tareas: ${totalTasksCount}\n`;
+                results.textContent += `🔄 Total duplicados: ${totalDuplicatesCount}\n`;
+                results.textContent += `📈 Porcentaje duplicación: ${totalTasksCount > 0 ? ((totalDuplicatesCount / totalTasksCount) * 100).toFixed(2) : 0}%\n\n`;
+
+                if (totalDuplicatesCount > 0) {
+                    results.textContent += `🚨 DUPLICADOS DETECTADOS\n`;
+                    results.textContent += `Usa las herramientas de limpieza para resolverlos.`;
+                } else {
+                    results.textContent += `✅ NO SE DETECTARON DUPLICADOS`;
+                }
+
+                // Actualizar estadísticas
+                totalTasks = totalTasksCount;
+                duplicatesFound = totalDuplicatesCount;
+                updateStats();
+
+            } catch (error) {
+                results.className = 'result error-result';
+                results.textContent = `❌ Error obteniendo proyectos: ${error.message}`;
+            }
+        }
+
+        // Analizar duplicados en detalle
+        async function analyzeDuplicates() {
+            const results = document.getElementById('results');
+            results.className = 'result info-result';
+            results.textContent = '🔍 Analizando duplicados en detalle...';
+
+            try {
+                if (!supabase) {
+                    await initializeSupabase();
+                }
+
+                if (projects.length === 0) {
+                    await getProjectList();
+                }
+
+                let reportText = `🔍 ANÁLISIS DETALLADO DE DUPLICADOS\n`;
+                reportText += `====================================\n\n`;
+
+                let totalDuplicates = 0;
+                let totalTasks = 0;
+                const problematicProjects = [];
+
+                for (const project of projects) {
+                    const { data: tasks, error: tasksError } = await supabase
+                        .from('tasks')
+                        .select('id, name, created_at')
+                        .eq('project_id', project.id)
+                        .order('created_at');
+
+                    if (tasksError) {
+                        reportText += `❌ Error en proyecto ${project.name}: ${tasksError.message}\n\n`;
+                        continue;
+                    }
+
+                    const taskCount = tasks ? tasks.length : 0;
+                    totalTasks += taskCount;
+
+                    // Detectar duplicados por ID
+                    const taskIds = new Set();
+                    const duplicates = [];
+                    const duplicateDetails = [];
+
+                    if (tasks) {
+                        tasks.forEach(task => {
+                            if (taskIds.has(task.id)) {
+                                duplicates.push(task.id);
+                                duplicateDetails.push({
+                                    id: task.id,
+                                    name: task.name,
+                                    created_at: task.created_at
+                                });
+                            } else {
+                                taskIds.add(task.id);
+                            }
+                        });
+                    }
+
+                    const duplicateCount = duplicates.length;
+                    totalDuplicates += duplicateCount;
+
+                    reportText += `📁 ${project.name}\n`;
+                    reportText += `  • Total tareas: ${taskCount}\n`;
+                    reportText += `  • Duplicados: ${duplicateCount}\n`;
+
+                    if (duplicateCount > 0) {
+                        problematicProjects.push({
+                            project,
+                            duplicateCount,
+                            duplicateDetails
+                        });
+
+                        reportText += `  • IDs duplicados: ${duplicates.join(', ')}\n`;
+                        
+                        // Mostrar detalles de duplicados
+                        duplicateDetails.forEach(dup => {
+                            reportText += `    - ${dup.id}: ${dup.name} (${dup.created_at})\n`;
+                        });
+                    }
+
+                    reportText += `\n`;
+                }
+
+                reportText += `📊 RESUMEN GENERAL:\n`;
+                reportText += `• Total proyectos: ${projects.length}\n`;
+                reportText += `• Total tareas: ${totalTasks}\n`;
+                reportText += `• Total duplicados: ${totalDuplicates}\n`;
+                reportText += `• Proyectos con problemas: ${problematicProjects.length}\n`;
+                reportText += `• Porcentaje duplicación: ${totalTasks > 0 ? ((totalDuplicates / totalTasks) * 100).toFixed(2) : 0}%\n\n`;
+
+                if (problematicProjects.length > 0) {
+                    reportText += `🚨 PROYECTOS CON DUPLICADOS:\n`;
+                    problematicProjects.forEach(p => {
+                        reportText += `• ${p.project.name}: ${p.duplicateCount} duplicados\n`;
+                    });
+                    reportText += `\n`;
+                    reportText += `🔧 RECOMENDACIONES:\n`;
+                    reportText += `• Usar "Limpiar Todos los Duplicados" para resolver automáticamente\n`;
+                    reportText += `• O usar "Limpiar por Proyecto" para proyectos específicos\n`;
+                    reportText += `• Crear backup antes de limpiar\n`;
+                } else {
+                    reportText += `✅ NO SE DETECTARON DUPLICADOS\n`;
+                    reportText += `El sistema está limpio.`;
+                }
+
+                results.textContent = reportText;
+                results.className = totalDuplicates > 0 ? 'result error-result' : 'result success-result';
+
+                // Actualizar estadísticas
+                duplicatesFound = totalDuplicates;
+                updateStats();
+
+            } catch (error) {
+                results.className = 'result error-result';
+                results.textContent = `❌ Error analizando duplicados: ${error.message}`;
+            }
+        }
+
+        // Limpiar todos los duplicados
+        async function cleanAllDuplicates() {
+            const results = document.getElementById('results');
+            results.className = 'result warning-result';
+            results.textContent = '⚠️ ¿Estás seguro de que quieres limpiar TODOS los duplicados?\n\nEsto eliminará permanentemente las tareas duplicadas.\n\nPresiona "OK" para continuar o "Cancelar" para abortar.';
+
+            if (!confirm('⚠️ ¿Limpiar TODOS los duplicados? Esta acción no se puede deshacer.')) {
+                results.className = 'result info-result';
+                results.textContent = '❌ Operación cancelada por el usuario';
+                return;
+            }
+
+            results.className = 'result info-result';
+            results.textContent = '🧹 Limpiando duplicados...';
+
+            try {
+                if (!supabase) {
+                    await initializeSupabase();
+                }
+
+                if (projects.length === 0) {
+                    await getProjectList();
+                }
+
+                let totalCleaned = 0;
+                let totalErrors = 0;
+
+                for (const project of projects) {
+                    results.textContent += `\n📁 Procesando ${project.name}...`;
+
+                    const { data: tasks, error: tasksError } = await supabase
+                        .from('tasks')
+                        .select('*')
+                        .eq('project_id', project.id)
+                        .order('created_at');
+
+                    if (tasksError) {
+                        results.textContent += `\n❌ Error: ${tasksError.message}`;
+                        totalErrors++;
+                        continue;
+                    }
+
+                    if (!tasks || tasks.length === 0) {
+                        continue;
+                    }
+
+                    // Agrupar por ID y mantener solo la primera ocurrencia
+                    const taskMap = new Map();
+                    const duplicatesToDelete = [];
+
+                    tasks.forEach(task => {
+                        if (taskMap.has(task.id)) {
+                            duplicatesToDelete.push(task.id);
+                        } else {
+                            taskMap.set(task.id, task);
+                        }
+                    });
+
+                    // Eliminar duplicados
+                    for (const duplicateId of duplicatesToDelete) {
+                        const { error: deleteError } = await supabase
+                            .from('tasks')
+                            .delete()
+                            .eq('id', duplicateId);
+
+                        if (deleteError) {
+                            results.textContent += `\n❌ Error eliminando duplicado ${duplicateId}: ${deleteError.message}`;
+                            totalErrors++;
+                        } else {
+                            totalCleaned++;
+                        }
+                    }
+
+                    if (duplicatesToDelete.length > 0) {
+                        results.textContent += `\n✅ Limpiados ${duplicatesToDelete.length} duplicados`;
+                    }
+                }
+
+                results.className = totalErrors > 0 ? 'result warning-result' : 'result success-result';
+                results.textContent += `\n\n🎉 LIMPIEZA COMPLETADA\n`;
+                results.textContent += `• Duplicados eliminados: ${totalCleaned}\n`;
+                results.textContent += `• Errores: ${totalErrors}\n`;
+
+                // Actualizar estadísticas
+                duplicatesFound = 0;
+                updateStats();
+
+                // Recargar lista de proyectos
+                setTimeout(() => {
+                    getProjectList();
+                }, 1000);
+
+            } catch (error) {
+                results.className = 'result error-result';
+                results.textContent = `❌ Error limpiando duplicados: ${error.message}`;
+            }
+        }
+
+        // Limpiar duplicados por proyecto
+        async function cleanProjectDuplicates() {
+            const results = document.getElementById('results');
+            results.className = 'result info-result';
+            results.textContent = '📁 Selecciona un proyecto para limpiar duplicados...';
+
+            if (projects.length === 0) {
+                await getProjectList();
+            }
+
+            if (projects.length === 0) {
+                results.className = 'result warning-result';
+                results.textContent = '⚠️ No hay proyectos disponibles';
+                return;
+            }
+
+            // Crear lista de proyectos con duplicados
+            const projectsWithDuplicates = [];
+            for (const project of projects) {
+                const { data: tasks } = await supabase
+                    .from('tasks')
+                    .select('id')
+                    .eq('project_id', project.id);
+
+                if (tasks) {
+                    const taskIds = new Set();
+                    const duplicates = [];
+                    tasks.forEach(task => {
+                        if (taskIds.has(task.id)) {
+                            duplicates.push(task.id);
+                        } else {
+                            taskIds.add(task.id);
+                        }
+                    });
+
+                    if (duplicates.length > 0) {
+                        projectsWithDuplicates.push({
+                            ...project,
+                            duplicateCount: duplicates.length
+                        });
+                    }
+                }
+            }
+
+            if (projectsWithDuplicates.length === 0) {
+                results.className = 'result success-result';
+                results.textContent = '✅ No hay proyectos con duplicados';
+                return;
+            }
+
+            // Mostrar opciones
+            let optionsText = '📁 Proyectos con duplicados:\n\n';
+            projectsWithDuplicates.forEach((project, index) => {
+                optionsText += `${index + 1}. ${project.name} (${project.duplicateCount} duplicados)\n`;
+            });
+
+            results.textContent = optionsText;
+
+            // En un entorno real, aquí podrías crear un selector de proyectos
+            // Por ahora, limpiar el primer proyecto con duplicados
+            const selectedProject = projectsWithDuplicates[0];
+            
+            if (confirm(`¿Limpiar duplicados en "${selectedProject.name}"?`)) {
+                await cleanProjectSpecific(selectedProject.id);
+            }
+        }
+
+        // Limpiar duplicados de un proyecto específico
+        async function cleanProjectSpecific(projectId) {
+            const results = document.getElementById('results');
+            results.className = 'result info-result';
+            results.textContent = `🧹 Limpiando duplicados del proyecto...`;
+
+            try {
+                const { data: tasks, error: tasksError } = await supabase
+                    .from('tasks')
+                    .select('*')
+                    .eq('project_id', projectId)
+                    .order('created_at');
+
+                if (tasksError) {
+                    results.className = 'result error-result';
+                    results.textContent = `❌ Error: ${tasksError.message}`;
+                    return;
+                }
+
+                if (!tasks || tasks.length === 0) {
+                    results.className = 'result warning-result';
+                    results.textContent = '⚠️ No hay tareas en este proyecto';
+                    return;
+                }
+
+                // Agrupar por ID y mantener solo la primera ocurrencia
+                const taskMap = new Map();
+                const duplicatesToDelete = [];
+
+                tasks.forEach(task => {
+                    if (taskMap.has(task.id)) {
+                        duplicatesToDelete.push(task.id);
+                    } else {
+                        taskMap.set(task.id, task);
+                    }
+                });
+
+                if (duplicatesToDelete.length === 0) {
+                    results.className = 'result success-result';
+                    results.textContent = '✅ No hay duplicados en este proyecto';
+                    return;
+                }
+
+                let cleaned = 0;
+                let errors = 0;
+
+                // Eliminar duplicados
+                for (const duplicateId of duplicatesToDelete) {
+                    const { error: deleteError } = await supabase
+                        .from('tasks')
+                        .delete()
+                        .eq('id', duplicateId);
+
+                    if (deleteError) {
+                        results.textContent += `\n❌ Error eliminando ${duplicateId}: ${deleteError.message}`;
+                        errors++;
+                    } else {
+                        cleaned++;
+                    }
+                }
+
+                results.className = errors > 0 ? 'result warning-result' : 'result success-result';
+                results.textContent += `\n\n✅ LIMPIEZA COMPLETADA\n`;
+                results.textContent += `• Duplicados eliminados: ${cleaned}\n`;
+                results.textContent += `• Errores: ${errors}\n`;
+
+                // Actualizar estadísticas
+                updateStats();
+
+                // Recargar lista de proyectos
+                setTimeout(() => {
+                    getProjectList();
+                }, 1000);
+
+            } catch (error) {
+                results.className = 'result error-result';
+                results.textContent = `❌ Error: ${error.message}`;
+            }
+        }
+
+        // Crear backup antes de limpiar
+        async function backupBeforeCleanup() {
+            const results = document.getElementById('results');
+            results.className = 'result info-result';
+            results.textContent = '💾 Creando backup antes de limpiar...';
+
+            try {
+                if (!supabase) {
+                    await initializeSupabase();
+                }
+
+                const { data: allTasks, error: tasksError } = await supabase
+                    .from('tasks')
+                    .select('*');
+
+                if (tasksError) {
+                    results.className = 'result error-result';
+                    results.textContent = `❌ Error creando backup: ${tasksError.message}`;
+                    return;
+                }
+
+                const backup = {
+                    timestamp: new Date().toISOString(),
+                    tasks: allTasks || [],
+                    totalTasks: allTasks ? allTasks.length : 0
+                };
+
+                // Crear archivo de descarga
+                const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `backup-tasks-${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                results.className = 'result success-result';
+                results.textContent = `✅ Backup creado exitosamente\n`;
+                results.textContent += `📁 Archivo: backup-tasks-${new Date().toISOString().split('T')[0]}.json\n`;
+                results.textContent += `📊 Total tareas: ${backup.totalTasks}\n`;
+                results.textContent += `💾 Descargado a tu carpeta de descargas`;
+
+            } catch (error) {
+                results.className = 'result error-result';
+                results.textContent = `❌ Error creando backup: ${error.message}`;
+            }
+        }
+
+        // Actualizar estadísticas
+        function updateStats() {
+            const statsContainer = document.getElementById('stats');
+            statsContainer.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-number">${projects.length}</div>
+                    <div class="stat-label">Proyectos</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${totalTasks}</div>
+                    <div class="stat-label">Total Tareas</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${duplicatesFound}</div>
+                    <div class="stat-label">Duplicados</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${totalTasks > 0 ? ((duplicatesFound / totalTasks) * 100).toFixed(1) : 0}%</div>
+                    <div class="stat-label">% Duplicación</div>
+                </div>
+            `;
+        }
+
+        // Inicializar al cargar la página
+        window.addEventListener('load', () => {
+            updateStats();
+        });
+    </script>
+</body>
+</html>

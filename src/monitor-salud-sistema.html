@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏥 Monitor de Salud del Sistema</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+        }
+        .container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .health-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .health-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            border-left: 5px solid #28a745;
+        }
+        .health-card.warning {
+            border-left-color: #ffc107;
+        }
+        .health-card.danger {
+            border-left-color: #dc3545;
+        }
+        .health-card h3 {
+            margin-top: 0;
+            color: #495057;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-ok { background: #28a745; }
+        .status-warning { background: #ffc107; }
+        .status-error { background: #dc3545; }
+        button {
+            background: linear-gradient(45deg, #007bff, #0056b3);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 123, 255, 0.3);
+        }
+        .success { background: linear-gradient(45deg, #28a745, #1e7e34); }
+        .warning { background: linear-gradient(45deg, #ffc107, #e0a800); }
+        .danger { background: linear-gradient(45deg, #dc3545, #c82333); }
+        .result {
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success-result {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error-result {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info-result {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .metric-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .metric-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .metric-label {
+            color: #6c757d;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏥 Monitor de Salud del Sistema</h1>
+        
+        <div class="health-grid">
+            <div class="health-card" id="dataIntegrityCard">
+                <h3><span class="status-indicator status-ok"></span>Integridad de Datos</h3>
+                <p>Verificando estructura y validez de los datos almacenados...</p>
+            </div>
+            
+            <div class="health-card" id="dependenciesCard">
+                <h3><span class="status-indicator status-ok"></span>Dependencias de Tareas</h3>
+                <p>Analizando dependencias circulares y relaciones entre tareas...</p>
+            </div>
+            
+            <div class="health-card" id="duplicatesCard">
+                <h3><span class="status-indicator status-ok"></span>Tareas Duplicadas</h3>
+                <p>Detectando tareas duplicadas por ID o contenido...</p>
+            </div>
+            
+            <div class="health-card" id="performanceCard">
+                <h3><span class="status-indicator status-ok"></span>Rendimiento</h3>
+                <p>Evaluando rendimiento y uso de memoria...</p>
+            </div>
+        </div>
+
+        <div class="metrics" id="metrics">
+            <!-- Las métricas se llenarán dinámicamente -->
+        </div>
+
+        <div style="text-align: center; margin: 30px 0;">
+            <button onclick="runFullHealthCheck()">🔍 Ejecutar Verificación Completa</button>
+            <button onclick="checkDataIntegrity()" class="success">🛡️ Verificar Integridad</button>
+            <button onclick="checkDependencies()" class="warning">🔗 Verificar Dependencias</button>
+            <button onclick="checkDuplicates()" class="danger">🔍 Verificar Duplicados</button>
+            <button onclick="exportHealthReport()">📊 Exportar Reporte</button>
+        </div>
+
+        <div id="results" class="result info-result">
+            Haz clic en "Ejecutar Verificación Completa" para comenzar el análisis de salud del sistema...
+        </div>
+    </div>
+
+    <script>
+        let healthData = null;
+
+        // Función principal de verificación de salud
+        function runFullHealthCheck() {
+            const results = document.getElementById('results');
+            results.className = 'result info-result';
+            results.textContent = '🔍 Iniciando verificación completa de salud del sistema...';
+
+            try {
+                // Obtener datos del localStorage
+                const portfolioData = localStorage.getItem('mi-dashboard-portfolio');
+                if (!portfolioData) {
+                    results.className = 'result error-result';
+                    results.textContent = '❌ No se encontraron datos en localStorage';
+                    return;
+                }
+
+                const data = JSON.parse(portfolioData);
+                const tasksByProject = data.tasksByProject || {};
+                const projects = data.projects || [];
+
+                let totalTasks = 0;
+                let totalProjects = projects.length;
+                let corruptedProjects = 0;
+                let duplicateTasks = 0;
+                let circularDependencies = 0;
+                let healthScore = 100;
+
+                // Verificar integridad de datos
+                const integrityResults = checkDataIntegrityInternal(data);
+                corruptedProjects = integrityResults.corruptedProjects;
+
+                // Verificar dependencias circulares
+                const dependencyResults = checkDependenciesInternal(tasksByProject);
+                circularDependencies = dependencyResults.circularDependencies;
+
+                // Verificar duplicados
+                const duplicateResults = checkDuplicatesInternal(tasksByProject);
+                duplicateTasks = duplicateResults.duplicateTasks;
+
+                // Calcular métricas
+                Object.values(tasksByProject).forEach(tasks => {
+                    if (Array.isArray(tasks)) {
+                        totalTasks += tasks.length;
+                    }
+                });
+
+                // Calcular puntuación de salud
+                if (corruptedProjects > 0) healthScore -= 30;
+                if (circularDependencies > 0) healthScore -= 25;
+                if (duplicateTasks > 0) healthScore -= 20;
+                if (totalTasks === 0) healthScore -= 15;
+
+                // Actualizar métricas
+                updateMetrics({
+                    totalProjects,
+                    totalTasks,
+                    corruptedProjects,
+                    circularDependencies,
+                    duplicateTasks,
+                    healthScore
+                });
+
+                // Actualizar tarjetas de salud
+                updateHealthCards({
+                    dataIntegrity: corruptedProjects === 0 ? 'ok' : 'danger',
+                    dependencies: circularDependencies === 0 ? 'ok' : 'warning',
+                    duplicates: duplicateTasks === 0 ? 'ok' : 'warning',
+                    performance: healthScore > 80 ? 'ok' : healthScore > 60 ? 'warning' : 'danger'
+                });
+
+                // Generar reporte
+                let reportText = `📊 REPORTE DE SALUD DEL SISTEMA\n`;
+                reportText += `================================\n\n`;
+                reportText += `🏆 PUNTUACIÓN GENERAL: ${healthScore}/100\n\n`;
+                reportText += `📈 MÉTRICAS:\n`;
+                reportText += `• Total de proyectos: ${totalProjects}\n`;
+                reportText += `• Total de tareas: ${totalTasks}\n`;
+                reportText += `• Proyectos corruptos: ${corruptedProjects}\n`;
+                reportText += `• Dependencias circulares: ${circularDependencies}\n`;
+                reportText += `• Tareas duplicadas: ${duplicateTasks}\n\n`;
+
+                if (healthScore === 100) {
+                    reportText += `✅ SISTEMA EN EXCELENTE ESTADO\n`;
+                    reportText += `Todos los componentes están funcionando correctamente.\n`;
+                } else if (healthScore >= 80) {
+                    reportText += `⚠️ SISTEMA EN BUEN ESTADO\n`;
+                    reportText += `Algunos problemas menores detectados, pero el sistema funciona bien.\n`;
+                } else if (healthScore >= 60) {
+                    reportText += `🚨 SISTEMA CON PROBLEMAS\n`;
+                    reportText += `Se detectaron problemas que requieren atención.\n`;
+                } else {
+                    reportText += `💥 SISTEMA EN ESTADO CRÍTICO\n`;
+                    reportText += `Se detectaron problemas graves que requieren intervención inmediata.\n`;
+                }
+
+                reportText += `\n🔧 RECOMENDACIONES:\n`;
+                if (corruptedProjects > 0) {
+                    reportText += `• Restaurar datos corruptos desde backup\n`;
+                }
+                if (circularDependencies > 0) {
+                    reportText += `• Usar el botón "Limpiar Dependencias Circulares"\n`;
+                }
+                if (duplicateTasks > 0) {
+                    reportText += `• Limpiar tareas duplicadas\n`;
+                }
+
+                results.textContent = reportText;
+                results.className = healthScore >= 80 ? 'result success-result' : 
+                                  healthScore >= 60 ? 'result info-result' : 'result error-result';
+
+                // Guardar datos de salud
+                healthData = {
+                    timestamp: new Date().toISOString(),
+                    healthScore,
+                    metrics: {
+                        totalProjects,
+                        totalTasks,
+                        corruptedProjects,
+                        circularDependencies,
+                        duplicateTasks
+                    },
+                    details: {
+                        integrity: integrityResults,
+                        dependencies: dependencyResults,
+                        duplicates: duplicateResults
+                    }
+                };
+
+            } catch (error) {
+                results.className = 'result error-result';
+                results.textContent = `❌ Error durante la verificación: ${error.message}`;
+            }
+        }
+
+        // Verificar integridad de datos
+        function checkDataIntegrityInternal(data) {
+            const tasksByProject = data.tasksByProject || {};
+            let corruptedProjects = 0;
+            const corruptionDetails = [];
+
+            Object.entries(tasksByProject).forEach(([projectId, tasks]) => {
+                if (typeof tasks === 'function') {
+                    corruptedProjects++;
+                    corruptionDetails.push(`${projectId}: función en lugar de array`);
+                } else if (tasks && !Array.isArray(tasks) && typeof tasks === 'object') {
+                    corruptedProjects++;
+                    corruptionDetails.push(`${projectId}: objeto no-array`);
+                }
+            });
+
+            return {
+                corruptedProjects,
+                corruptionDetails,
+                totalProjects: Object.keys(tasksByProject).length
+            };
+        }
+
+        // Verificar dependencias circulares
+        function checkDependenciesInternal(tasksByProject) {
+            let circularDependencies = 0;
+            const circularDetails = [];
+
+            Object.entries(tasksByProject).forEach(([projectId, tasks]) => {
+                if (!Array.isArray(tasks)) return;
+
+                const visited = new Set();
+                const recursionStack = new Set();
+
+                const dfs = (currentId, path = []) => {
+                    if (recursionStack.has(currentId)) {
+                        const cycleStart = path.indexOf(currentId);
+                        const cycle = path.slice(cycleStart).concat([currentId]);
+                        circularDependencies++;
+                        circularDetails.push({
+                            projectId,
+                            taskId: currentId,
+                            cycle: cycle
+                        });
+                        return true;
+                    }
+                    if (visited.has(currentId)) return false;
+
+                    recursionStack.add(currentId);
+                    visited.add(currentId);
+
+                    const task = tasks.find(t => t.id === currentId);
+                    if (task) {
+                        for (const predId of task.predecessors) {
+                            if (dfs(predId, [...path, currentId])) {
+                                return true;
+                            }
+                        }
+                    }
+
+                    recursionStack.delete(currentId);
+                    return false;
+                };
+
+                tasks.forEach(task => {
+                    if (!visited.has(task.id)) {
+                        dfs(task.id);
+                    }
+                });
+            });
+
+            return {
+                circularDependencies,
+                circularDetails
+            };
+        }
+
+        // Verificar duplicados
+        function checkDuplicatesInternal(tasksByProject) {
+            let duplicateTasks = 0;
+            const duplicateDetails = [];
+
+            Object.entries(tasksByProject).forEach(([projectId, tasks]) => {
+                if (!Array.isArray(tasks)) return;
+
+                const taskIds = new Set();
+                tasks.forEach(task => {
+                    if (taskIds.has(task.id)) {
+                        duplicateTasks++;
+                        duplicateDetails.push({
+                            projectId,
+                            taskId: task.id,
+                            taskName: task.name
+                        });
+                    } else {
+                        taskIds.add(task.id);
+                    }
+                });
+            });
+
+            return {
+                duplicateTasks,
+                duplicateDetails
+            };
+        }
+
+        // Actualizar métricas
+        function updateMetrics(metrics) {
+            const metricsContainer = document.getElementById('metrics');
+            metricsContainer.innerHTML = `
+                <div class="metric-card">
+                    <div class="metric-number">${metrics.totalProjects}</div>
+                    <div class="metric-label">Proyectos</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-number">${metrics.totalTasks}</div>
+                    <div class="metric-label">Tareas</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-number">${metrics.corruptedProjects}</div>
+                    <div class="metric-label">Proyectos Corruptos</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-number">${metrics.circularDependencies}</div>
+                    <div class="metric-label">Dependencias Circulares</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-number">${metrics.duplicateTasks}</div>
+                    <div class="metric-label">Duplicados</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-number">${metrics.healthScore}</div>
+                    <div class="metric-label">Puntuación de Salud</div>
+                </div>
+            `;
+        }
+
+        // Actualizar tarjetas de salud
+        function updateHealthCards(statuses) {
+            const cards = {
+                dataIntegrity: document.getElementById('dataIntegrityCard'),
+                dependencies: document.getElementById('dependenciesCard'),
+                duplicates: document.getElementById('duplicatesCard'),
+                performance: document.getElementById('performanceCard')
+            };
+
+            Object.entries(statuses).forEach(([key, status]) => {
+                const card = cards[key];
+                const indicator = card.querySelector('.status-indicator');
+                
+                card.className = `health-card ${status === 'ok' ? '' : status}`;
+                indicator.className = `status-indicator status-${status}`;
+            });
+        }
+
+        // Funciones individuales de verificación
+        function checkDataIntegrity() {
+            console.log('🛡️ Verificando integridad de datos...');
+            runFullHealthCheck();
+        }
+
+        function checkDependencies() {
+            console.log('🔗 Verificando dependencias...');
+            runFullHealthCheck();
+        }
+
+        function checkDuplicates() {
+            console.log('🔍 Verificando duplicados...');
+            runFullHealthCheck();
+        }
+
+        // Exportar reporte de salud
+        function exportHealthReport() {
+            if (!healthData) {
+                alert('⚠️ Primero debes ejecutar la verificación de salud.');
+                return;
+            }
+
+            try {
+                const exportData = {
+                    ...healthData,
+                    exportDate: new Date().toISOString(),
+                    tool: 'Monitor de Salud del Sistema'
+                };
+
+                const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `reporte-salud-sistema-${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                alert('✅ Reporte de salud exportado exitosamente');
+
+            } catch (error) {
+                alert(`❌ Error al exportar: ${error.message}`);
+            }
+        }
+
+        // Ejecutar verificación automática al cargar
+        window.onload = function() {
+            runFullHealthCheck();
+        };
+    </script>
+</body>
+</html>

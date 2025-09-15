@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Diagnóstico de Datos del Proyecto</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h2>Diagnóstico de Datos del Proyecto</h2>
+    <button onclick="diagnosticarDatos()">Diagnosticar Datos</button>
+    <div id="resultado"></div>
+
+    <script>
+        const supabaseUrl = 'https://ogqpsrsssrrytrqoyyph.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ncXBzcnNzc3JyeXRycW95eXBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc3Nzc5NjAsImV4cCI6MjA3MzM1Mzk2MH0.EqXjG1iefYMZ84Tw-4po98gBV7uRuPoz0idQgJ03pzg';
+
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        async function diagnosticarDatos() {
+            try {
+                // 1. Cargar proyectos
+                const { data: projects, error: projectsError } = await supabase
+                    .from('projects')
+                    .select('*');
+
+                if (projectsError) {
+                    document.getElementById('resultado').innerHTML = `
+                        <h3>Error cargando proyectos:</h3>
+                        <pre>${JSON.stringify(projectsError, null, 2)}</pre>
+                    `;
+                    return;
+                }
+
+                let html = '<h3>📊 Diagnóstico de Datos</h3>';
+                
+                // Mostrar proyectos
+                html += `<h4>🏗️ Proyectos (${projects.length}):</h4>`;
+                projects.forEach(project => {
+                    html += `
+                        <div style="border: 1px solid #ccc; margin: 10px; padding: 10px;">
+                            <strong>${project.name}</strong> (ID: ${project.id})<br>
+                            <strong>Presupuesto:</strong> $${project.budget?.toLocaleString() || 'N/A'}<br>
+                            <strong>Estado:</strong> ${project.status}<br>
+                            <strong>Manager:</strong> ${project.manager || 'N/A'}<br>
+                            <strong>Fecha Inicio:</strong> ${project.start_date || 'N/A'}<br>
+                            <strong>Fecha Fin:</strong> ${project.end_date || 'N/A'}
+                        </div>
+                    `;
+                });
+
+                // Para cada proyecto, cargar sus tareas
+                for (const project of projects) {
+                    const { data: tasks, error: tasksError } = await supabase
+                        .from('tasks')
+                        .select('*')
+                        .eq('project_id', project.id);
+
+                    if (tasksError) {
+                        html += `<h4>❌ Error cargando tareas para ${project.name}:</h4>`;
+                        html += `<pre>${JSON.stringify(tasksError, null, 2)}</pre>`;
+                    } else {
+                        html += `<h4>📋 Tareas de ${project.name} (${tasks.length}):</h4>`;
+                        
+                        if (tasks.length > 0) {
+                            // Mostrar primeras 5 tareas
+                            const sampleTasks = tasks.slice(0, 5);
+                            sampleTasks.forEach((task, index) => {
+                                html += `
+                                    <div style="border: 1px solid #eee; margin: 5px; padding: 5px; font-size: 12px;">
+                                        <strong>${index + 1}. ${task.name}</strong><br>
+                                        <strong>Duración:</strong> ${task.duration || 'N/A'}<br>
+                                        <strong>Inicio:</strong> ${task.start_date || 'N/A'}<br>
+                                        <strong>Fin:</strong> ${task.end_date || 'N/A'}<br>
+                                        <strong>Progreso:</strong> ${task.progress || 0}%<br>
+                                        <strong>Prioridad:</strong> ${task.priority || 'N/A'}<br>
+                                        <strong>Asignado:</strong> ${task.assigned_to || 'N/A'}<br>
+                                        <strong>Costo:</strong> $${task.cost || 0}
+                                    </div>
+                                `;
+                            });
+                            
+                            if (tasks.length > 5) {
+                                html += `<p>... y ${tasks.length - 5} tareas más</p>`;
+                            }
+                        } else {
+                            html += `<p>No hay tareas para este proyecto</p>`;
+                        }
+                    }
+                }
+
+                // Verificar datos locales
+                html += `<h4>💾 Datos Locales (localStorage):</h4>`;
+                const localData = localStorage.getItem('portfolioData');
+                if (localData) {
+                    try {
+                        const parsed = JSON.parse(localData);
+                        html += `<p><strong>Proyectos locales:</strong> ${parsed.projects?.length || 0}</p>`;
+                        html += `<p><strong>Proyecto actual:</strong> ${parsed.currentProjectId || 'N/A'}</p>`;
+                        html += `<p><strong>Tareas por proyecto:</strong> ${Object.keys(parsed.tasksByProject || {}).length} proyectos</p>`;
+                        
+                        if (parsed.tasksByProject) {
+                            Object.keys(parsed.tasksByProject).forEach(projectId => {
+                                const tasks = parsed.tasksByProject[projectId];
+                                html += `<p>- Proyecto ${projectId}: ${tasks?.length || 0} tareas</p>`;
+                            });
+                        }
+                    } catch (e) {
+                        html += `<p>Error parseando datos locales: ${e.message}</p>`;
+                    }
+                } else {
+                    html += `<p>No hay datos locales</p>`;
+                }
+
+                document.getElementById('resultado').innerHTML = html;
+
+            } catch (err) {
+                document.getElementById('resultado').innerHTML = `
+                    <h3>Error de conexión:</h3>
+                    <p>${err.message}</p>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

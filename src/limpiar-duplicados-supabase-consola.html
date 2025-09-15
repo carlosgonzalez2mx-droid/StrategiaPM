@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧹 Limpiar Duplicados Supabase - Consola</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+        }
+        .container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            background: #f8f9fa;
+        }
+        .section h3 {
+            color: #34495e;
+            margin-top: 0;
+        }
+        button {
+            background: linear-gradient(45deg, #e74c3c, #c0392b);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(231, 76, 60, 0.3);
+        }
+        .success {
+            background: linear-gradient(45deg, #27ae60, #229954);
+        }
+        .warning {
+            background: linear-gradient(45deg, #f39c12, #e67e22);
+        }
+        .info {
+            background: linear-gradient(45deg, #3498db, #2980b9);
+        }
+        .result {
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+            font-size: 11px;
+        }
+        .success-result {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error-result {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info-result {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .warning-result {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        .console-commands {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            margin: 10px 0;
+        }
+        .command {
+            background: #34495e;
+            padding: 5px 10px;
+            border-radius: 4px;
+            margin: 5px 0;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+        .command:hover {
+            background: #4a5f7a;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧹 Limpiar Duplicados Supabase - Consola</h1>
+        
+        <div class="section">
+            <h3>🚀 Comandos de Consola</h3>
+            <p>Ejecuta estos comandos en la consola del navegador (F12) para limpiar duplicados:</p>
+            
+            <div class="console-commands">
+                <div class="command" onclick="copyToClipboard('window.supabaseService.cleanDuplicatesInSupabase()')">
+                    📋 window.supabaseService.cleanDuplicatesInSupabase()
+                </div>
+                <div class="command" onclick="copyToClipboard('window.cleanDuplicatesInSupabase()')">
+                    📋 window.cleanDuplicatesInSupabase()
+                </div>
+                <div class="command" onclick="copyToClipboard('window.location.reload()')">
+                    🔄 window.location.reload()
+                </div>
+            </div>
+            
+            <button onclick="executeCleanup()" class="error">🧹 Ejecutar Limpieza</button>
+            <button onclick="checkDuplicates()" class="info">🔍 Verificar Duplicados</button>
+            <button onclick="reloadApp()" class="success">🔄 Recargar Aplicación</button>
+        </div>
+
+        <div class="section">
+            <h3>📊 Estado de la Limpieza</h3>
+            <div id="status" class="result info-result">
+                Haz clic en "Verificar Duplicados" para ver el estado actual...
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>📝 Log de Operaciones</h3>
+            <div id="log" class="result info-result">
+                El log de operaciones aparecerá aquí...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let logEntries = [];
+
+        // Función para agregar entradas al log
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = `[${timestamp}] ${message}`;
+            logEntries.push(entry);
+            
+            const logElement = document.getElementById('log');
+            logElement.textContent = logEntries.join('\n');
+            logElement.scrollTop = logElement.scrollHeight;
+            
+            console.log(entry);
+        }
+
+        // Función para copiar al portapapeles
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                addLog(`📋 Comando copiado: ${text}`, 'success');
+            }).catch(err => {
+                addLog(`❌ Error copiando: ${err}`, 'error');
+            });
+        }
+
+        // Función para ejecutar limpieza
+        async function executeCleanup() {
+            addLog('🧹 Iniciando limpieza de duplicados...', 'info');
+            
+            try {
+                // Verificar si la aplicación está cargada
+                if (typeof window.supabaseService === 'undefined') {
+                    addLog('❌ SupabaseService no está disponible. Asegúrate de que la aplicación esté cargada.', 'error');
+                    return;
+                }
+
+                if (!window.supabaseService.isAuthenticated()) {
+                    addLog('❌ No hay usuario autenticado en Supabase', 'error');
+                    return;
+                }
+
+                addLog('✅ Usuario autenticado, ejecutando limpieza...', 'success');
+                
+                const success = await window.supabaseService.cleanDuplicatesInSupabase();
+                
+                if (success) {
+                    addLog('✅ Limpieza completada exitosamente', 'success');
+                    document.getElementById('status').textContent = '✅ Limpieza completada exitosamente';
+                    document.getElementById('status').className = 'result success-result';
+                } else {
+                    addLog('❌ Error en la limpieza', 'error');
+                    document.getElementById('status').textContent = '❌ Error en la limpieza';
+                    document.getElementById('status').className = 'result error-result';
+                }
+                
+            } catch (error) {
+                addLog(`❌ Error ejecutando limpieza: ${error.message}`, 'error');
+                document.getElementById('status').textContent = `❌ Error: ${error.message}`;
+                document.getElementById('status').className = 'result error-result';
+            }
+        }
+
+        // Función para verificar duplicados
+        async function checkDuplicates() {
+            addLog('🔍 Verificando duplicados...', 'info');
+            
+            try {
+                if (typeof window.supabaseService === 'undefined') {
+                    addLog('❌ SupabaseService no está disponible', 'error');
+                    return;
+                }
+
+                if (!window.supabaseService.isAuthenticated()) {
+                    addLog('❌ No hay usuario autenticado', 'error');
+                    return;
+                }
+
+                // Obtener proyectos
+                const { data: projects, error: projectsError } = await window.supabaseService.supabase
+                    .from('projects')
+                    .select('id, name');
+
+                if (projectsError) {
+                    addLog(`❌ Error obteniendo proyectos: ${projectsError.message}`, 'error');
+                    return;
+                }
+
+                let totalTasks = 0;
+                let totalDuplicates = 0;
+                let reportText = '';
+
+                for (const project of projects) {
+                    const { data: tasks, error: tasksError } = await window.supabaseService.supabase
+                        .from('tasks')
+                        .select('id, name, created_at')
+                        .eq('project_id', project.id);
+
+                    if (tasksError) {
+                        addLog(`⚠️ Error obteniendo tareas para ${project.name}: ${tasksError.message}`, 'warning');
+                        continue;
+                    }
+
+                    const taskCount = tasks ? tasks.length : 0;
+                    totalTasks += taskCount;
+
+                    // Detectar duplicados por ID
+                    const taskIds = new Set();
+                    const duplicates = [];
+                    tasks.forEach(task => {
+                        if (taskIds.has(task.id)) {
+                            duplicates.push(task);
+                        } else {
+                            taskIds.add(task.id);
+                        }
+                    });
+
+                    const duplicateCount = duplicates.length;
+                    totalDuplicates += duplicateCount;
+
+                    reportText += `📁 ${project.name}:\n`;
+                    reportText += `  • Total tareas: ${taskCount}\n`;
+                    reportText += `  • Duplicados: ${duplicateCount}\n`;
+                    if (duplicateCount > 0) {
+                        reportText += `  • IDs duplicados: ${duplicates.map(d => d.id).slice(0, 3).join(', ')}${duplicates.length > 3 ? '...' : ''}\n`;
+                    }
+                    reportText += `\n`;
+                }
+
+                reportText += `📊 RESUMEN:\n`;
+                reportText += `• Total proyectos: ${projects.length}\n`;
+                reportText += `• Total tareas: ${totalTasks}\n`;
+                reportText += `• Total duplicados: ${totalDuplicates}\n`;
+                reportText += `• Porcentaje duplicación: ${totalTasks > 0 ? ((totalDuplicates / totalTasks) * 100).toFixed(2) : 0}%\n`;
+
+                document.getElementById('status').textContent = reportText;
+                document.getElementById('status').className = totalDuplicates > 0 ? 'result error-result' : 'result success-result';
+
+                addLog(`✅ Verificación completada: ${totalDuplicates} duplicados encontrados`, totalDuplicates > 0 ? 'error' : 'success');
+
+            } catch (error) {
+                addLog(`❌ Error verificando duplicados: ${error.message}`, 'error');
+                document.getElementById('status').textContent = `❌ Error: ${error.message}`;
+                document.getElementById('status').className = 'result error-result';
+            }
+        }
+
+        // Función para recargar la aplicación
+        function reloadApp() {
+            addLog('🔄 Recargando aplicación...', 'info');
+            window.location.reload();
+        }
+
+        // Interceptar console.log para mostrar en el log
+        const originalConsoleLog = console.log;
+        console.log = function(...args) {
+            const message = args.join(' ');
+            if (message.includes('DUPLICACIÓN') || message.includes('Limpieza') || message.includes('duplicados')) {
+                addLog(`[CONSOLE] ${message}`, 'info');
+            }
+            return originalConsoleLog.apply(this, args);
+        };
+
+        // Inicializar
+        addLog('🔍 Herramienta de limpieza de duplicados iniciada', 'info');
+        addLog('📋 Instrucciones:', 'info');
+        addLog('1. Haz clic en "Verificar Duplicados" para ver el estado actual', 'info');
+        addLog('2. Haz clic en "Ejecutar Limpieza" para limpiar duplicados', 'info');
+        addLog('3. Haz clic en "Recargar Aplicación" para aplicar cambios', 'info');
+        addLog('4. También puedes usar los comandos de consola directamente', 'info');
+    </script>
+</body>
+</html>

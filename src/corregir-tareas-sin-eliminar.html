@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Corregir Tareas Sin Eliminar</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h2>Corregir Tareas Sin Eliminar</h2>
+    <p>Este script corregirá los IDs inválidos y dependencias circulares sin eliminar las tareas.</p>
+    <button onclick="corregirTareas()" style="background-color: #28a745; color: white; padding: 10px 20px; border: none; border-radius: 5px;">CORREGIR TAREAS</button>
+    <div id="resultado"></div>
+
+    <script>
+        const supabaseUrl = 'https://ogqpsrsssrrytrqoyyph.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ncXBzcnNzc3JyeXRycW95eXBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc3Nzc5NjAsImV4cCI6MjA3MzM1Mzk2MH0.EqXjG1iefYMZ84Tw-4po98gBV7uRuPoz0idQgJ03pzg';
+
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        // Función para generar UUID válido
+        function generateUUID() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0;
+                const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+
+        // Función para detectar dependencias circulares
+        function detectCircularDependencies(tasks) {
+            const taskMap = new Map();
+            const circularTasks = new Set();
+            
+            // Crear mapa de tareas
+            tasks.forEach(task => {
+                taskMap.set(task.id, {
+                    ...task,
+                    predecessors: [...(task.predecessors || [])],
+                    successors: [...(task.successors || [])]
+                });
+            });
+            
+            const visited = new Set();
+            const recStack = new Set();
+            
+            const hasCycle = (taskId) => {
+                if (recStack.has(taskId)) {
+                    circularTasks.add(taskId);
+                    return true;
+                }
+                if (visited.has(taskId)) return false;
+                
+                visited.add(taskId);
+                recStack.add(taskId);
+                
+                const task = taskMap.get(taskId);
+                if (task && task.predecessors) {
+                    for (const predId of task.predecessors) {
+                        if (hasCycle(predId)) {
+                            circularTasks.add(taskId);
+                            return true;
+                        }
+                    }
+                }
+                
+                recStack.delete(taskId);
+                return false;
+            };
+            
+            // Detectar ciclos
+            for (const taskId of taskMap.keys()) {
+                if (!visited.has(taskId)) {
+                    hasCycle(taskId);
+                }
+            }
+            
+            return circularTasks;
+        }
+
+        async function corregirTareas() {
+            try {
+                let html = '<h3>🔧 Corrigiendo tareas sin eliminar</h3>';
+                
+                // 1. Cargar proyectos
+                const { data: projects, error: projectsError } = await supabase
+                    .from('projects')
+                    .select('id, name');
+
+                if (projectsError) {
+                    html += `<p>❌ Error cargando proyectos: ${projectsError.message}</p>`;
+                    document.getElementById('resultado').innerHTML = html;
+                    return;
+                }
+
+                html += `<h4>📋 Proyectos encontrados: ${projects.length}</h4>`;
+
+                let totalTasksProcessed = 0;
+                let totalIdsFixed = 0;
+                let totalCircularDepsFixed = 0;
+
+                // 2. Para cada proyecto, corregir tareas
+                for (const project of projects) {
+                    html += `<h5>🔄 Procesando proyecto: ${project.name}</h5>`;
+                    
+                    // Cargar tareas del proyecto
+                    const { data: tasks, error: tasksError } = await supabase
+                        .from('tasks')
+                        .select('*')
+                        .eq('project_id', project.id);
+
+                    if (tasksError) {
+                        html += `<p>❌ Error cargando tareas: ${tasksError.message}</p>`;
+                        continue;
+                    }
+
+                    if (tasks.length === 0) {
+                        html += `<p>ℹ️ No hay tareas para ${project.name}</p>`;
+                        continue;
+                    }
+
+                    html += `<p>📊 Tareas encontradas: ${tasks.length}</p>`;
+
+                    // Detectar dependencias circulares
+                    const circularTasks = detectCircularDependencies(tasks);
+                    html += `<p>⚠️ Tareas con dependencias circulares: ${circularTasks.size}</p>`;
+
+                    // Procesar cada tarea
+                    for (const task of tasks) {
+                        let needsUpdate = false;
+                        const updates = {};
+
+                        // Verificar si el ID es un UUID válido
+                        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+                        if (!uuidRegex.test(task.id)) {
+                            const newId = generateUUID();
+                            updates.id = newId;
+                            needsUpdate = true;
+                            totalIdsFixed++;
+                            html += `<p>🔧 ID corregido: ${task.id} → ${newId} (${task.name})</p>`;
+                        }
+
+                        // Si tiene dependencias circulares, limpiarlas
+                        if (circularTasks.has(task.id)) {
+                            updates.predecessors = [];
+                            updates.successors = [];
+                            needsUpdate = true;
+                            totalCircularDepsFixed++;
+                            html += `<p>🔧 Dependencias circulares limpiadas: ${task.name}</p>`;
+                        }
+
+                        // Actualizar la tarea si es necesario
+                        if (needsUpdate) {
+                            const { error: updateError } = await supabase
+                                .from('tasks')
+                                .update(updates)
+                                .eq('id', task.id);
+
+                            if (updateError) {
+                                html += `<p>❌ Error actualizando tarea ${task.name}: ${updateError.message}</p>`;
+                            } else {
+                                html += `<p>✅ Tarea actualizada: ${task.name}</p>`;
+                            }
+                        }
+
+                        totalTasksProcessed++;
+                    }
+
+                    html += `<p>✅ Proyecto ${project.name} procesado: ${tasks.length} tareas</p>`;
+                }
+
+                html += '<h3>🎉 Corrección Completada</h3>';
+                html += `<p><strong>Resumen:</strong></p>`;
+                html += `<ul>`;
+                html += `<li>📊 Tareas procesadas: ${totalTasksProcessed}</li>`;
+                html += `<li>🔧 IDs corregidos: ${totalIdsFixed}</li>`;
+                html += `<li>🔧 Dependencias circulares corregidas: ${totalCircularDepsFixed}</li>`;
+                html += `</ul>`;
+                html += '<p><strong>Recomendación:</strong> Recarga tu aplicación para ver los cambios.</p>';
+
+                document.getElementById('resultado').innerHTML = html;
+
+            } catch (err) {
+                document.getElementById('resultado').innerHTML = `
+                    <h3>Error general:</h3>
+                    <p>${err.message}</p>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

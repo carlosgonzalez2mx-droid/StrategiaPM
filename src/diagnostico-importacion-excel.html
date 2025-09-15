@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 Diagnóstico Importación Excel</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+        }
+        .container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            background: #f8f9fa;
+        }
+        .section h3 {
+            color: #34495e;
+            margin-top: 0;
+        }
+        button {
+            background: linear-gradient(45deg, #3498db, #2980b9);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.3);
+        }
+        .success {
+            background: linear-gradient(45deg, #27ae60, #229954);
+        }
+        .warning {
+            background: linear-gradient(45deg, #f39c12, #e67e22);
+        }
+        .error {
+            background: linear-gradient(45deg, #e74c3c, #c0392b);
+        }
+        .result {
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+            font-size: 11px;
+        }
+        .success-result {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error-result {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info-result {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .warning-result {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        .file-info {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #3498db;
+            margin: 10px 0;
+        }
+        .test-method {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #f39c12;
+            margin: 10px 0;
+        }
+        .test-method h4 {
+            margin-top: 0;
+            color: #f39c12;
+        }
+        .progress {
+            background: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            background: linear-gradient(45deg, #3498db, #2980b9);
+            height: 20px;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Diagnóstico Importación Excel</h1>
+        
+        <div class="section">
+            <h3>📁 Seleccionar Archivo para Diagnóstico</h3>
+            <input type="file" id="fileInput" accept=".xlsx,.xls" style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 5px; width: 100%;">
+            <button onclick="analyzeFile()" class="success">🔍 Analizar Archivo</button>
+            <button onclick="testAllMethods()" class="warning">🧪 Probar Todos los Métodos</button>
+            <button onclick="generateTestFile()" class="info">📝 Generar Archivo de Prueba</button>
+        </div>
+
+        <div class="section">
+            <h3>📊 Información del Archivo</h3>
+            <div id="fileInfo" class="file-info">
+                Selecciona un archivo para ver su información...
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>🧪 Pruebas de Lectura</h3>
+            <div id="testResults">
+                Los resultados de las pruebas aparecerán aquí...
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>📝 Log Detallado</h3>
+            <div id="detailedLog" class="result info-result">
+                El log detallado aparecerá aquí...
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script>
+        let selectedFile = null;
+        let logEntries = [];
+
+        // Función para agregar entradas al log
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = `[${timestamp}] ${message}`;
+            logEntries.push(entry);
+            
+            const logElement = document.getElementById('detailedLog');
+            logElement.textContent = logEntries.join('\n');
+            logElement.scrollTop = logElement.scrollHeight;
+            
+            console.log(entry);
+        }
+
+        // Configurar input de archivo
+        document.getElementById('fileInput').addEventListener('change', (e) => {
+            selectedFile = e.target.files[0];
+            if (selectedFile) {
+                displayFileInfo(selectedFile);
+                addLog(`Archivo seleccionado: ${selectedFile.name}`, 'success');
+            }
+        });
+
+        // Mostrar información del archivo
+        function displayFileInfo(file) {
+            const fileInfo = document.getElementById('fileInfo');
+            fileInfo.innerHTML = `
+                <h4>📄 ${file.name}</h4>
+                <p><strong>Tamaño:</strong> ${(file.size / 1024).toFixed(2)} KB (${file.size} bytes)</p>
+                <p><strong>Tipo MIME:</strong> ${file.type || 'No especificado'}</p>
+                <p><strong>Última modificación:</strong> ${new Date(file.lastModified).toLocaleString()}</p>
+                <p><strong>Extensión:</strong> ${file.name.split('.').pop().toLowerCase()}</p>
+            `;
+        }
+
+        // Analizar archivo
+        function analyzeFile() {
+            if (!selectedFile) {
+                alert('⚠️ Por favor selecciona un archivo primero');
+                return;
+            }
+
+            addLog('🔍 Iniciando análisis del archivo...', 'info');
+            
+            // Verificar extensiones válidas
+            const validExtensions = ['xlsx', 'xls'];
+            const fileExtension = selectedFile.name.split('.').pop().toLowerCase();
+            
+            if (!validExtensions.includes(fileExtension)) {
+                addLog(`❌ Extensión de archivo inválida: ${fileExtension}`, 'error');
+                return;
+            }
+            
+            addLog(`✅ Extensión válida: ${fileExtension}`, 'success');
+            
+            // Verificar tamaño
+            if (selectedFile.size === 0) {
+                addLog('❌ El archivo está vacío', 'error');
+                return;
+            }
+            
+            if (selectedFile.size > 10 * 1024 * 1024) {
+                addLog('⚠️ El archivo es muy grande (>10MB)', 'warning');
+            } else {
+                addLog('✅ Tamaño de archivo válido', 'success');
+            }
+            
+            // Verificar tipo MIME
+            if (selectedFile.type && selectedFile.type.includes('sheet')) {
+                addLog('✅ Tipo MIME válido', 'success');
+            } else {
+                addLog('⚠️ Tipo MIME no reconocido o vacío', 'warning');
+            }
+            
+            addLog('✅ Análisis básico completado', 'success');
+        }
+
+        // Probar todos los métodos de lectura
+        function testAllMethods() {
+            if (!selectedFile) {
+                alert('⚠️ Por favor selecciona un archivo primero');
+                return;
+            }
+
+            addLog('🧪 Iniciando pruebas de todos los métodos de lectura...', 'info');
+            
+            const testResults = document.getElementById('testResults');
+            testResults.innerHTML = '<div class="progress"><div class="progress-bar" style="width: 0%">Iniciando pruebas...</div></div>';
+            
+            let completedTests = 0;
+            const totalTests = 4;
+            
+            // Método 1: FileReader con ArrayBuffer
+            testFileReaderArrayBuffer();
+            
+            // Método 2: FileReader con DataURL
+            setTimeout(() => testFileReaderDataURL(), 1000);
+            
+            // Método 3: Fetch con URL.createObjectURL
+            setTimeout(() => testFetchMethod(), 2000);
+            
+            // Método 4: FileReader con BinaryString
+            setTimeout(() => testFileReaderBinaryString(), 3000);
+            
+            function updateProgress() {
+                completedTests++;
+                const percentage = (completedTests / totalTests) * 100;
+                const progressBar = document.querySelector('.progress-bar');
+                progressBar.style.width = `${percentage}%`;
+                progressBar.textContent = `Completado: ${completedTests}/${totalTests}`;
+            }
+            
+            function testFileReaderArrayBuffer() {
+                addLog('🧪 Prueba 1: FileReader con ArrayBuffer', 'info');
+                const testDiv = document.createElement('div');
+                testDiv.className = 'test-method';
+                testDiv.innerHTML = '<h4>Método 1: FileReader + ArrayBuffer</h4><p>Probando...</p>';
+                testResults.appendChild(testDiv);
+                
+                const reader = new FileReader();
+                
+                reader.onload = (e) => {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        testDiv.innerHTML = '<h4>Método 1: FileReader + ArrayBuffer</h4><p style="color: green;">✅ ÉXITO</p>';
+                        addLog('✅ Método 1 exitoso: FileReader + ArrayBuffer', 'success');
+                    } catch (error) {
+                        testDiv.innerHTML = '<h4>Método 1: FileReader + ArrayBuffer</h4><p style="color: red;">❌ FALLO</p>';
+                        addLog(`❌ Método 1 falló: ${error.message}`, 'error');
+                    }
+                    updateProgress();
+                };
+                
+                reader.onerror = (error) => {
+                    testDiv.innerHTML = '<h4>Método 1: FileReader + ArrayBuffer</h4><p style="color: red;">❌ ERROR DE LECTURA</p>';
+                    addLog(`❌ Método 1 error de lectura: ${error.target?.error?.message || 'Error desconocido'}`, 'error');
+                    updateProgress();
+                };
+                
+                reader.readAsArrayBuffer(selectedFile);
+            }
+            
+            function testFileReaderDataURL() {
+                addLog('🧪 Prueba 2: FileReader con DataURL', 'info');
+                const testDiv = document.createElement('div');
+                testDiv.className = 'test-method';
+                testDiv.innerHTML = '<h4>Método 2: FileReader + DataURL</h4><p>Probando...</p>';
+                testResults.appendChild(testDiv);
+                
+                const reader = new FileReader();
+                
+                reader.onload = (e) => {
+                    try {
+                        const base64 = e.target.result.split(',')[1];
+                        const binaryString = atob(base64);
+                        const data = new Uint8Array(binaryString.length);
+                        for (let i = 0; i < binaryString.length; i++) {
+                            data[i] = binaryString.charCodeAt(i);
+                        }
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        testDiv.innerHTML = '<h4>Método 2: FileReader + DataURL</h4><p style="color: green;">✅ ÉXITO</p>';
+                        addLog('✅ Método 2 exitoso: FileReader + DataURL', 'success');
+                    } catch (error) {
+                        testDiv.innerHTML = '<h4>Método 2: FileReader + DataURL</h4><p style="color: red;">❌ FALLO</p>';
+                        addLog(`❌ Método 2 falló: ${error.message}`, 'error');
+                    }
+                    updateProgress();
+                };
+                
+                reader.onerror = (error) => {
+                    testDiv.innerHTML = '<h4>Método 2: FileReader + DataURL</h4><p style="color: red;">❌ ERROR DE LECTURA</p>';
+                    addLog(`❌ Método 2 error de lectura: ${error.target?.error?.message || 'Error desconocido'}`, 'error');
+                    updateProgress();
+                };
+                
+                reader.readAsDataURL(selectedFile);
+            }
+            
+            function testFetchMethod() {
+                addLog('🧪 Prueba 3: Fetch con URL.createObjectURL', 'info');
+                const testDiv = document.createElement('div');
+                testDiv.className = 'test-method';
+                testDiv.innerHTML = '<h4>Método 3: Fetch + ObjectURL</h4><p>Probando...</p>';
+                testResults.appendChild(testDiv);
+                
+                try {
+                    const fileUrl = URL.createObjectURL(selectedFile);
+                    
+                    fetch(fileUrl)
+                        .then(response => response.arrayBuffer())
+                        .then(arrayBuffer => {
+                            try {
+                                const data = new Uint8Array(arrayBuffer);
+                                const workbook = XLSX.read(data, { type: 'array' });
+                                testDiv.innerHTML = '<h4>Método 3: Fetch + ObjectURL</h4><p style="color: green;">✅ ÉXITO</p>';
+                                addLog('✅ Método 3 exitoso: Fetch + ObjectURL', 'success');
+                            } catch (error) {
+                                testDiv.innerHTML = '<h4>Método 3: Fetch + ObjectURL</h4><p style="color: red;">❌ FALLO</p>';
+                                addLog(`❌ Método 3 falló: ${error.message}`, 'error');
+                            }
+                            URL.revokeObjectURL(fileUrl);
+                            updateProgress();
+                        })
+                        .catch(error => {
+                            testDiv.innerHTML = '<h4>Método 3: Fetch + ObjectURL</h4><p style="color: red;">❌ ERROR DE FETCH</p>';
+                            addLog(`❌ Método 3 error de fetch: ${error.message}`, 'error');
+                            URL.revokeObjectURL(fileUrl);
+                            updateProgress();
+                        });
+                } catch (error) {
+                    testDiv.innerHTML = '<h4>Método 3: Fetch + ObjectURL</h4><p style="color: red;">❌ ERROR DE URL</p>';
+                    addLog(`❌ Método 3 error de URL: ${error.message}`, 'error');
+                    updateProgress();
+                }
+            }
+            
+            function testFileReaderBinaryString() {
+                addLog('🧪 Prueba 4: FileReader con BinaryString', 'info');
+                const testDiv = document.createElement('div');
+                testDiv.className = 'test-method';
+                testDiv.innerHTML = '<h4>Método 4: FileReader + BinaryString</h4><p>Probando...</p>';
+                testResults.appendChild(testDiv);
+                
+                const reader = new FileReader();
+                
+                reader.onload = (e) => {
+                    try {
+                        const binaryString = e.target.result;
+                        const data = new Uint8Array(binaryString.length);
+                        for (let i = 0; i < binaryString.length; i++) {
+                            data[i] = binaryString.charCodeAt(i);
+                        }
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        testDiv.innerHTML = '<h4>Método 4: FileReader + BinaryString</h4><p style="color: green;">✅ ÉXITO</p>';
+                        addLog('✅ Método 4 exitoso: FileReader + BinaryString', 'success');
+                    } catch (error) {
+                        testDiv.innerHTML = '<h4>Método 4: FileReader + BinaryString</h4><p style="color: red;">❌ FALLO</p>';
+                        addLog(`❌ Método 4 falló: ${error.message}`, 'error');
+                    }
+                    updateProgress();
+                };
+                
+                reader.onerror = (error) => {
+                    testDiv.innerHTML = '<h4>Método 4: FileReader + BinaryString</h4><p style="color: red;">❌ ERROR DE LECTURA</p>';
+                    addLog(`❌ Método 4 error de lectura: ${error.target?.error?.message || 'Error desconocido'}`, 'error');
+                    updateProgress();
+                };
+                
+                reader.readAsBinaryString(selectedFile);
+            }
+        }
+
+        // Generar archivo de prueba
+        function generateTestFile() {
+            addLog('📝 Generando archivo Excel de prueba...', 'info');
+            
+            try {
+                const workbook = XLSX.utils.book_new();
+                
+                // Crear datos de prueba
+                const testData = [
+                    ['ID', 'Nombre', 'Duración', 'Inicio', 'Fin', 'Progreso', 'Prioridad', 'Asignado', 'Costo', 'Predecesoras'],
+                    ['1', 'Tarea de Prueba 1', '5', '2025-01-01', '2025-01-05', '0', 'Alta', 'Usuario', '1000', ''],
+                    ['2', 'Tarea de Prueba 2', '3', '2025-01-06', '2025-01-08', '0', 'Media', 'Usuario', '500', '1'],
+                    ['3', 'Tarea de Prueba 3', '2', '2025-01-09', '2025-01-10', '0', 'Baja', 'Usuario', '200', '2']
+                ];
+                
+                const worksheet = XLSX.utils.aoa_to_sheet(testData);
+                XLSX.utils.book_append_sheet(workbook, worksheet, 'Cronograma');
+                
+                // Generar archivo
+                const fileName = `archivo-prueba-${new Date().toISOString().split('T')[0]}.xlsx`;
+                XLSX.writeFile(workbook, fileName);
+                
+                addLog(`✅ Archivo de prueba generado: ${fileName}`, 'success');
+                
+            } catch (error) {
+                addLog(`❌ Error generando archivo de prueba: ${error.message}`, 'error');
+            }
+        }
+
+        // Inicializar
+        addLog('🔍 Herramienta de diagnóstico iniciada', 'info');
+        addLog('📋 Instrucciones:', 'info');
+        addLog('1. Selecciona un archivo Excel para analizar', 'info');
+        addLog('2. Haz clic en "Analizar Archivo" para verificar propiedades básicas', 'info');
+        addLog('3. Haz clic en "Probar Todos los Métodos" para probar diferentes formas de leer el archivo', 'info');
+        addLog('4. Si tienes problemas, genera un archivo de prueba con "Generar Archivo de Prueba"', 'info');
+    </script>
+</body>
+</html>

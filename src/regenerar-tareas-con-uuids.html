@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Regenerar Tareas con UUIDs Válidos</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <h2>Regenerar Tareas con UUIDs Válidos</h2>
+    <p><strong>⚠️ ADVERTENCIA:</strong> Este script eliminará TODAS las tareas de Supabase y las recreará con UUIDs válidos.</p>
+    <button onclick="regenerarTareas()" style="background-color: #dc3545; color: white; padding: 10px 20px; border: none; border-radius: 5px;">REGENERAR TAREAS</button>
+    <div id="resultado"></div>
+
+    <script>
+        const supabaseUrl = 'https://ogqpsrsssrrytrqoyyph.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ncXBzcnNzc3JyeXRycW95eXBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc3Nzc5NjAsImV4cCI6MjA3MzM1Mzk2MH0.EqXjG1iefYMZ84Tw-4po98gBV7uRuPoz0idQgJ03pzg';
+
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        // Función para generar UUID válido
+        function generateUUID() {
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                const r = Math.random() * 16 | 0;
+                const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        }
+
+        // Función para limpiar dependencias circulares
+        function cleanCircularDependencies(tasks) {
+            const taskMap = new Map();
+            const cleanedTasks = [];
+            
+            // Crear mapa de tareas
+            tasks.forEach(task => {
+                taskMap.set(task.id, {
+                    ...task,
+                    predecessors: [...(task.predecessors || [])],
+                    successors: [...(task.successors || [])]
+                });
+            });
+            
+            // Detectar y limpiar dependencias circulares
+            const visited = new Set();
+            const recStack = new Set();
+            const circularTasks = new Set();
+            
+            const hasCycle = (taskId) => {
+                if (recStack.has(taskId)) {
+                    circularTasks.add(taskId);
+                    return true;
+                }
+                if (visited.has(taskId)) return false;
+                
+                visited.add(taskId);
+                recStack.add(taskId);
+                
+                const task = taskMap.get(taskId);
+                if (task && task.predecessors) {
+                    for (const predId of task.predecessors) {
+                        if (hasCycle(predId)) {
+                            circularTasks.add(taskId);
+                            return true;
+                        }
+                    }
+                }
+                
+                recStack.delete(taskId);
+                return false;
+            };
+            
+            // Detectar ciclos
+            for (const taskId of taskMap.keys()) {
+                if (!visited.has(taskId)) {
+                    hasCycle(taskId);
+                }
+            }
+            
+            // Limpiar dependencias circulares
+            for (const taskId of circularTasks) {
+                const task = taskMap.get(taskId);
+                if (task) {
+                    task.predecessors = [];
+                    task.successors = [];
+                }
+            }
+            
+            return Array.from(taskMap.values());
+        }
+
+        async function regenerarTareas() {
+            if (!confirm('¿Estás seguro? Esto eliminará TODAS las tareas de Supabase y las recreará con UUIDs válidos.')) {
+                return;
+            }
+
+            try {
+                let html = '<h3>🔄 Regenerando tareas con UUIDs válidos</h3>';
+                
+                // 1. Eliminar TODAS las tareas
+                html += '<h4>🗑️ Eliminando todas las tareas...</h4>';
+                const { error: deleteError } = await supabase
+                    .from('tasks')
+                    .delete()
+                    .neq('id', '00000000-0000-0000-0000-000000000000');
+
+                if (deleteError) {
+                    html += `<p>❌ Error eliminando tareas: ${deleteError.message}</p>`;
+                    document.getElementById('resultado').innerHTML = html;
+                    return;
+                }
+
+                html += '<p>✅ Todas las tareas eliminadas</p>';
+
+                // 2. Cargar proyectos
+                const { data: projects, error: projectsError } = await supabase
+                    .from('projects')
+                    .select('id, name');
+
+                if (projectsError) {
+                    html += `<p>❌ Error cargando proyectos: ${projectsError.message}</p>`;
+                    document.getElementById('resultado').innerHTML = html;
+                    return;
+                }
+
+                html += `<h4>📋 Proyectos encontrados: ${projects.length}</h4>`;
+
+                // 3. Para cada proyecto, regenerar tareas
+                for (const project of projects) {
+                    html += `<h5>🔄 Procesando proyecto: ${project.name}</h5>`;
+                    
+                    // Cargar datos locales
+                    const localData = localStorage.getItem('portfolioData');
+                    if (!localData) {
+                        html += `<p>⚠️ No hay datos locales para ${project.name}</p>`;
+                        continue;
+                    }
+
+                    try {
+                        const parsed = JSON.parse(localData);
+                        const projectTasks = parsed.tasksByProject?.[project.id] || [];
+                        
+                        if (projectTasks.length === 0) {
+                            html += `<p>ℹ️ No hay tareas locales para ${project.name}</p>`;
+                            continue;
+                        }
+
+                        // Limpiar dependencias circulares
+                        const cleanedTasks = cleanCircularDependencies(projectTasks);
+                        html += `<p>🔧 Dependencias circulares limpiadas: ${projectTasks.length - cleanedTasks.length}</p>`;
+
+                        // Eliminar duplicados por nombre y contenido
+                        const uniqueTasks = [];
+                        const seenContent = new Set();
+                        let duplicatesRemoved = 0;
+
+                        for (const task of cleanedTasks) {
+                            const contentKey = `${task.name}-${task.duration}-${task.startDate}-${task.endDate}`;
+                            if (seenContent.has(contentKey)) {
+                                duplicatesRemoved++;
+                            } else {
+                                seenContent.add(contentKey);
+                                uniqueTasks.push(task);
+                            }
+                        }
+
+                        html += `<p>📊 Tareas originales: ${projectTasks.length}, únicas: ${uniqueTasks.length}, duplicados eliminados: ${duplicatesRemoved}</p>`;
+
+                        // Regenerar con UUIDs válidos
+                        if (uniqueTasks.length > 0) {
+                            const tasksToInsert = uniqueTasks.map(task => ({
+                                id: generateUUID(), // Nuevo UUID válido
+                                name: task.name,
+                                description: task.description || '',
+                                duration: task.duration || 0,
+                                progress: task.progress || 0,
+                                priority: task.priority || 'medium',
+                                cost: task.cost || 0,
+                                predecessors: [], // Limpiar dependencias problemáticas
+                                successors: [], // Limpiar dependencias problemáticas
+                                resources: task.resources || [],
+                                status: task.status || 'pending',
+                                project_id: project.id,
+                                owner_id: '00000000-0000-0000-0000-000000000000',
+                                wbs_code: task.wbsCode || task.wbs_code || '',
+                                start_date: task.startDate || task.start_date,
+                                end_date: task.endDate || task.end_date,
+                                assigned_to: task.assignedTo || task.assigned_to || '',
+                                is_milestone: task.isMilestone || task.is_milestone || false,
+                                original_duration: task.originalDuration || task.original_duration || task.duration
+                            }));
+
+                            const { error: insertError } = await supabase
+                                .from('tasks')
+                                .insert(tasksToInsert);
+
+                            if (insertError) {
+                                html += `<p>❌ Error insertando tareas para ${project.name}: ${insertError.message}</p>`;
+                            } else {
+                                html += `<p>✅ ${uniqueTasks.length} tareas regeneradas para ${project.name}</p>`;
+                            }
+                        }
+
+                    } catch (parseError) {
+                        html += `<p>❌ Error parseando datos locales: ${parseError.message}</p>`;
+                    }
+                }
+
+                html += '<h3>🎉 Regeneración Completada</h3>';
+                html += '<p><strong>Recomendación:</strong> Recarga tu aplicación para ver los cambios.</p>';
+
+                document.getElementById('resultado').innerHTML = html;
+
+            } catch (err) {
+                document.getElementById('resultado').innerHTML = `
+                    <h3>Error general:</h3>
+                    <p>${err.message}</p>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 Debug Profundo de Duplicación de Tareas</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+        }
+        .container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .debug-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            background: #f8f9fa;
+        }
+        .debug-section h3 {
+            color: #34495e;
+            margin-top: 0;
+        }
+        button {
+            background: linear-gradient(45deg, #e74c3c, #c0392b);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+            transition: all 0.3s ease;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(231, 76, 60, 0.3);
+        }
+        .success {
+            background: linear-gradient(45deg, #27ae60, #229954);
+        }
+        .warning {
+            background: linear-gradient(45deg, #f39c12, #e67e22);
+        }
+        .info {
+            background: linear-gradient(45deg, #3498db, #2980b9);
+        }
+        .result {
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+            font-size: 12px;
+        }
+        .success-result {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error-result {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info-result {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .warning-result {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        .task-analysis {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .task-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #e74c3c;
+        }
+        .task-card.unique {
+            border-left-color: #27ae60;
+        }
+        .task-card.duplicate {
+            border-left-color: #e74c3c;
+        }
+        .task-id {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .task-name {
+            color: #34495e;
+            margin: 5px 0;
+        }
+        .task-meta {
+            font-size: 11px;
+            color: #7f8c8d;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .stat-number {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #e74c3c;
+        }
+        .stat-label {
+            color: #7f8c8d;
+            margin-top: 5px;
+        }
+        .trace-log {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Debug Profundo de Duplicación de Tareas</h1>
+        
+        <div class="stats" id="stats">
+            <!-- Las estadísticas se llenarán dinámicamente -->
+        </div>
+
+        <div class="debug-section">
+            <h3>📊 Análisis de Duplicación</h3>
+            <button onclick="analyzeDuplication()">🔍 Analizar Duplicación</button>
+            <button onclick="traceTaskLifecycle()" class="info">🔄 Rastrear Ciclo de Vida</button>
+            <button onclick="checkLocalStorageChanges()" class="warning">💾 Verificar Cambios en localStorage</button>
+            <button onclick="simulateTaskCreation()" class="success">🧪 Simular Creación de Tarea</button>
+        </div>
+
+        <div class="debug-section">
+            <h3>📋 Análisis de Tareas por Proyecto</h3>
+            <div id="taskAnalysis" class="task-analysis">
+                <!-- El análisis se llenará dinámicamente -->
+            </div>
+        </div>
+
+        <div class="debug-section">
+            <h3>🔄 Log de Rastreo</h3>
+            <div id="traceLog" class="trace-log">
+                Haz clic en "Rastrear Ciclo de Vida" para comenzar el monitoreo...
+            </div>
+        </div>
+
+        <div class="debug-section">
+            <h3>📝 Resultados del Debug</h3>
+            <div id="results" class="result info-result">
+                Haz clic en "Analizar Duplicación" para comenzar el análisis profundo...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let debugData = null;
+        let traceLog = [];
+
+        // Función principal de análisis de duplicación
+        function analyzeDuplication() {
+            const results = document.getElementById('results');
+            results.className = 'result info-result';
+            results.textContent = '🔍 Iniciando análisis profundo de duplicación...';
+
+            try {
+                // Obtener datos del localStorage
+                const portfolioData = localStorage.getItem('mi-dashboard-portfolio');
+                if (!portfolioData) {
+                    results.className = 'result error-result';
+                    results.textContent = '❌ No se encontraron datos en localStorage';
+                    return;
+                }
+
+                const data = JSON.parse(portfolioData);
+                const tasksByProject = data.tasksByProject || {};
+                const projects = data.projects || [];
+
+                let totalTasks = 0;
+                let duplicateTasks = 0;
+                let uniqueTasks = 0;
+                let projectsWithDuplicates = 0;
+                const duplicateDetails = [];
+                const taskAnalysis = [];
+
+                // Analizar cada proyecto
+                Object.entries(tasksByProject).forEach(([projectId, tasks]) => {
+                    const project = projects.find(p => p.id === projectId);
+                    const projectName = project ? project.name : `Proyecto ${projectId}`;
+
+                    if (!Array.isArray(tasks)) {
+                        console.warn(`⚠️ Proyecto ${projectId} no tiene tareas válidas:`, typeof tasks);
+                        return;
+                    }
+
+                    totalTasks += tasks.length;
+
+                    // Análisis detallado de duplicados
+                    const taskIds = new Map(); // ID -> [tareas con ese ID]
+                    const contentHashes = new Map(); // Hash -> [tareas con ese contenido]
+
+                    tasks.forEach((task, index) => {
+                        // Verificar duplicados por ID
+                        if (!taskIds.has(task.id)) {
+                            taskIds.set(task.id, []);
+                        }
+                        taskIds.get(task.id).push({ task, index });
+
+                        // Verificar duplicados por contenido
+                        const contentHash = JSON.stringify({
+                            name: task.name,
+                            duration: task.duration,
+                            startDate: task.startDate,
+                            endDate: task.endDate,
+                            description: task.description,
+                            predecessors: task.predecessors,
+                            successors: task.successors,
+                            cost: task.cost,
+                            priority: task.priority,
+                            assignedTo: task.assignedTo
+                        });
+
+                        if (!contentHashes.has(contentHash)) {
+                            contentHashes.set(contentHash, []);
+                        }
+                        contentHashes.get(contentHash).push({ task, index });
+                    });
+
+                    // Identificar duplicados reales
+                    const projectDuplicates = [];
+                    const projectUnique = [];
+
+                    taskIds.forEach((taskList, taskId) => {
+                        if (taskList.length > 1) {
+                            // Duplicado por ID
+                            projectDuplicates.push({
+                                type: 'ID',
+                                taskId,
+                                count: taskList.length,
+                                tasks: taskList
+                            });
+                            duplicateTasks += taskList.length - 1; // -1 porque una es original
+                        } else {
+                            projectUnique.push(taskList[0]);
+                        }
+                    });
+
+                    contentHashes.forEach((taskList, contentHash) => {
+                        if (taskList.length > 1) {
+                            // Verificar si ya se contó como duplicado por ID
+                            const alreadyCounted = taskList.some(t => 
+                                projectDuplicates.some(d => d.taskId === t.task.id)
+                            );
+                            
+                            if (!alreadyCounted) {
+                                // Duplicado por contenido
+                                projectDuplicates.push({
+                                    type: 'CONTENT',
+                                    contentHash: contentHash.substring(0, 50) + '...',
+                                    count: taskList.length,
+                                    tasks: taskList
+                                });
+                                duplicateTasks += taskList.length - 1;
+                            }
+                        }
+                    });
+
+                    if (projectDuplicates.length > 0) {
+                        projectsWithDuplicates++;
+                        duplicateDetails.push({
+                            projectId,
+                            projectName,
+                            duplicates: projectDuplicates
+                        });
+                    }
+
+                    uniqueTasks += projectUnique.length;
+
+                    // Crear análisis para la interfaz
+                    taskAnalysis.push({
+                        projectId,
+                        projectName,
+                        totalTasks: tasks.length,
+                        uniqueTasks: projectUnique.length,
+                        duplicateTasks: projectDuplicates.length,
+                        duplicates: projectDuplicates
+                    });
+                });
+
+                // Actualizar estadísticas
+                updateStats({
+                    totalTasks,
+                    uniqueTasks,
+                    duplicateTasks,
+                    projectsWithDuplicates,
+                    totalProjects: Object.keys(tasksByProject).length
+                });
+
+                // Actualizar análisis de tareas
+                updateTaskAnalysis(taskAnalysis);
+
+                // Generar reporte detallado
+                let reportText = `🔍 ANÁLISIS PROFUNDO DE DUPLICACIÓN\n`;
+                reportText += `====================================\n\n`;
+                reportText += `📊 RESUMEN GENERAL:\n`;
+                reportText += `• Total de tareas: ${totalTasks}\n`;
+                reportText += `• Tareas únicas: ${uniqueTasks}\n`;
+                reportText += `• Tareas duplicadas: ${duplicateTasks}\n`;
+                reportText += `• Proyectos con duplicados: ${projectsWithDuplicates}/${Object.keys(tasksByProject).length}\n\n`;
+
+                if (duplicateDetails.length > 0) {
+                    reportText += `🚨 DUPLICADOS DETECTADOS:\n\n`;
+                    duplicateDetails.forEach(project => {
+                        reportText += `📁 Proyecto: ${project.projectName} (${project.projectId})\n`;
+                        project.duplicates.forEach(dup => {
+                            reportText += `  ${dup.type === 'ID' ? '🆔' : '📄'} Duplicado por ${dup.type}: ${dup.count} instancias\n`;
+                            if (dup.type === 'ID') {
+                                reportText += `    ID: ${dup.taskId}\n`;
+                                reportText += `    Nombre: ${dup.tasks[0].task.name}\n`;
+                            }
+                            reportText += `    Posiciones: ${dup.tasks.map(t => t.index).join(', ')}\n\n`;
+                        });
+                    });
+
+                    reportText += `🔧 POSIBLES CAUSAS:\n`;
+                    reportText += `• Múltiples llamadas a setTasks()\n`;
+                    reportText += `• Problemas en updateCurrentProjectTasks()\n`;
+                    reportText += `• Sincronización con Supabase\n`;
+                    reportText += `• Eventos duplicados en la interfaz\n`;
+                    reportText += `• Problemas en el cálculo CPM\n\n`;
+
+                    reportText += `🛠️ SOLUCIONES RECOMENDADAS:\n`;
+                    reportText += `• Revisar logs de setTasks en la consola\n`;
+                    reportText += `• Verificar que no haya múltiples useEffect ejecutándose\n`;
+                    reportText += `• Comprobar sincronización con Supabase\n`;
+                    reportText += `• Usar el rastreador de ciclo de vida\n`;
+                } else {
+                    reportText += `✅ NO SE DETECTARON DUPLICADOS\n`;
+                    reportText += `El problema puede estar en:\n`;
+                    reportText += `• La creación de nuevas tareas\n`;
+                    reportText += `• La sincronización en tiempo real\n`;
+                    reportText += `• Problemas de concurrencia\n`;
+                }
+
+                results.textContent = reportText;
+                results.className = duplicateTasks > 0 ? 'result error-result' : 'result success-result';
+
+                // Guardar datos de debug
+                debugData = {
+                    timestamp: new Date().toISOString(),
+                    summary: {
+                        totalTasks,
+                        uniqueTasks,
+                        duplicateTasks,
+                        projectsWithDuplicates
+                    },
+                    details: duplicateDetails,
+                    taskAnalysis
+                };
+
+            } catch (error) {
+                results.className = 'result error-result';
+                results.textContent = `❌ Error durante el análisis: ${error.message}`;
+            }
+        }
+
+        // Rastrear ciclo de vida de tareas
+        function traceTaskLifecycle() {
+            const traceLogElement = document.getElementById('traceLog');
+            traceLogElement.innerHTML = '🔄 Iniciando rastreo del ciclo de vida de tareas...\n';
+            traceLog = [];
+
+            // Interceptar localStorage
+            const originalSetItem = localStorage.setItem;
+            localStorage.setItem = function(key, value) {
+                if (key === 'mi-dashboard-portfolio') {
+                    const timestamp = new Date().toLocaleTimeString();
+                    traceLog.push(`[${timestamp}] localStorage.setItem('${key}')`);
+                    
+                    try {
+                        const data = JSON.parse(value);
+                        const tasksByProject = data.tasksByProject || {};
+                        Object.entries(tasksByProject).forEach(([projectId, tasks]) => {
+                            if (Array.isArray(tasks)) {
+                                traceLog.push(`  📁 Proyecto ${projectId}: ${tasks.length} tareas`);
+                            }
+                        });
+                    } catch (e) {
+                        traceLog.push(`  ❌ Error al parsear datos: ${e.message}`);
+                    }
+                }
+                return originalSetItem.apply(this, arguments);
+            };
+
+            // Interceptar console.log para detectar setTasks
+            const originalConsoleLog = console.log;
+            console.log = function(...args) {
+                const message = args.join(' ');
+                if (message.includes('setTasks') || message.includes('updateCurrentProjectTasks')) {
+                    const timestamp = new Date().toLocaleTimeString();
+                    traceLog.push(`[${timestamp}] ${message}`);
+                }
+                return originalConsoleLog.apply(this, arguments);
+            };
+
+            // Actualizar log cada segundo
+            const updateInterval = setInterval(() => {
+                if (traceLog.length > 0) {
+                    traceLogElement.innerHTML = traceLog.slice(-20).join('\n');
+                    traceLogElement.scrollTop = traceLogElement.scrollHeight;
+                }
+            }, 1000);
+
+            // Detener después de 30 segundos
+            setTimeout(() => {
+                clearInterval(updateInterval);
+                localStorage.setItem = originalSetItem;
+                console.log = originalConsoleLog;
+                traceLog.push('⏹️ Rastreo detenido');
+                traceLogElement.innerHTML = traceLog.join('\n');
+            }, 30000);
+        }
+
+        // Verificar cambios en localStorage
+        function checkLocalStorageChanges() {
+            const results = document.getElementById('results');
+            results.className = 'result info-result';
+            results.textContent = '💾 Verificando cambios en localStorage...';
+
+            try {
+                const portfolioData = localStorage.getItem('mi-dashboard-portfolio');
+                if (!portfolioData) {
+                    results.className = 'result error-result';
+                    results.textContent = '❌ No se encontraron datos en localStorage';
+                    return;
+                }
+
+                const data = JSON.parse(portfolioData);
+                const tasksByProject = data.tasksByProject || {};
+
+                let reportText = `💾 ANÁLISIS DE LOCALSTORAGE\n`;
+                reportText += `===========================\n\n`;
+
+                Object.entries(tasksByProject).forEach(([projectId, tasks]) => {
+                    reportText += `📁 Proyecto: ${projectId}\n`;
+                    if (Array.isArray(tasks)) {
+                        reportText += `  📊 Total de tareas: ${tasks.length}\n`;
+                        
+                        // Verificar IDs únicos
+                        const taskIds = new Set();
+                        const duplicateIds = [];
+                        
+                        tasks.forEach((task, index) => {
+                            if (taskIds.has(task.id)) {
+                                duplicateIds.push({ id: task.id, index, name: task.name });
+                            } else {
+                                taskIds.add(task.id);
+                            }
+                        });
+
+                        if (duplicateIds.length > 0) {
+                            reportText += `  🚨 Duplicados por ID: ${duplicateIds.length}\n`;
+                            duplicateIds.forEach(dup => {
+                                reportText += `    • ID: ${dup.id}, Posición: ${dup.index}, Nombre: ${dup.name}\n`;
+                            });
+                        } else {
+                            reportText += `  ✅ Sin duplicados por ID\n`;
+                        }
+                    } else {
+                        reportText += `  ❌ Datos inválidos: ${typeof tasks}\n`;
+                    }
+                    reportText += `\n`;
+                });
+
+                results.textContent = reportText;
+                results.className = 'result info-result';
+
+            } catch (error) {
+                results.className = 'result error-result';
+                results.textContent = `❌ Error al verificar localStorage: ${error.message}`;
+            }
+        }
+
+        // Simular creación de tarea
+        function simulateTaskCreation() {
+            const results = document.getElementById('results');
+            results.className = 'result info-result';
+            results.textContent = '🧪 Simulando creación de tarea...';
+
+            try {
+                // Obtener datos actuales
+                const portfolioData = localStorage.getItem('mi-dashboard-portfolio');
+                if (!portfolioData) {
+                    results.className = 'result error-result';
+                    results.textContent = '❌ No se encontraron datos en localStorage';
+                    return;
+                }
+
+                const data = JSON.parse(portfolioData);
+                const tasksByProject = data.tasksByProject || {};
+                const projects = data.projects || [];
+
+                // Encontrar el primer proyecto activo
+                const activeProject = projects.find(p => p.status === 'active');
+                if (!activeProject) {
+                    results.className = 'result error-result';
+                    results.textContent = '❌ No se encontró proyecto activo';
+                    return;
+                }
+
+                const projectId = activeProject.id;
+                const currentTasks = tasksByProject[projectId] || [];
+
+                // Crear nueva tarea de prueba
+                const newTask = {
+                    id: `debug-task-${Date.now()}`,
+                    name: 'Tarea de Prueba Debug',
+                    duration: 5,
+                    startDate: new Date().toISOString().split('T')[0],
+                    endDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                    progress: 0,
+                    predecessors: [],
+                    successors: [],
+                    cost: 0,
+                    priority: 'medium',
+                    assignedTo: '',
+                    isMilestone: false,
+                    isCritical: false,
+                    originalDuration: 5,
+                    description: 'Tarea creada para debug de duplicación'
+                };
+
+                // Simular la adición de la tarea
+                const updatedTasks = [...currentTasks, newTask];
+                tasksByProject[projectId] = updatedTasks;
+                data.tasksByProject = tasksByProject;
+                data.timestamp = new Date().toISOString();
+
+                // Guardar en localStorage
+                localStorage.setItem('mi-dashboard-portfolio', JSON.stringify(data));
+
+                let reportText = `🧪 SIMULACIÓN DE CREACIÓN DE TAREA\n`;
+                reportText += `===================================\n\n`;
+                reportText += `📁 Proyecto: ${activeProject.name} (${projectId})\n`;
+                reportText += `🆔 Nueva tarea ID: ${newTask.id}\n`;
+                reportText += `📊 Tareas antes: ${currentTasks.length}\n`;
+                reportText += `📊 Tareas después: ${updatedTasks.length}\n\n`;
+                reportText += `✅ Tarea agregada exitosamente\n`;
+                reportText += `🔄 Recarga la aplicación para ver si se duplica\n`;
+
+                results.textContent = reportText;
+                results.className = 'result success-result';
+
+            } catch (error) {
+                results.className = 'result error-result';
+                results.textContent = `❌ Error en simulación: ${error.message}`;
+            }
+        }
+
+        // Actualizar estadísticas
+        function updateStats(stats) {
+            const statsContainer = document.getElementById('stats');
+            statsContainer.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-number">${stats.totalTasks}</div>
+                    <div class="stat-label">Total Tareas</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${stats.uniqueTasks}</div>
+                    <div class="stat-label">Tareas Únicas</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${stats.duplicateTasks}</div>
+                    <div class="stat-label">Tareas Duplicadas</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${stats.projectsWithDuplicates}</div>
+                    <div class="stat-label">Proyectos con Duplicados</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${stats.totalProjects}</div>
+                    <div class="stat-label">Total Proyectos</div>
+                </div>
+            `;
+        }
+
+        // Actualizar análisis de tareas
+        function updateTaskAnalysis(analysis) {
+            const analysisContainer = document.getElementById('taskAnalysis');
+            
+            if (analysis.length === 0) {
+                analysisContainer.innerHTML = '<p>No hay proyectos para analizar</p>';
+                return;
+            }
+
+            analysisContainer.innerHTML = analysis.map(project => `
+                <div class="task-card ${project.duplicateTasks > 0 ? 'duplicate' : 'unique'}">
+                    <div class="task-id">📁 ${project.projectName}</div>
+                    <div class="task-name">${project.projectId}</div>
+                    <div class="task-meta">
+                        📊 Total: ${project.totalTasks} | 
+                        ✅ Únicas: ${project.uniqueTasks} | 
+                        ${project.duplicateTasks > 0 ? '🚨' : '✅'} Duplicados: ${project.duplicateTasks}
+                    </div>
+                    ${project.duplicates.length > 0 ? `
+                        <div class="task-meta" style="margin-top: 10px; color: #e74c3c;">
+                            ${project.duplicates.map(dup => 
+                                `${dup.type === 'ID' ? '🆔' : '📄'} ${dup.count} instancias`
+                            ).join(' | ')}
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('');
+        }
+
+        // Ejecutar análisis automático al cargar
+        window.onload = function() {
+            analyzeDuplication();
+        };
+    </script>
+</body>
+</html>
