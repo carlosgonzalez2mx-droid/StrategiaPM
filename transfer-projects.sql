@@ -67,10 +67,10 @@ AND EXISTS (
     AND column_name = 'owner_id'
 );
 
--- 8. Verificar tareas transferidas (solo si existe owner_id)
+-- 8. Verificar tareas transferidas (usando columnas que existen)
 SELECT 
     t.id,
-    t.title,
+    t.name as task_name,
     t.project_id,
     p.name as project_name
 FROM tasks t
@@ -79,4 +79,4 @@ WHERE t.project_id IN (
     SELECT id FROM projects 
     WHERE owner_id = '7b40ce74-b881-4594-aa9d-5e136740eeff'
 )
-ORDER BY p.name, t.title;
+ORDER BY p.name, t.name;

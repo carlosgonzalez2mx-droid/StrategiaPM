@@ -27,6 +27,7 @@ import DataManager from './components/DataManager';
 import FileStatusIndicator from './components/FileStatusIndicator';
 import SupabaseAuth from './components/SupabaseAuth';
 import OrganizationMembers from './components/OrganizationMembers';
+import SplashScreen from './components/SplashScreen';
 import filePersistenceService from './services/FilePersistenceService';
 import supabaseService from './services/SupabaseService';
 
@@ -36,7 +37,7 @@ import { ProjectProvider } from './contexts/ProjectContext';
 
 // Componente principal de la aplicación (requiere autenticación)
 function MainApp() {
-  const { user } = useAuth();
+  const { user, showSplash, completeSplash } = useAuth();
   
   // ===== ESTADO MULTI-PROYECTO =====
   const [projects, setProjects] = useState([
@@ -1499,6 +1500,11 @@ function MainApp() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Splash Screen */}
+      {showSplash && (
+        <SplashScreen onComplete={completeSplash} />
+      )}
+      
       {/* Modal de autenticación */}
       {showAuthModal && (
         <SupabaseAuth

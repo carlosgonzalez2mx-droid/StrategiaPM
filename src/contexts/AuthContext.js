@@ -80,69 +80,7 @@ export const ROLE_PERMISSIONS = {
   }
 };
 
-// Usuarios de ejemplo para testing
-export const SAMPLE_USERS = [
-  {
-    id: "1",
-    email: "pm@strategiapm.com",
-    password: "pm123", // En producción esto sería un hash
-    firstName: "Ana",
-    lastName: "García",
-    role: "project_manager",
-    isActive: true,
-    avatar: "👩‍💼"
-  },
-  {
-    id: "2",
-    email: "ejecutivo@strategiapm.com",
-    password: "ejec123",
-    firstName: "Carlos",
-    lastName: "Rodríguez",
-    role: "executive_manager",
-    isActive: true,
-    avatar: "👨‍💼"
-  },
-  {
-    id: "3",
-    email: "asistente@strategiapm.com",
-    password: "asis123",
-    firstName: "María",
-    lastName: "López",
-    role: "pmo_assistant",
-    isActive: true,
-    avatar: "👩‍💻"
-  },
-  {
-    id: "4",
-    email: "financiero@strategiapm.com",
-    password: "fin123",
-    firstName: "Roberto",
-    lastName: "Martínez",
-    role: "financial_analyst",
-    isActive: true,
-    avatar: "👨‍💻"
-  },
-  {
-    id: "5",
-    email: "coordinador@strategiapm.com",
-    password: "coord123",
-    firstName: "Laura",
-    lastName: "Fernández",
-    role: "project_coordinator",
-    isActive: true,
-    avatar: "👩‍🎯"
-  },
-  {
-    id: "6",
-    email: "auditor@strategiapm.com",
-    password: "audit123",
-    firstName: "Miguel",
-    lastName: "Sánchez",
-    role: "auditor",
-    isActive: true,
-    avatar: "👨‍🔍"
-  }
-];
+// Sistema de autenticación local eliminado - Solo Supabase
 
 const AuthContext = createContext();
 
@@ -158,48 +96,19 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [permissions, setPermissions] = useState([]);
-  const [users, setUsers] = useState(SAMPLE_USERS);
   const [loading, setLoading] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
 
   // Código problemático eliminado - no es necesario limpiar localStorage automáticamente
   // Esto causaba problemas de sincronización con la carga de datos del portfolio
 
-  // Función de login
+  // Función de login - Solo Supabase
   const login = async (email, password) => {
     setLoading(true);
-    
     try {
-      console.log('🔐 Intentando login con:', { email, password });
-      console.log('👥 Usuarios disponibles:', users);
-      
-      // Simular delay de red
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const foundUser = users.find(u => 
-        u.email === email && u.password === password && u.isActive
-      );
-      
-      console.log('🔍 Usuario encontrado:', foundUser);
-      
-      if (!foundUser) {
-        throw new Error('Credenciales inválidas o usuario inactivo');
-      }
-      
-      const userData = {
-        ...foundUser,
-        roleInfo: ROLE_PERMISSIONS[foundUser.role]
-      };
-      
-      console.log('✅ Login exitoso:', userData);
-      
-      setUser(userData);
-      setIsAuthenticated(true);
-      setPermissions(ROLE_PERMISSIONS[foundUser.role]?.permissions || []);
-      
-      // Guardar en localStorage
-      localStorage.setItem('strategiapm_user', JSON.stringify(userData));
-      
-      return userData;
+      // La lógica de login se maneja completamente en SupabaseService
+      console.log('🔐 Login manejado por SupabaseService');
+      return null;
     } catch (error) {
       console.error('❌ Error en login:', error);
       throw error;
@@ -214,6 +123,11 @@ export const AuthProvider = ({ children }) => {
     setIsAuthenticated(false);
     setPermissions([]);
     localStorage.removeItem('strategiapm_user');
+  };
+
+  // Función para completar el splash screen
+  const completeSplash = () => {
+    setShowSplash(false);
   };
 
   // Función para limpiar completamente el estado (útil para debugging)
@@ -309,8 +223,8 @@ export const AuthProvider = ({ children }) => {
     user,
     isAuthenticated,
     permissions,
-    users,
     loading,
+    showSplash,
     hasPermission,
     hasModuleAccess,
     getUserPermissions,
@@ -318,9 +232,7 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     clearAuthState,
-    createUser,
-    updateUser,
-    deleteUser
+    completeSplash
   };
 
   return (
