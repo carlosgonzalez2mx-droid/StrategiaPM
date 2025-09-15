@@ -47,24 +47,36 @@ FROM projects p
 LEFT JOIN auth.users u ON u.id = p.owner_id
 ORDER BY p.created_at;
 
--- 6. También transferir las tareas asociadas
+-- 6. Verificar estructura de la tabla tasks
+SELECT column_name, data_type 
+FROM information_schema.columns 
+WHERE table_name = 'tasks' 
+ORDER BY ordinal_position;
+
+-- 7. Transferir tareas solo si tienen owner_id
 UPDATE tasks 
 SET 
-    owner_id = '7b40ce74-b881-4594-aa9d-5e136740eeff',
-    updated_at = NOW()
+    owner_id = '7b40ce74-b881-4594-aa9d-5e136740eeff'
 WHERE project_id IN (
     SELECT id FROM projects 
     WHERE owner_id = '7b40ce74-b881-4594-aa9d-5e136740eeff'
+)
+AND EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'tasks' 
+    AND column_name = 'owner_id'
 );
 
--- 7. Verificar tareas transferidas
+-- 8. Verificar tareas transferidas (solo si existe owner_id)
 SELECT 
     t.id,
     t.title,
     t.project_id,
-    p.name as project_name,
-    t.owner_id
+    p.name as project_name
 FROM tasks t
 JOIN projects p ON p.id = t.project_id
-WHERE t.owner_id = '7b40ce74-b881-4594-aa9d-5e136740eeff'
+WHERE t.project_id IN (
+    SELECT id FROM projects 
+    WHERE owner_id = '7b40ce74-b881-4594-aa9d-5e136740eeff'
+)
 ORDER BY p.name, t.title;
