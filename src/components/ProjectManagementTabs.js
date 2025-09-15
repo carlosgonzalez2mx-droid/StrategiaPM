@@ -269,6 +269,16 @@ const ProjectManagementTabs = ({
 
   const evmMetrics = calculateEVMMetrics();
 
+  // Calcular fecha de inicio real del cronograma basada en las tareas
+  const calculateProjectStartDate = () => {
+    if (!tasks || tasks.length === 0) return null;
+    
+    const startDates = tasks.map(task => new Date(task.startDate));
+    const minStartDate = new Date(Math.min(...startDates));
+    
+    return minStartDate.toISOString().split('T')[0];
+  };
+
   // Calcular fecha de fin real del cronograma basada en las tareas
   const calculateProjectEndDate = () => {
     if (!tasks || tasks.length === 0) return null;
@@ -279,6 +289,7 @@ const ProjectManagementTabs = ({
     return maxEndDate.toISOString().split('T')[0];
   };
 
+  const projectStartDate = calculateProjectStartDate();
   const projectEndDate = calculateProjectEndDate();
 
   const getPerformanceColor = (value) => {
@@ -326,7 +337,7 @@ const ProjectManagementTabs = ({
                   </span>
                   <span className="flex items-center space-x-1">
                     <span className="text-red-500">📅</span>
-                    <span>{currentProject.startDate} - {projectEndDate || currentProject.endDate}</span>
+                    <span>{projectStartDate || currentProject.startDate} - {projectEndDate || currentProject.endDate}</span>
                   </span>
                 </div>
                 {/* KPIs en tiempo real */}
@@ -479,7 +490,7 @@ const ProjectManagementTabs = ({
                       <span className="text-sm font-medium text-green-600">Inicio</span>
                     </div>
                     <div className="text-xl font-bold text-green-800">
-                      {currentProject?.startDate ? new Date(currentProject.startDate).toLocaleDateString('es-ES') : 'N/A'}
+                      {projectStartDate ? new Date(projectStartDate).toLocaleDateString('es-ES') : 'N/A'}
                     </div>
                     <div className="text-sm text-green-600 mt-1">
                       Fecha de inicio del cronograma
