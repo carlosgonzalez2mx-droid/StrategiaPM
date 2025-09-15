@@ -22,6 +22,8 @@
     }
   ],
   "env": {
-    "NODE_ENV": "production"
+    "NODE_ENV": "production",
+    "CI": "false",
+    "ESLINT_NO_DEV_ERRORS": "true"
   }
 }

@@ -8,6 +8,9 @@ cleanup-*.js
 !vercel.json
 !package.json
 !package-lock.json
+!eslintrc.js
+!tailwind.config.js
+!postcss.config.js
 desktop-app/
 electron-app/
 executable/
