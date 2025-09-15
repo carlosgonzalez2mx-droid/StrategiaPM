@@ -1002,14 +1002,33 @@ function MainApp() {
       setUseSupabase(newUseSupabase);
     };
 
+    const handleRequestSupabaseAuth = (event) => {
+      const { action } = event.detail;
+      console.log('🔐 Solicitud de autenticación Supabase:', action);
+      
+      if (action === 'activate') {
+        // Verificar si ya está autenticado
+        if (supabaseService.isAuthenticated()) {
+          console.log('✅ Ya está autenticado, activando Supabase...');
+          setUseSupabase(true);
+          alert('✅ Supabase activado\n\nLos datos se sincronizarán automáticamente con la base de datos en la nube.');
+        } else {
+          console.log('🔐 No está autenticado, mostrando modal...');
+          setShowAuthModal(true);
+        }
+      }
+    };
+
     window.addEventListener('dataRestore', handleDataRestore);
     window.addEventListener('dataImport', handleDataImport);
     window.addEventListener('toggleSupabase', handleToggleSupabase);
+    window.addEventListener('requestSupabaseAuth', handleRequestSupabaseAuth);
 
     return () => {
       window.removeEventListener('dataRestore', handleDataRestore);
       window.removeEventListener('dataImport', handleDataImport);
       window.removeEventListener('toggleSupabase', handleToggleSupabase);
+      window.removeEventListener('requestSupabaseAuth', handleRequestSupabaseAuth);
     };
   }, []);
 

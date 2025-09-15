@@ -364,20 +364,21 @@ const ProjectManagementTabs = ({
           </label>
           <button
             onClick={() => {
-              // Toggle Supabase mode
-              const newUseSupabase = !useSupabase;
-              console.log('🔄 Cambiando modo Supabase:', newUseSupabase);
-              
-              // Disparar evento personalizado para notificar al componente padre
-              window.dispatchEvent(new CustomEvent('toggleSupabase', { 
-                detail: { useSupabase: newUseSupabase } 
-              }));
-              
-              // Mostrar mensaje al usuario
-              if (newUseSupabase) {
-                alert('✅ Supabase activado\n\nLos datos se sincronizarán automáticamente con la base de datos en la nube.');
-              } else {
+              if (useSupabase) {
+                // Si ya está activo, desactivar
+                console.log('🔄 Desactivando Supabase...');
+                window.dispatchEvent(new CustomEvent('toggleSupabase', { 
+                  detail: { useSupabase: false } 
+                }));
                 alert('⚠️ Supabase desactivado\n\nLos datos se guardarán solo localmente.');
+              } else {
+                // Si no está activo, verificar autenticación y activar
+                console.log('🔄 Intentando activar Supabase...');
+                
+                // Disparar evento para abrir modal de autenticación
+                window.dispatchEvent(new CustomEvent('requestSupabaseAuth', { 
+                  detail: { action: 'activate' } 
+                }));
               }
             }}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
