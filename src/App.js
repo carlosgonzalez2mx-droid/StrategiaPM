@@ -996,12 +996,20 @@ function MainApp() {
       if (data.auditLogsByProject) setAuditLogsByProject(data.auditLogsByProject);
     };
 
+    const handleToggleSupabase = (event) => {
+      const { useSupabase: newUseSupabase } = event.detail;
+      console.log('🔄 Toggle Supabase desde ProjectManagementTabs:', newUseSupabase);
+      setUseSupabase(newUseSupabase);
+    };
+
     window.addEventListener('dataRestore', handleDataRestore);
     window.addEventListener('dataImport', handleDataImport);
+    window.addEventListener('toggleSupabase', handleToggleSupabase);
 
     return () => {
       window.removeEventListener('dataRestore', handleDataRestore);
       window.removeEventListener('dataImport', handleDataImport);
+      window.removeEventListener('toggleSupabase', handleToggleSupabase);
     };
   }, []);
 

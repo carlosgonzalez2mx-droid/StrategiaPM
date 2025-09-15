@@ -358,9 +358,37 @@ const ProjectManagementTabs = ({
 
       {/* Selector de Proyectos Activos */}
       <div className="bg-white rounded-lg shadow-sm p-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Proyecto Activo
-        </label>
+        <div className="flex items-center justify-between mb-2">
+          <label className="block text-sm font-medium text-gray-700">
+            Proyecto Activo
+          </label>
+          <button
+            onClick={() => {
+              // Toggle Supabase mode
+              const newUseSupabase = !useSupabase;
+              console.log('🔄 Cambiando modo Supabase:', newUseSupabase);
+              
+              // Disparar evento personalizado para notificar al componente padre
+              window.dispatchEvent(new CustomEvent('toggleSupabase', { 
+                detail: { useSupabase: newUseSupabase } 
+              }));
+              
+              // Mostrar mensaje al usuario
+              if (newUseSupabase) {
+                alert('✅ Supabase activado\n\nLos datos se sincronizarán automáticamente con la base de datos en la nube.');
+              } else {
+                alert('⚠️ Supabase desactivado\n\nLos datos se guardarán solo localmente.');
+              }
+            }}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              useSupabase 
+                ? 'bg-green-100 text-green-800 border border-green-300 hover:bg-green-200' 
+                : 'bg-blue-100 text-blue-800 border border-blue-300 hover:bg-blue-200'
+            }`}
+          >
+            {useSupabase ? '🟢 Supabase Activo' : '🔵 Activar Supabase'}
+          </button>
+        </div>
         <select
           value={currentProjectId}
           onChange={(e) => setCurrentProjectId(e.target.value)}
