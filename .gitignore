@@ -17,6 +17,7 @@ executable/
 *.html
 !debug-supabase-permissions.html
 !debug-simple.html
+!fix-user-role.html
 *.sql
 *.md
 *.txt
