@@ -22,6 +22,7 @@ executable/
 !transfer-projects.sql
 *.sql
 !transfer-projects.sql
+!transfer-projects-simple.sql
 *.md
 *.txt
 .DS_Store
