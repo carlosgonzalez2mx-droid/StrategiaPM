@@ -16,6 +16,7 @@ electron-app/
 executable/
 *.html
 !debug-supabase-permissions.html
+!debug-simple.html
 *.sql
 *.md
 *.txt
