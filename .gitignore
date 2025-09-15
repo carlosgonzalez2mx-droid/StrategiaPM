@@ -13,3 +13,4 @@ executable/
 *.md
 *.txt
 .DS_Store
+node_modules/
