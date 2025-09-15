@@ -1500,11 +1500,6 @@ function MainApp() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Splash Screen */}
-      {showSplash && (
-        <SplashScreen onComplete={completeSplash} />
-      )}
-      
       {/* Modal de autenticación */}
       {showAuthModal && (
         <SupabaseAuth
@@ -1665,20 +1660,34 @@ function App() {
     <Router>
       <AuthProvider>
         <ProjectProvider>
-    <Routes>
-            <Route path="/login" element={<LoginForm />} />
-      <Route 
-        path="/*" 
-              element={
-                <ProtectedRoute>
-                  <MainApp />
-                </ProtectedRoute>
-              } 
-      />
-    </Routes>
+          <AppContent />
         </ProjectProvider>
       </AuthProvider>
     </Router>
+  );
+}
+
+// Componente que maneja el splash screen y la autenticación
+function AppContent() {
+  const { showSplash, completeSplash, isAuthenticated } = useAuth();
+
+  // Si está mostrando splash screen, no verificar autenticación
+  if (showSplash) {
+    return <SplashScreen onComplete={completeSplash} />;
+  }
+
+  return (
+    <Routes>
+      <Route path="/login" element={<LoginForm />} />
+      <Route 
+        path="/*" 
+        element={
+          <ProtectedRoute>
+            <MainApp />
+          </ProtectedRoute>
+        } 
+      />
+    </Routes>
   );
 }
 

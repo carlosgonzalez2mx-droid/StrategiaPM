@@ -99,6 +99,26 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
 
+  // Verificar autenticación al cargar
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        // Verificar si hay usuario en localStorage
+        const savedUser = localStorage.getItem('strategiapm_user');
+        if (savedUser) {
+          const userData = JSON.parse(savedUser);
+          setUser(userData);
+          setIsAuthenticated(true);
+          setPermissions(ROLE_PERMISSIONS[userData.role]?.permissions || []);
+        }
+      } catch (error) {
+        console.error('Error verificando autenticación:', error);
+      }
+    };
+
+    checkAuth();
+  }, []);
+
   // Código problemático eliminado - no es necesario limpiar localStorage automáticamente
   // Esto causaba problemas de sincronización con la carga de datos del portfolio
 
