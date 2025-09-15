@@ -198,10 +198,11 @@ class SupabaseService {
         }
       }
 
-      // Cargar proyectos (TODOS los proyectos, no solo los de la organización)
+      // Cargar proyectos de la organización del usuario
       const { data: projects, error: projectsError } = await this.supabase
         .from('projects')
-        .select('*');
+        .select('*')
+        .eq('organization_id', this.organizationId);
 
       if (projectsError) {
         console.error('❌ Error cargando proyectos:', projectsError);
@@ -1130,10 +1131,11 @@ class SupabaseService {
     try {
       console.log('🧹 Iniciando limpieza de duplicados en Supabase...');
 
-      // Obtener todos los proyectos
+      // Obtener proyectos de la organización
       const { data: projects, error: projectsError } = await this.supabase
         .from('projects')
-        .select('id, name');
+        .select('id, name')
+        .eq('organization_id', this.organizationId);
 
       if (projectsError) {
         console.error('❌ Error obteniendo proyectos:', projectsError);
