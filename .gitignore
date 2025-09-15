@@ -18,6 +18,7 @@ executable/
 !debug-supabase-permissions.html
 !debug-simple.html
 !fix-user-role.html
+!fix-role-safari.html
 *.sql
 *.md
 *.txt

@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fix User Role - Safari Compatible</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            margin: 20px; 
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .log { 
+            background: #f8f9fa; 
+            padding: 15px; 
+            margin: 10px 0; 
+            border-radius: 5px; 
+            border-left: 4px solid #007bff;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 14px;
+        }
+        .error { background: #fff5f5; color: #c53030; border-left-color: #e53e3e; }
+        .success { background: #f0fff4; color: #2f855a; border-left-color: #38a169; }
+        .warning { background: #fffaf0; color: #dd6b20; border-left-color: #ed8936; }
+        button { 
+            padding: 12px 24px; 
+            margin: 8px; 
+            background: #007bff; 
+            color: white; 
+            border: none; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-size: 16px;
+            font-weight: 500;
+        }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #6c757d; cursor: not-allowed; }
+        input { 
+            padding: 12px; 
+            margin: 8px; 
+            width: 100%; 
+            max-width: 400px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        h1 { color: #2d3748; text-align: center; }
+        h3 { color: #4a5568; margin-top: 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Corrección de Rol de Usuario</h1>
+        <p style="text-align: center; color: #666;">Herramienta compatible con Safari para cambiar tu rol de "user" a "owner"</p>
+        
+        <div class="section">
+            <h3>1. Autenticación</h3>
+            <input type="email" id="email" placeholder="Email" value="carlosgonzalez2.mx@gmail.com">
+            <br>
+            <input type="password" id="password" placeholder="Password">
+            <br>
+            <button onclick="signIn()">Iniciar Sesión</button>
+            <button onclick="signOut()">Cerrar Sesión</button>
+        </div>
+
+        <div class="section">
+            <h3>2. Verificar y Corregir Rol</h3>
+            <button onclick="checkCurrentRole()">Verificar Rol Actual</button>
+            <button onclick="fixUserRole()">Cambiar Rol a Owner</button>
+            <button onclick="verifyOrganization()">Verificar Organización</button>
+            <button onclick="testProjectAccess()">Probar Acceso a Proyectos</button>
+        </div>
+
+        <div class="section">
+            <h3>3. Logs de Resultados</h3>
+            <div id="output"></div>
+        </div>
+    </div>
+
+    <script>
+        const supabase = window.supabase.createClient(
+            'https://ogqpsrsssrrytrqoyyph.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ncXBzcnNzc3JyeXRycW95eXBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc3Nzc5NjAsImV4cCI6MjA3MzM1Mzk2MH0.EqXjG1iefYMZ84Tw-4po98gBV7uRuPoz0idQgJ03pzg'
+        );
+
+        let currentUser = null;
+
+        function log(message, type = 'log') {
+            const output = document.getElementById('output');
+            const logDiv = document.createElement('div');
+            logDiv.className = `log ${type}`;
+            logDiv.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong> - ${message}`;
+            output.appendChild(logDiv);
+            output.scrollTop = output.scrollHeight;
+            console.log(message);
+        }
+
+        async function signIn() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            if (!email || !password) {
+                log('❌ Por favor ingresa email y password', 'error');
+                return;
+            }
+
+            try {
+                log('🔄 Iniciando sesión...', 'warning');
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email,
+                    password
+                });
+
+                if (error) {
+                    log(`❌ Error de autenticación: ${error.message}`, 'error');
+                    return;
+                }
+
+                currentUser = data.user;
+                log(`✅ Usuario autenticado: ${currentUser.email}`, 'success');
+                log(`📋 ID del usuario: ${currentUser.id}`, 'log');
+                log(`📋 Rol actual: ${currentUser.user_metadata?.role || 'No definido'}`, 'warning');
+            } catch (error) {
+                log(`❌ Error inesperado: ${error.message}`, 'error');
+            }
+        }
+
+        async function signOut() {
+            try {
+                await supabase.auth.signOut();
+                currentUser = null;
+                log('✅ Sesión cerrada', 'success');
+            } catch (error) {
+                log(`❌ Error cerrando sesión: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkCurrentRole() {
+            if (!currentUser) {
+                log('❌ No hay usuario autenticado. Por favor inicia sesión primero.', 'error');
+                return;
+            }
+
+            log(`📋 Usuario: ${currentUser.email}`, 'log');
+            log(`📋 ID: ${currentUser.id}`, 'log');
+            log(`📋 Rol en user_metadata: ${currentUser.user_metadata?.role || 'No definido'}`, 'warning');
+            log(`📋 Rol en app_metadata: ${currentUser.app_metadata?.role || 'No definido'}`, 'warning');
+            
+            if (currentUser.user_metadata?.role === 'user') {
+                log('⚠️ Tu rol es "user". Necesitas cambiarlo a "owner" para acceder a los proyectos.', 'warning');
+            } else if (currentUser.user_metadata?.role === 'owner') {
+                log('✅ Tu rol ya es "owner". Deberías poder acceder a los proyectos.', 'success');
+            }
+        }
+
+        async function fixUserRole() {
+            if (!currentUser) {
+                log('❌ No hay usuario autenticado. Por favor inicia sesión primero.', 'error');
+                return;
+            }
+
+            try {
+                log('🔄 Cambiando rol a "owner"...', 'warning');
+                
+                // Actualizar el rol en user_metadata
+                const { data, error } = await supabase.auth.updateUser({
+                    data: {
+                        role: 'owner'
+                    }
+                });
+
+                if (error) {
+                    log(`❌ Error actualizando rol: ${error.message}`, 'error');
+                    return;
+                }
+
+                currentUser = data.user;
+                log(`✅ Rol actualizado a: ${currentUser.user_metadata?.role}`, 'success');
+                
+                // También actualizar en la tabla de usuarios si existe
+                const { error: updateError } = await supabase
+                    .from('users')
+                    .update({ role: 'owner' })
+                    .eq('id', currentUser.id);
+
+                if (updateError) {
+                    log(`⚠️ Error actualizando tabla users: ${updateError.message}`, 'warning');
+                } else {
+                    log('✅ Rol actualizado en tabla users', 'success');
+                }
+
+                log('🎉 ¡Rol cambiado exitosamente! Ahora deberías poder acceder a los proyectos.', 'success');
+
+            } catch (error) {
+                log(`❌ Error inesperado: ${error.message}`, 'error');
+            }
+        }
+
+        async function verifyOrganization() {
+            if (!currentUser) {
+                log('❌ No hay usuario autenticado. Por favor inicia sesión primero.', 'error');
+                return;
+            }
+
+            try {
+                log('🔄 Verificando organizaciones...', 'warning');
+                
+                // Buscar organizaciones del usuario
+                const { data: orgs, error } = await supabase
+                    .from('organizations')
+                    .select('*')
+                    .eq('owner_id', currentUser.id);
+
+                if (error) {
+                    log(`❌ Error obteniendo organizaciones: ${error.message}`, 'error');
+                    return;
+                }
+
+                log(`✅ Organizaciones encontradas: ${orgs.length}`, 'success');
+                orgs.forEach(org => {
+                    log(`  - ${org.name} (ID: ${org.id})`, 'log');
+                });
+
+                // Verificar si el usuario es owner de alguna organización
+                if (orgs.length > 0) {
+                    log('✅ Usuario es owner de al menos una organización', 'success');
+                } else {
+                    log('⚠️ Usuario no es owner de ninguna organización', 'warning');
+                }
+
+            } catch (error) {
+                log(`❌ Error inesperado: ${error.message}`, 'error');
+            }
+        }
+
+        async function testProjectAccess() {
+            if (!currentUser) {
+                log('❌ No hay usuario autenticado. Por favor inicia sesión primero.', 'error');
+                return;
+            }
+
+            try {
+                log('🔄 Probando acceso a proyectos...', 'warning');
+                
+                // Buscar organización del usuario
+                const { data: orgs, error: orgError } = await supabase
+                    .from('organizations')
+                    .select('id')
+                    .eq('owner_id', currentUser.id)
+                    .single();
+
+                if (orgError || !orgs) {
+                    log('❌ No se encontró organización del usuario', 'error');
+                    return;
+                }
+
+                log(`📋 Organización encontrada: ${orgs.id}`, 'log');
+
+                // Intentar acceder a proyectos de la organización
+                const { data: projects, error: projectsError } = await supabase
+                    .from('projects')
+                    .select('*')
+                    .eq('organization_id', orgs.id);
+
+                if (projectsError) {
+                    log(`❌ Error accediendo a proyectos: ${projectsError.message} (${projectsError.code})`, 'error');
+                } else {
+                    log(`✅ Proyectos encontrados: ${projects.length}`, 'success');
+                    projects.forEach(project => {
+                        log(`  - ${project.name} (ID: ${project.id})`, 'log');
+                    });
+                    
+                    if (projects.length > 0) {
+                        log('🎉 ¡Acceso a proyectos funcionando correctamente!', 'success');
+                    } else {
+                        log('⚠️ No se encontraron proyectos en tu organización', 'warning');
+                    }
+                }
+
+            } catch (error) {
+                log(`❌ Error inesperado: ${error.message}`, 'error');
+            }
+        }
+
+        // Auto-inicializar
+        window.onload = function() {
+            log('📋 Herramienta de corrección de rol cargada. Compatible con Safari.', 'warning');
+            log('💡 Instrucciones: 1) Inicia sesión, 2) Verifica tu rol, 3) Cambia a owner, 4) Prueba acceso', 'warning');
+        };
+    </script>
+</body>
+</html>
