@@ -1676,19 +1676,8 @@ function AppContent() {
     return <SplashScreen onComplete={completeSplash} />;
   }
 
-  return (
-    <Routes>
-      <Route path="/login" element={<LoginForm />} />
-      <Route 
-        path="/*" 
-        element={
-          <ProtectedRoute>
-            <MainApp />
-          </ProtectedRoute>
-        } 
-      />
-    </Routes>
-  );
+  // DESACTIVAR AUTENTICACIÓN - Cargar directamente MainApp
+  return <MainApp />;
 }
 
 export default App;
