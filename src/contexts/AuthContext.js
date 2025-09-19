@@ -113,6 +113,9 @@ export const AuthProvider = ({ children }) => {
         }
       } catch (error) {
         console.error('Error verificando autenticación:', error);
+      } finally {
+        // Completar el splash screen después de verificar autenticación
+        setShowSplash(false);
       }
     };
 
