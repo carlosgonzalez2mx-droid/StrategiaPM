@@ -2007,10 +2007,15 @@ const ProjectManagement = ({
             
             <div className="flex-1 overflow-auto p-4">
               <ScheduleManagement
+                tasks={[]}
+                setTasks={() => {}}
+                importTasks={() => {}}
                 projectData={currentProject}
                 workPackages={workPackages}
                 setWorkPackages={setWorkPackages}
                 reportingDate={reportingDate}
+                includeWeekends={false}
+                setIncludeWeekends={() => {}}
               />
             </div>
           </div>

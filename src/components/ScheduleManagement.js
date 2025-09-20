@@ -2042,20 +2042,30 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
       
       for (const predId of task.predecessors) {
         // 1. Verificar que la predecesora existe
-        const predecessorTask = tasks.find(t => t.id === predId);
+        // PRIMERO: Buscar por ID exacto
+        let predecessorTask = tasks.find(t => t.id === predId);
+        
+        // SEGUNDO: Si no se encuentra, buscar por número de fila (para Excel)
+        if (!predecessorTask && !isNaN(predId)) {
+          const rowNumber = parseInt(predId);
+          if (rowNumber > 0 && rowNumber <= tasks.length) {
+            predecessorTask = tasks[rowNumber - 1]; // Las filas empiezan en 1, el array en 0
+          }
+        }
+        
         if (!predecessorTask) {
           errors.push(`❌ Tarea "${task.name}": La predecesora "${predId}" no existe`);
           continue;
         }
         
         // 2. Verificar que no es la misma tarea
-        if (task.id === predId) {
+        if (task.id === predId || task === predecessorTask) {
           errors.push(`❌ Tarea "${task.name}": No puede ser predecesora de sí misma`);
           continue;
         }
         
         // 3. Verificar dependencia circular
-        if (hasCircularDependency(task.id, predId)) {
+        if (hasCircularDependency(task.id, predecessorTask.id)) {
           errors.push(`❌ Tarea "${task.name}": Dependencia circular con "${predecessorTask.name}"`);
           continue;
         }
@@ -2677,7 +2687,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         const start = obj['startdate'] ? parseExcelDate(obj['startdate']) : toISO(new Date());
         const end = obj['enddate'] ? parseExcelDate(obj['enddate']) : addDays(start, duration, includeWeekends);
         const progress = Number.isFinite(Number(obj['progress'])) ? Math.min(100, Math.max(0, Math.round(Number(obj['progress'])))) : 0;
-        const predecessors = String(obj['predecessors'] || '').split(',').map((s) => s.trim()).filter(Boolean);
+        const predecessors = String(obj['predecessors'] || obj['predecesoras'] || '').split(',').map((s) => s.trim()).filter(Boolean);
         const resources = String(obj['resources'] || '').split(',').map((s) => s.trim()).filter(Boolean);
         const cost = Number.isFinite(Number(obj['cost'])) ? Number(obj['cost']) : 0;
         const isMilestone = String(obj['ismilestone']).toLowerCase() === 'true' || duration === 0;
@@ -2741,7 +2751,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
       StartDate: task.startDate,
       EndDate: task.endDate,
       Progress: task.progress,
-      Predecessors: task.predecessors.join(', '),
+      Predecessors: task.predecessors?.join(', ') || '',
       Resources: task.resources.join(', '),
       Cost: task.cost,
       IsMilestone: task.isMilestone,
@@ -2798,7 +2808,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         task.priority || 'Media',
         task.assignedTo || 'Sin asignar',
         task.cost || 0,
-        task.predecessors?.map(p => p.name).join(', ') || 'Sin',
+        task.predecessors?.join(', ') || 'Sin',
         task.isMilestone ? 'Sí' : 'No',
         task.isCritical ? 'Sí' : 'No',
         task.isCritical ? 'Sí' : 'No'
@@ -3373,20 +3383,18 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
           status: 'pending' // Agregar status por defecto
         };
         
-        // Procesar predecesoras si existen
+        // Procesar predecesoras si existen - USAR EL PROCESAMIENTO CORRECTO
         if (row[columnMap.predecesoras]) {
           const predStr = row[columnMap.predecesoras].toString();
           console.log(`🔍 Procesando predecesoras para tarea ${i}: "${predStr}"`);
           
-          const predNumbers = predStr.split(/[,\s]+/)
-            .filter(n => n && !isNaN(n) && parseInt(n.trim()) > 0) // Solo números positivos
-            .map(n => parseInt(n.trim()))
-            .filter(num => num <= newTasks.length + 1); // Solo números válidos de fila
+          // PROCESAMIENTO CORRECTO: Dividir por comas y mantener los valores originales
+          const predValues = predStr.split(',').map(s => s.trim()).filter(Boolean);
+          console.log(`🔍 Valores de predecesoras procesados: [${predValues.join(', ')}]`);
           
-          console.log(`🔍 Números de predecesoras procesados: [${predNumbers.join(', ')}]`);
-          
-          task.predecessors = predNumbers.map(num => `task-${fileTimestamp}-${num}`).filter(id => id !== task.id);
-          console.log(`🔍 IDs de predecesoras generados: [${task.predecessors.join(', ')}]`);
+          // Mantener los valores originales como están (no convertir a números de fila)
+          task.predecessors = predValues;
+          console.log(`🔍 Predecesoras finales: [${task.predecessors.join(', ')}]`);
         }
         
         newTasks.push(task);
@@ -5296,8 +5304,20 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                               {task.predecessors.length > 0 ? (
                                 <div className="flex flex-wrap gap-1">
                                   {task.predecessors.map(predId => {
-                                    const predIndex = tasks.findIndex(t => t.id === predId);
-                                    const predNumber = predIndex + 1;
+                                    // Primero intentar buscar por ID exacto
+                                    let predIndex = tasks.findIndex(t => t.id === predId);
+                                    
+                                    // Si no se encuentra por ID, buscar por número de fila (para Excel importado)
+                                    if (predIndex === -1 && !isNaN(predId)) {
+                                      const rowNumber = parseInt(predId);
+                                      if (rowNumber > 0 && rowNumber <= tasks.length) {
+                                        predIndex = rowNumber - 1; // Las filas empiezan en 1, el array en 0
+                                      }
+                                    }
+                                    
+                                    // Si aún no se encuentra, mostrar el valor original
+                                    const predNumber = predIndex !== -1 ? predIndex + 1 : predId;
+                                    
                                     return (
                                       <span
                                         key={predId}
