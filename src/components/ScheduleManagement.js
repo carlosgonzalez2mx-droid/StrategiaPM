@@ -1986,17 +1986,27 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         dependencyType: t.dependencyType
       })));
       
+      // CORRECCIÓN: Recalcular fechas después de actualizar predecesoras
+      const recalculatedTasks = recalculateTaskDates(updatedTasks, includeWeekends);
+      console.log('🔄 FECHAS RECALCULADAS DESPUÉS DE ACTUALIZAR PREDECESORAS:', recalculatedTasks.map(t => ({
+        id: t.id,
+        name: t.name,
+        predecessors: t.predecessors,
+        startDate: t.startDate,
+        endDate: t.endDate
+      })));
+      
       // Actualizar selectedTask si es la tarea que se está editando
       if (selectedTask && selectedTask.id === taskId) {
-        const updatedSelectedTask = updatedTasks.find(t => t.id === taskId);
+        const updatedSelectedTask = recalculatedTasks.find(t => t.id === taskId);
         if (updatedSelectedTask) {
           setSelectedTask(updatedSelectedTask);
         }
       }
       
-      return updatedTasks;
+      return recalculatedTasks;
     });
-  }, [hasCircularDependency, selectedTask]);
+  }, [hasCircularDependency, selectedTask, recalculateTaskDates, includeWeekends]);
 
   // Función para manejar cambios en el campo nombre (sin loop infinito)
   const handleNameChange = useCallback((e) => {
@@ -2647,6 +2657,85 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
     };
   }, [selectedTask, hasCircularDependency, updatePredecessors]);
 
+  // Función para recalcular fechas de tareas basándose en dependencias
+  const recalculateTaskDates = useCallback((tasks, includeWeekends = false) => {
+    console.log('🔄 RECALCULANDO FECHAS DE TAREAS:', tasks.length);
+    
+    // Crear mapa de tareas por ID
+    const taskMap = new Map(tasks.map(t => [t.id, { ...t }]));
+    const processed = new Set();
+    const recalculated = [];
+    
+    // Función recursiva para procesar tareas en orden de dependencias
+    const processTask = (taskId) => {
+      if (processed.has(taskId)) return;
+      
+      const task = taskMap.get(taskId);
+      if (!task) return;
+      
+      // Procesar predecesoras primero
+      for (const predId of task.predecessors) {
+        processTask(predId);
+      }
+      
+      // Calcular nueva fecha de inicio basándose en predecesoras
+      let newStartDate = task.startDate;
+      
+      if (task.predecessors.length > 0) {
+        // Encontrar la fecha de fin más tardía de las predecesoras
+        let latestEndDate = null;
+        
+        for (const predId of task.predecessors) {
+          const predTask = taskMap.get(predId);
+          if (predTask) {
+            const predEndDate = new Date(predTask.endDate);
+            if (!latestEndDate || predEndDate > latestEndDate) {
+              latestEndDate = predEndDate;
+            }
+          }
+        }
+        
+        if (latestEndDate) {
+          // La tarea debe empezar después de que termine la última predecesora
+          newStartDate = toISO(latestEndDate);
+        }
+      }
+      
+      // Calcular nueva fecha de fin
+      const newEndDate = addDays(newStartDate, task.duration, includeWeekends);
+      
+      // Actualizar la tarea
+      const updatedTask = {
+        ...task,
+        startDate: newStartDate,
+        endDate: newEndDate,
+        earlyStart: newStartDate,
+        earlyFinish: newEndDate
+      };
+      
+      taskMap.set(taskId, updatedTask);
+      recalculated.push(updatedTask);
+      processed.add(taskId);
+      
+      console.log('🔄 TAREA RECALCULADA:', {
+        id: taskId,
+        name: task.name,
+        predecessors: task.predecessors,
+        oldStart: task.startDate,
+        newStart: newStartDate,
+        oldEnd: task.endDate,
+        newEnd: newEndDate
+      });
+    };
+    
+    // Procesar todas las tareas
+    for (const task of tasks) {
+      processTask(task.id);
+    }
+    
+    return recalculated;
+  }, []);
+
   // Función para actualizar datos del proyecto (ya no se usa)
   const updateBusinessCase = useCallback((field, value) => {
     // Esta función ya no se usa, pero se mantiene por compatibilidad
@@ -2715,12 +2804,22 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         }
       }
 
+      // CORRECCIÓN: Recalcular fechas basándose en las dependencias
+      const recalculatedTasks = recalculateTaskDates(imported, includeWeekends);
+      console.log('📊 TAREAS RECALCULADAS:', recalculatedTasks.map(t => ({
+        id: t.id,
+        name: t.name,
+        predecessors: t.predecessors,
+        startDate: t.startDate,
+        endDate: t.endDate
+      })));
+
       if (typeof importTasks === 'function') {
-        importTasks(imported);
-        console.log('📊 IMPORTACIÓN ANTIGUA - importTasks llamado exitosamente');
+        importTasks(recalculatedTasks);
+        console.log('📊 IMPORTACIÓN CORREGIDA - importTasks llamado exitosamente');
       } else {
-        setTasks(imported);
-        console.log('📊 IMPORTACIÓN ANTIGUA - setTasks llamado como fallback');
+        setTasks(recalculatedTasks);
+        console.log('📊 IMPORTACIÓN CORREGIDA - setTasks llamado como fallback');
       }
       setBaselineTasks([]);
       setShowBaseline(false);
