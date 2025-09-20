@@ -39,6 +39,8 @@ const OrganizationMembers = ({
           console.error('Error cargando miembros:', membersError);
           setError('Error cargando miembros de la organización');
         } else {
+          console.log('🔍 DEBUG - Datos cargados:', membersData);
+          
           // Filtrar solo miembros activos para mostrar
           const activeMembers = (membersData || []).filter(member => member.status === 'active');
           setMembers(activeMembers);
@@ -46,6 +48,9 @@ const OrganizationMembers = ({
           // Separar invitaciones pendientes
           const pendingInvitations = (membersData || []).filter(member => member.status === 'pending');
           setInvitations(pendingInvitations);
+          
+          console.log('🔍 DEBUG - Miembros activos:', activeMembers);
+          console.log('🔍 DEBUG - Invitaciones pendientes:', pendingInvitations);
         }
       }
     } catch (error) {
@@ -258,9 +263,12 @@ ${registrationUrl}`);
 
   const getRoleLabel = (role) => {
     switch (role) {
-      case 'owner': return 'Propietario';
-      case 'admin': return 'Administrador';
-      case 'member': return 'Miembro';
+      case 'organization_owner': return '👑 Administrador';
+      case 'organization_member_write': return '✏️ Miembro (Editar)';
+      case 'organization_member_read': return '👀 Miembro (Solo lectura)';
+      case 'owner': return '👑 Propietario';
+      case 'admin': return '👑 Administrador';
+      case 'member': return '✏️ Miembro';
       default: return role;
     }
   };
