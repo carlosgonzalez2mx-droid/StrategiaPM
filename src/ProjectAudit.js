@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import useAuditLog from '../hooks/useAuditLog';
+import AuditDiagnostic from './AuditDiagnostic';
 
 const ProjectAudit = ({ 
   projects, 
@@ -353,6 +354,12 @@ const ProjectAudit = ({
           </div>
         </div>
       </div>
+
+      {/* Diagnóstico del Sistema de Auditoría */}
+      <AuditDiagnostic 
+        projectId={currentProjectId} 
+        useSupabase={useSupabase} 
+      />
 
       {/* Filtros */}
       <div className="bg-white rounded-lg shadow-sm p-6">
