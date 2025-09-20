@@ -181,7 +181,8 @@ const Sidebar = ({
   const navigation = [
     { id: 'portfolio', name: 'Portafolio de Proyectos', icon: '🏢' },
     { id: 'project-management', name: 'Gestión de Proyectos', icon: '📊' },
-    { id: 'executive', name: 'Dashboard Ejecutivo', icon: '📈' }
+    { id: 'executive', name: 'Dashboard Ejecutivo', icon: '📈' },
+    { id: 'user-management', name: 'Gestión de Usuarios', icon: '👥' }
   ];
 
   const getSectionDescription = (sectionId) => {
@@ -189,6 +190,7 @@ const Sidebar = ({
       case 'portfolio': return 'Gestión estratégica de proyectos con Business Case, TIR y presupuestos';
       case 'project-management': return 'Control operativo con módulos de riesgos, cronograma y finanzas';
       case 'executive': return 'KPIs consolidados y métricas ejecutivas de todos los proyectos activos';
+      case 'user-management': return 'Gestionar usuarios, roles y permisos de la organización';
       default: return '';
     }
   };

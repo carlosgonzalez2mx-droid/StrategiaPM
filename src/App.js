@@ -26,6 +26,7 @@ import BackupManager from './components/BackupManager';
 import FileStatusIndicator from './components/FileStatusIndicator';
 import SupabaseAuth from './components/SupabaseAuth';
 import OrganizationMembers from './components/OrganizationMembers';
+import UserManagement from './components/UserManagement';
 import SplashScreen from './components/SplashScreen';
 import filePersistenceService from './services/FilePersistenceService';
 import supabaseService from './services/SupabaseService';
@@ -1555,6 +1556,15 @@ function MainApp() {
                 purchaseOrdersByProject={purchaseOrdersByProject}
                 advancesByProject={advancesByProject}
                 invoicesByProject={invoicesByProject}
+              />
+            )}
+
+            {/* Gestión de Usuarios */}
+            {activeSection === 'user-management' && (
+              <UserManagement
+                currentProject={currentProject}
+                useSupabase={useSupabase}
+                projects={projects}
               />
             )}
 

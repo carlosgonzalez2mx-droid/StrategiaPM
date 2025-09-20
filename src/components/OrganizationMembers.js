@@ -112,6 +112,10 @@ const OrganizationMembers = ({
           });
         }
 
+        const registrationUrl = window.location.hostname === 'localhost' 
+          ? 'https://strategiapm.vercel.app' 
+          : window.location.origin;
+
         alert(`✅ Invitación enviada a ${inviteEmail} con rol ${inviteRole}
 
 📧 El usuario recibirá acceso cuando:
@@ -119,7 +123,7 @@ const OrganizationMembers = ({
 2. O cuando acepte la invitación si ya está registrado
 
 Puedes compartir este enlace para que se registren:
-${window.location.origin}`);
+${registrationUrl}`);
 
         // Recargar miembros
         await loadOrganizationMembers();
