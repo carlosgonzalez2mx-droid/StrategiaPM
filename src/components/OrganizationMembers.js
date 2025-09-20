@@ -29,6 +29,15 @@ const OrganizationMembers = ({
       const { default: supabaseService } = await import('../services/SupabaseService');
       
       if (supabaseService.isAuthenticated()) {
+        console.log('🔍 DEBUG - Usuario autenticado:', supabaseService.getCurrentUser());
+        console.log('🔍 DEBUG - Organization ID:', organizationId);
+        
+        // Probar consulta directa sin filtros para ver si es problema de RLS
+        const { data: allMembers, error: allError } = await supabaseService.supabase
+          .from('organization_members')
+          .select('*');
+        console.log('🔍 DEBUG - Todos los miembros (sin filtro):', { allMembers, allError });
+        
         const { data: membersData, error: membersError } = await supabaseService.supabase
           .from('organization_members')
           .select('*')
@@ -36,7 +45,7 @@ const OrganizationMembers = ({
           .order('joined_at', { ascending: false });
 
         if (membersError) {
-          console.error('Error cargando miembros:', membersError);
+          console.error('❌ Error cargando miembros:', membersError);
           setError('Error cargando miembros de la organización');
         } else {
           console.log('🔍 DEBUG - Datos cargados:', membersData);
