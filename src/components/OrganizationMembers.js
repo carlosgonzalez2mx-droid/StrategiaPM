@@ -22,6 +22,7 @@ const OrganizationMembers = ({
 
   // Cargar miembros de la organización
   const loadOrganizationMembers = async () => {
+    console.log('🔍 DEBUG - loadOrganizationMembers ejecutándose', { useSupabase, organizationId });
     if (!useSupabase || !organizationId) return;
 
     try {
@@ -230,6 +231,7 @@ ${registrationUrl}`);
 
   // Cargar miembros al montar el componente
   useEffect(() => {
+    console.log('🔍 DEBUG - OrganizationMembers useEffect ejecutándose');
     loadOrganizationMembers();
   }, [organizationId, useSupabase]);
 
