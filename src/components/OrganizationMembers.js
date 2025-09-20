@@ -71,6 +71,13 @@ const OrganizationMembers = ({
         console.log('🔍 DEBUG - Usuario autenticado:', supabaseService.getCurrentUser());
         console.log('🔍 DEBUG - Organization ID:', organizationId);
         
+        // Verificar contexto de RLS
+        const { data: rlsTest, error: rlsError } = await supabaseService.supabase
+          .from('user_organization_roles')
+          .select('role, organization_id')
+          .eq('user_id', supabaseService.getCurrentUser()?.id);
+        console.log('🔍 DEBUG - RLS Context:', { rlsTest, rlsError });
+        
         // Verificar si el usuario ya está en la organización
         const { data: existingMember, error: memberError } = await supabaseService.supabase
           .from('organization_members')
