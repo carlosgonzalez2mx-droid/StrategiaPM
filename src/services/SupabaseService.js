@@ -1580,6 +1580,528 @@ class SupabaseService {
       return { success: false, error };
     }
   }
+
+  // ========== BACKUP DE BASE DE DATOS ==========
+
+  // Crear backup completo de la base de datos
+  async createDatabaseBackup() {
+    try {
+      console.log('🔄 Iniciando backup de base de datos...');
+      
+      // Obtener fecha actual para el nombre del archivo
+      const now = new Date();
+      const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
+      const timestamp = now.toISOString().replace(/[:.]/g, '-'); // Para timestamp único
+      
+      // Definir tablas a respaldar
+      const tables = [
+        'organizations',
+        'users', 
+        'projects',
+        'risks',
+        'tasks',
+        'purchase_orders',
+        'advances',
+        'invoices',
+        'contracts',
+        'resources',
+        'resource_assignments'
+      ];
+      
+      const backupData = {
+        metadata: {
+          timestamp: now.toISOString(),
+          version: '1.0',
+          source: 'supabase',
+          tables: tables,
+          organizationId: this.organizationId
+        },
+        data: {}
+      };
+      
+      // Consultar cada tabla
+      for (const tableName of tables) {
+        try {
+          console.log(`📊 Respaldo tabla: ${tableName}`);
+          
+          let query = this.supabase.from(tableName).select('*');
+          
+          // Aplicar filtros RLS si es necesario
+          if (tableName !== 'organizations' && this.organizationId) {
+            query = query.eq('organization_id', this.organizationId);
+          }
+          
+          const { data, error } = await query;
+          
+          if (error) {
+            console.warn(`⚠️ Error consultando tabla ${tableName}:`, error);
+            backupData.data[tableName] = [];
+          } else {
+            backupData.data[tableName] = data || [];
+            console.log(`✅ Tabla ${tableName}: ${data?.length || 0} registros`);
+          }
+        } catch (tableError) {
+          console.error(`❌ Error procesando tabla ${tableName}:`, tableError);
+          backupData.data[tableName] = [];
+        }
+      }
+      
+      // Crear nombre del archivo con prefijo DatabaseSt
+      const fileName = `DatabaseSt_${dateStr}.json`;
+      
+      // Convertir a JSON
+      const jsonData = JSON.stringify(backupData, null, 2);
+      
+      // Crear blob y descargar
+      const blob = new Blob([jsonData], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      
+      // Crear elemento de descarga
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      
+      // Limpiar
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      console.log(`✅ Backup completado: ${fileName}`);
+      
+      return {
+        success: true,
+        fileName,
+        recordCount: Object.values(backupData.data).reduce((total, tableData) => total + tableData.length, 0),
+        tables: tables.length
+      };
+      
+    } catch (error) {
+      console.error('❌ Error creando backup:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  // Crear backup silencioso (sin descarga automática)
+  async createSilentBackup() {
+    try {
+      console.log('🔄 Creando backup silencioso...');
+      
+      const backupData = await this._generateBackupData();
+      
+      if (!backupData.success) {
+        return backupData;
+      }
+      
+      // Guardar en localStorage con timestamp
+      const backupKey = `strategiapm_backup_${new Date().toISOString().split('T')[0]}`;
+      const backupInfo = {
+        ...backupData.data,
+        _backupInfo: {
+          timestamp: new Date().toISOString(),
+          recordCount: backupData.recordCount,
+          tables: backupData.tables.length,
+          version: '1.0'
+        }
+      };
+      
+      try {
+        localStorage.setItem(backupKey, JSON.stringify(backupInfo));
+        console.log(`✅ Backup silencioso guardado: ${backupData.recordCount} registros`);
+        
+        return {
+          success: true,
+          recordCount: backupData.recordCount,
+          tables: backupData.tables.length,
+          stored: true
+        };
+      } catch (storageError) {
+        console.warn('⚠️ Error guardando en localStorage:', storageError);
+        return {
+          success: true,
+          recordCount: backupData.recordCount,
+          tables: backupData.tables.length,
+          stored: false,
+          warning: 'Backup creado pero no guardado localmente'
+        };
+      }
+      
+    } catch (error) {
+      console.error('❌ Error creando backup silencioso:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  // Función privada para generar datos de backup
+  async _generateBackupData() {
+    try {
+      // Obtener datos de todas las tablas críticas
+      const tables = [
+        'organizations',
+        'users', 
+        'projects',
+        'risks',
+        'tasks',
+        'purchase_orders',
+        'advances',
+        'invoices',
+        'contracts',
+        'resources',
+        'resource_assignments'
+      ];
+      
+      const backupData = {
+        metadata: {
+          timestamp: new Date().toISOString(),
+          version: '1.0',
+          source: 'supabase',
+          tables: tables.length
+        },
+        data: {}
+      };
+      
+      let totalRecords = 0;
+      
+      // Obtener datos de cada tabla
+      for (const tableName of tables) {
+        try {
+          let query = this.supabase.from(tableName).select('*');
+          
+          // Aplicar filtros RLS si es necesario
+          if (tableName !== 'organizations' && this.organizationId) {
+            query = query.eq('organization_id', this.organizationId);
+          }
+          
+          const { data, error } = await query;
+          
+          if (error) {
+            console.warn(`⚠️ Error obteniendo datos de ${tableName}:`, error);
+            backupData.data[tableName] = [];
+          } else {
+            backupData.data[tableName] = data || [];
+            totalRecords += (data || []).length;
+            console.log(`✅ ${tableName}: ${(data || []).length} registros`);
+          }
+        } catch (tableError) {
+          console.warn(`⚠️ Error procesando tabla ${tableName}:`, tableError);
+          backupData.data[tableName] = [];
+        }
+      }
+      
+      return {
+        success: true,
+        data: backupData,
+        recordCount: totalRecords,
+        tables
+      };
+      
+    } catch (error) {
+      console.error('❌ Error generando datos de backup:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  // Obtener estadísticas de backup
+  async getBackupStats() {
+    try {
+      const tables = [
+        'organizations',
+        'users', 
+        'projects',
+        'risks',
+        'tasks',
+        'purchase_orders',
+        'advances',
+        'invoices',
+        'contracts',
+        'resources',
+        'resource_assignments'
+      ];
+      
+      const stats = {};
+      let totalRecords = 0;
+      
+      for (const tableName of tables) {
+        try {
+          let query = this.supabase.from(tableName).select('*', { count: 'exact', head: true });
+          
+          if (tableName !== 'organizations' && this.organizationId) {
+            query = query.eq('organization_id', this.organizationId);
+          }
+          
+          const { count, error } = await query;
+          
+          if (error) {
+            console.warn(`⚠️ Error contando tabla ${tableName}:`, error);
+            stats[tableName] = 0;
+          } else {
+            stats[tableName] = count || 0;
+            totalRecords += count || 0;
+          }
+        } catch (tableError) {
+          console.error(`❌ Error contando tabla ${tableName}:`, tableError);
+          stats[tableName] = 0;
+        }
+      }
+      
+      return {
+        success: true,
+        stats,
+        totalRecords,
+        tablesCount: tables.length
+      };
+      
+    } catch (error) {
+      console.error('❌ Error obteniendo estadísticas:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  // ========== RESTAURACIÓN DE BACKUP ==========
+
+  // Validar archivo de backup
+  validateBackupFile(backupData) {
+    try {
+      // Verificar estructura básica
+      if (!backupData || typeof backupData !== 'object') {
+        return { valid: false, error: 'Archivo no válido: estructura incorrecta' };
+      }
+
+      // Verificar metadata
+      if (!backupData.metadata) {
+        return { valid: false, error: 'Archivo no válido: falta metadata' };
+      }
+
+      const { metadata } = backupData;
+      
+      // Verificar campos requeridos en metadata
+      if (!metadata.timestamp || !metadata.version || !metadata.source) {
+        return { valid: false, error: 'Archivo no válido: metadata incompleta' };
+      }
+
+      // Verificar que sea de Supabase
+      if (metadata.source !== 'supabase') {
+        return { valid: false, error: 'Archivo no válido: no es un backup de Supabase' };
+      }
+
+      // Verificar que tenga datos
+      if (!backupData.data || typeof backupData.data !== 'object') {
+        return { valid: false, error: 'Archivo no válido: no contiene datos' };
+      }
+
+      // Verificar tablas esperadas
+      const expectedTables = [
+        'organizations', 'users', 'projects', 'risks', 'tasks',
+        'purchase_orders', 'advances', 'invoices', 'contracts',
+        'resources', 'resource_assignments'
+      ];
+
+      const availableTables = Object.keys(backupData.data);
+      const missingTables = expectedTables.filter(table => !availableTables.includes(table));
+
+      if (missingTables.length > 0) {
+        console.warn(`⚠️ Tablas faltantes en backup: ${missingTables.join(', ')}`);
+      }
+
+      // Calcular estadísticas
+      const stats = {};
+      let totalRecords = 0;
+
+      availableTables.forEach(table => {
+        const records = Array.isArray(backupData.data[table]) ? backupData.data[table].length : 0;
+        stats[table] = records;
+        totalRecords += records;
+      });
+
+      return {
+        valid: true,
+        stats,
+        totalRecords,
+        tablesCount: availableTables.length,
+        timestamp: metadata.timestamp,
+        version: metadata.version
+      };
+
+    } catch (error) {
+      return { valid: false, error: `Error validando archivo: ${error.message}` };
+    }
+  }
+
+  // Restaurar datos desde archivo de backup
+  async restoreFromBackup(backupData, options = {}) {
+    try {
+      console.log('🔄 Iniciando restauración de backup...');
+      
+      // Validar archivo
+      const validation = this.validateBackupFile(backupData);
+      if (!validation.valid) {
+        return {
+          success: false,
+          error: validation.error
+        };
+      }
+
+      console.log(`✅ Archivo válido: ${validation.totalRecords} registros en ${validation.tablesCount} tablas`);
+
+      const results = {
+        success: true,
+        processed: 0,
+        errors: [],
+        details: {}
+      };
+
+      // Orden de restauración (respetar dependencias)
+      const restoreOrder = [
+        'organizations',
+        'users',
+        'projects',
+        'resources',
+        'risks',
+        'tasks',
+        'resource_assignments',
+        'purchase_orders',
+        'advances',
+        'invoices',
+        'contracts'
+      ];
+
+      // Procesar cada tabla en orden
+      for (const tableName of restoreOrder) {
+        if (!backupData.data[tableName]) {
+          console.log(`⏭️ Saltando tabla ${tableName}: no presente en backup`);
+          continue;
+        }
+
+        const tableData = backupData.data[tableName];
+        if (!Array.isArray(tableData) || tableData.length === 0) {
+          console.log(`⏭️ Saltando tabla ${tableName}: sin datos`);
+          results.details[tableName] = { processed: 0, errors: 0 };
+          continue;
+        }
+
+        console.log(`📊 Restaurando tabla ${tableName}: ${tableData.length} registros`);
+
+        try {
+          // Limpiar tabla si se especifica
+          if (options.clearExisting) {
+            console.log(`🗑️ Limpiando tabla ${tableName}...`);
+            const { error: deleteError } = await this.supabase
+              .from(tableName)
+              .delete()
+              .neq('id', '00000000-0000-0000-0000-000000000000'); // Condición que siempre es verdadera
+            
+            if (deleteError) {
+              console.warn(`⚠️ Error limpiando tabla ${tableName}:`, deleteError);
+            }
+          }
+
+          // Insertar datos en lotes
+          const batchSize = 100;
+          let processed = 0;
+          let errors = 0;
+
+          for (let i = 0; i < tableData.length; i += batchSize) {
+            const batch = tableData.slice(i, i + batchSize);
+            
+            const { data, error } = await this.supabase
+              .from(tableName)
+              .insert(batch);
+
+            if (error) {
+              console.error(`❌ Error insertando lote en ${tableName}:`, error);
+              errors += batch.length;
+              results.errors.push({
+                table: tableName,
+                batch: Math.floor(i / batchSize) + 1,
+                error: error.message,
+                records: batch.length
+              });
+            } else {
+              processed += batch.length;
+              results.processed += batch.length;
+            }
+
+            // Pequeña pausa entre lotes para no sobrecargar
+            if (i + batchSize < tableData.length) {
+              await new Promise(resolve => setTimeout(resolve, 100));
+            }
+          }
+
+          results.details[tableName] = { processed, errors };
+          console.log(`✅ Tabla ${tableName}: ${processed} procesados, ${errors} errores`);
+
+        } catch (tableError) {
+          console.error(`❌ Error procesando tabla ${tableName}:`, tableError);
+          results.errors.push({
+            table: tableName,
+            error: tableError.message
+          });
+          results.details[tableName] = { processed: 0, errors: tableData.length };
+        }
+      }
+
+      console.log(`✅ Restauración completada: ${results.processed} registros procesados`);
+      
+      return results;
+
+    } catch (error) {
+      console.error('❌ Error en restauración:', error);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  // Obtener preview de datos del backup
+  getBackupPreview(backupData) {
+    try {
+      const validation = this.validateBackupFile(backupData);
+      if (!validation.valid) {
+        return { success: false, error: validation.error };
+      }
+
+      const preview = {};
+      const tables = Object.keys(backupData.data);
+
+      tables.forEach(tableName => {
+        const data = backupData.data[tableName];
+        if (Array.isArray(data) && data.length > 0) {
+          preview[tableName] = {
+            count: data.length,
+            sample: data.slice(0, 3), // Primeros 3 registros como muestra
+            fields: Object.keys(data[0] || {})
+          };
+        }
+      });
+
+      return {
+        success: true,
+        preview,
+        totalRecords: validation.totalRecords,
+        timestamp: validation.timestamp,
+        version: validation.version
+      };
+
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
 }
 
 // Crear instancia singleton
