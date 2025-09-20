@@ -602,74 +602,9 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
   // Estados principales - INDEPENDIENTES de Work Packages
   // NOTA: tasks y setTasks ahora vienen como props del componente padre
   
-  // Estados locales del componente
-  const [selectedTask, setSelectedTask] = useState(null);
-  const [tempTaskName, setTempTaskName] = useState('');
-  const [viewMode, setViewMode] = useState('excel');
-  const [showAddTaskModal, setShowAddTaskModal] = useState(false);
-  const [editingCell, setEditingCell] = useState(null); // {taskId, field}
-  const [editingValue, setEditingValue] = useState('');
-  const [selectedRow, setSelectedRow] = useState(null);
-  const [newTaskData, setNewTaskData] = useState({
-    name: '',
-    duration: 1,
-    startDate: '',
-    endDate: '',
-    description: '',
-    priority: 'medium',
-    assignedTo: '',
-    cost: 0,
-    selectedPredecessors: [],
-    selectedSuccessors: []
-  });
-  const [selectedPredecessor, setSelectedPredecessor] = useState('');
-  const [selectedSuccessor, setSelectedSuccessor] = useState('');
-  const [dependencyType, setDependencyType] = useState('finish-to-start');
-  const [ganttScale, setGanttScale] = useState('days');
-  const [showCriticalPath, setShowCriticalPath] = useState(true);
-  const [showDependencies, setShowDependencies] = useState(true);
-  const [baselineTasks, setBaselineTasks] = useState([]);
-  const [showBaseline, setShowBaseline] = useState(false);
-  const [showBusinessCase, setShowBusinessCase] = useState(false);
-  const [showResourceAnalysis, setShowResourceAnalysis] = useState(false);
-  
-  // Función helper segura para setTasks
-  const safeSetTasks = (updater) => {
-    if (typeof setTasks === 'function') {
-      setTasks(updater);
-    } else {
-      console.warn('⚠️ setTasks no está disponible, no se puede actualizar tareas');
-    }
-  };
-
-  // Debug: Verificar props recibidas
-  console.log('🔍 ScheduleManagement - Props recibidas:', {
-    tasksLength: tasks?.length || 0,
-    hasSetTasks: typeof setTasks === 'function',
-    hasImportTasks: typeof importTasks === 'function',
-    projectData: projectData?.name || 'No project data',
-    includeWeekends: includeWeekends
-  });
-  
   // Corregir hitos existentes cuando se cargan las tareas
   useEffect(() => {
     console.log('🔧 useEffect EJECUTÁNDOSE - TAREAS:', tasks?.length || 0);
-    
-    // Verificar que setTasks esté disponible
-    if (typeof setTasks !== 'function') {
-      console.warn('⚠️ ScheduleManagement: setTasks no está disponible');
-      return;
-    }
-    
-    if (!tasks || !Array.isArray(tasks)) {
-      console.warn('⚠️ ScheduleManagement: tasks no es un array válido:', tasks);
-      return;
-    }
-    
-    if (tasks.length === 0) {
-      console.log('ℹ️ ScheduleManagement: No hay tareas para procesar');
-      return;
-    }
     
     if (tasks && tasks.length > 0) {
       // Verificar si hay hitos con fechas incorrectas
@@ -683,7 +618,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         console.log('🔧 EJECUTANDO CORRECCIÓN AUTOMÁTICA');
         
         // Corregir directamente sin usar la función
-        safeSetTasks(prev => prev.map(task => {
+        setTasks(prev => prev.map(task => {
           if (!task.isMilestone) return task;
           
           // Verificar si la fecha de fin es diferente a la de inicio
@@ -830,16 +765,32 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
     totalInvestment: projectData.totalBudget
   };
 
+  // Estados de UI
+  const [selectedTask, setSelectedTask] = useState(null);
+  const [tempTaskName, setTempTaskName] = useState('');
+  const [viewMode, setViewMode] = useState('excel');
   // includeWeekends y setIncludeWeekends ahora vienen como props desde el estado global
   
-  // NUEVOS ESTADOS PARA VISTA TABLA (ya declarados arriba)
+  // NUEVOS ESTADOS PARA VISTA TABLA
+  const [editingCell, setEditingCell] = useState(null); // {taskId, field}
+  const [editingValue, setEditingValue] = useState('');
+  const [selectedRow, setSelectedRow] = useState(null);
   
-  // Estados locales para los selects de dependencias (ya declarados arriba)
+  // Estados locales para los selects de dependencias
+  const [selectedPredecessor, setSelectedPredecessor] = useState('');
+  const [selectedSuccessor, setSelectedSuccessor] = useState('');
   
   // Refs para los selects
   const predecessorSelectRef = useRef(null);
   const successorSelectRef = useRef(null);
-  // Estados de visualización (ya declarados arriba)
+  const [ganttScale, setGanttScale] = useState('days');
+  const [showCriticalPath, setShowCriticalPath] = useState(true);
+
+  const [showDependencies, setShowDependencies] = useState(true);
+  const [baselineTasks, setBaselineTasks] = useState([]);
+  const [showBaseline, setShowBaseline] = useState(false);
+  const [showBusinessCase, setShowBusinessCase] = useState(false);
+  const [showResourceAnalysis, setShowResourceAnalysis] = useState(false);
   const [cmpError, setCmpError] = useState(null);
   
   // Estados del diagrama de red
@@ -2035,27 +1986,17 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         dependencyType: t.dependencyType
       })));
       
-      // CORRECCIÓN: Recalcular fechas después de actualizar predecesoras
-      const recalculatedTasks = recalculateTaskDates(updatedTasks, includeWeekends);
-      console.log('🔄 FECHAS RECALCULADAS DESPUÉS DE ACTUALIZAR PREDECESORAS:', recalculatedTasks.map(t => ({
-        id: t.id,
-        name: t.name,
-        predecessors: t.predecessors,
-        startDate: t.startDate,
-        endDate: t.endDate
-      })));
-      
       // Actualizar selectedTask si es la tarea que se está editando
       if (selectedTask && selectedTask.id === taskId) {
-        const updatedSelectedTask = recalculatedTasks.find(t => t.id === taskId);
+        const updatedSelectedTask = updatedTasks.find(t => t.id === taskId);
         if (updatedSelectedTask) {
           setSelectedTask(updatedSelectedTask);
         }
       }
       
-      return recalculatedTasks;
+      return updatedTasks;
     });
-  }, [hasCircularDependency, selectedTask, recalculateTaskDates, includeWeekends]);
+  }, [hasCircularDependency, selectedTask]);
 
   // Función para manejar cambios en el campo nombre (sin loop infinito)
   const handleNameChange = useCallback((e) => {
@@ -2706,85 +2647,6 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
     };
   }, [selectedTask, hasCircularDependency, updatePredecessors]);
 
-  // Función para recalcular fechas de tareas basándose en dependencias
-  const recalculateTaskDates = useCallback((tasks, includeWeekends = false) => {
-    console.log('🔄 RECALCULANDO FECHAS DE TAREAS:', tasks.length);
-    
-    // Crear mapa de tareas por ID
-    const taskMap = new Map(tasks.map(t => [t.id, { ...t }]));
-    const processed = new Set();
-    const recalculated = [];
-    
-    // Función recursiva para procesar tareas en orden de dependencias
-    const processTask = (taskId) => {
-      if (processed.has(taskId)) return;
-      
-      const task = taskMap.get(taskId);
-      if (!task) return;
-      
-      // Procesar predecesoras primero
-      for (const predId of task.predecessors) {
-        processTask(predId);
-      }
-      
-      // Calcular nueva fecha de inicio basándose en predecesoras
-      let newStartDate = task.startDate;
-      
-      if (task.predecessors.length > 0) {
-        // Encontrar la fecha de fin más tardía de las predecesoras
-        let latestEndDate = null;
-        
-        for (const predId of task.predecessors) {
-          const predTask = taskMap.get(predId);
-          if (predTask) {
-            const predEndDate = new Date(predTask.endDate);
-            if (!latestEndDate || predEndDate > latestEndDate) {
-              latestEndDate = predEndDate;
-            }
-          }
-        }
-        
-        if (latestEndDate) {
-          // La tarea debe empezar después de que termine la última predecesora
-          newStartDate = toISO(latestEndDate);
-        }
-      }
-      
-      // Calcular nueva fecha de fin
-      const newEndDate = addDays(newStartDate, task.duration, includeWeekends);
-      
-      // Actualizar la tarea
-      const updatedTask = {
-        ...task,
-        startDate: newStartDate,
-        endDate: newEndDate,
-        earlyStart: newStartDate,
-        earlyFinish: newEndDate
-      };
-      
-      taskMap.set(taskId, updatedTask);
-      recalculated.push(updatedTask);
-      processed.add(taskId);
-      
-      console.log('🔄 TAREA RECALCULADA:', {
-        id: taskId,
-        name: task.name,
-        predecessors: task.predecessors,
-        oldStart: task.startDate,
-        newStart: newStartDate,
-        oldEnd: task.endDate,
-        newEnd: newEndDate
-      });
-    };
-    
-    // Procesar todas las tareas
-    for (const task of tasks) {
-      processTask(task.id);
-    }
-    
-    return recalculated;
-  }, []);
-
   // Función para actualizar datos del proyecto (ya no se usa)
   const updateBusinessCase = useCallback((field, value) => {
     // Esta función ya no se usa, pero se mantiene por compatibilidad
@@ -2853,22 +2715,12 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         }
       }
 
-      // CORRECCIÓN: Recalcular fechas basándose en las dependencias
-      const recalculatedTasks = recalculateTaskDates(imported, includeWeekends);
-      console.log('📊 TAREAS RECALCULADAS:', recalculatedTasks.map(t => ({
-        id: t.id,
-        name: t.name,
-        predecessors: t.predecessors,
-        startDate: t.startDate,
-        endDate: t.endDate
-      })));
-
       if (typeof importTasks === 'function') {
-        importTasks(recalculatedTasks);
-        console.log('📊 IMPORTACIÓN CORREGIDA - importTasks llamado exitosamente');
+        importTasks(imported);
+        console.log('📊 IMPORTACIÓN ANTIGUA - importTasks llamado exitosamente');
       } else {
-        setTasks(recalculatedTasks);
-        console.log('📊 IMPORTACIÓN CORREGIDA - setTasks llamado como fallback');
+        setTasks(imported);
+        console.log('📊 IMPORTACIÓN ANTIGUA - setTasks llamado como fallback');
       }
       setBaselineTasks([]);
       setShowBaseline(false);
@@ -3130,7 +2982,19 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
     };
   }, [tasksWithCPM, projectData]);
 
-  // SISTEMA COMPLETAMENTE NUEVO PARA AGREGAR TAREAS (estados ya declarados arriba)
+  // SISTEMA COMPLETAMENTE NUEVO PARA AGREGAR TAREAS
+  const [showAddTaskModal, setShowAddTaskModal] = useState(false);
+  const [newTaskData, setNewTaskData] = useState({
+    name: '',
+    duration: 5,
+    startDate: toISO(new Date()),
+    endDate: addDays(toISO(new Date()), 5),
+    description: '',
+    priority: 'medium',
+    assignedTo: '',
+    cost: 0,
+    selectedPredecessors: []
+  });
 
   // Función para sincronizar dependencias bidireccionalmente (SOLO PREDECESORAS)
   const syncDependencies = (taskId, predecessors, successors) => {
@@ -4779,74 +4643,6 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
   };
 
   // Componente simplificado - sin caso de negocio redundante
-
-  // Verificar si no hay tareas o si setTasks no está disponible
-  if (typeof setTasks !== 'function') {
-    return (
-      <div className="space-y-6">
-        <div className="bg-red-50 border border-red-200 rounded-2xl shadow-lg p-6 mb-8">
-          <div className="flex items-center">
-            <div className="bg-red-100 rounded-2xl p-3 mr-4">
-              <span className="text-2xl">⚠️</span>
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-red-800 mb-2">Error de Configuración</h1>
-              <p className="text-red-600">El componente ScheduleManagement no está configurado correctamente. Falta la función setTasks.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {
-    return (
-      <div className="space-y-6">
-        {/* BARRA UNIFICADA - DISEÑO CON COLOR AZUL CLARO */}
-        <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 rounded-2xl shadow-lg p-6 mb-8 border border-blue-200 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-100/30 rounded-full -translate-y-16 translate-x-16"></div>
-          <div className="absolute bottom-0 left-0 w-24 h-24 bg-indigo-100/30 rounded-full translate-y-12 -translate-x-12"></div>
-          
-          <div className="relative z-10">
-            <div className="flex items-center">
-              <div className="bg-blue-100 rounded-2xl p-3 mr-4">
-                <span className="text-2xl">📅</span>
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold text-gray-800 mb-2">Cronograma del Proyecto</h1>
-                <p className="text-gray-600 text-lg">Gestión de tiempo, dependencias y recursos integrada con EVM</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Mensaje cuando no hay tareas */}
-        <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
-          <div className="text-6xl mb-6">📋</div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-4">No hay tareas en este proyecto</h2>
-          <p className="text-gray-600 mb-8 text-lg">
-            Comienza creando tu primera tarea o importa un cronograma desde Excel
-          </p>
-          <div className="flex justify-center space-x-4">
-            <button
-              onClick={() => setShowAddTaskModal(true)}
-              className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors flex items-center space-x-2"
-            >
-              <span>➕</span>
-              <span>Crear Primera Tarea</span>
-            </button>
-            <button
-              onClick={() => document.getElementById('excel-file-input')?.click()}
-              className="bg-green-600 text-white px-6 py-3 rounded-xl hover:bg-green-700 transition-colors flex items-center space-x-2"
-            >
-              <span>📥</span>
-              <span>Importar desde Excel</span>
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
