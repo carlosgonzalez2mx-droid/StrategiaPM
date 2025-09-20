@@ -633,15 +633,6 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
   const [showBusinessCase, setShowBusinessCase] = useState(false);
   const [showResourceAnalysis, setShowResourceAnalysis] = useState(false);
   
-  // Debug: Verificar props recibidas
-  console.log('🔍 ScheduleManagement - Props recibidas:', {
-    tasksLength: tasks?.length || 0,
-    hasSetTasks: typeof setTasks === 'function',
-    hasImportTasks: typeof importTasks === 'function',
-    projectData: projectData?.name || 'No project data',
-    includeWeekends: includeWeekends
-  });
-
   // Función helper segura para setTasks
   const safeSetTasks = (updater) => {
     if (typeof setTasks === 'function') {
@@ -650,6 +641,15 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
       console.warn('⚠️ setTasks no está disponible, no se puede actualizar tareas');
     }
   };
+
+  // Debug: Verificar props recibidas
+  console.log('🔍 ScheduleManagement - Props recibidas:', {
+    tasksLength: tasks?.length || 0,
+    hasSetTasks: typeof setTasks === 'function',
+    hasImportTasks: typeof importTasks === 'function',
+    projectData: projectData?.name || 'No project data',
+    includeWeekends: includeWeekends
+  });
   
   // Corregir hitos existentes cuando se cargan las tareas
   useEffect(() => {
