@@ -641,10 +641,25 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
     projectData: projectData?.name || 'No project data',
     includeWeekends: includeWeekends
   });
+
+  // Función helper segura para setTasks
+  const safeSetTasks = (updater) => {
+    if (typeof setTasks === 'function') {
+      setTasks(updater);
+    } else {
+      console.warn('⚠️ setTasks no está disponible, no se puede actualizar tareas');
+    }
+  };
   
   // Corregir hitos existentes cuando se cargan las tareas
   useEffect(() => {
     console.log('🔧 useEffect EJECUTÁNDOSE - TAREAS:', tasks?.length || 0);
+    
+    // Verificar que setTasks esté disponible
+    if (typeof setTasks !== 'function') {
+      console.warn('⚠️ ScheduleManagement: setTasks no está disponible');
+      return;
+    }
     
     if (!tasks || !Array.isArray(tasks)) {
       console.warn('⚠️ ScheduleManagement: tasks no es un array válido:', tasks);
@@ -668,7 +683,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         console.log('🔧 EJECUTANDO CORRECCIÓN AUTOMÁTICA');
         
         // Corregir directamente sin usar la función
-        setTasks(prev => prev.map(task => {
+        safeSetTasks(prev => prev.map(task => {
           if (!task.isMilestone) return task;
           
           // Verificar si la fecha de fin es diferente a la de inicio
@@ -4765,7 +4780,25 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
 
   // Componente simplificado - sin caso de negocio redundante
 
-  // Verificar si no hay tareas
+  // Verificar si no hay tareas o si setTasks no está disponible
+  if (typeof setTasks !== 'function') {
+    return (
+      <div className="space-y-6">
+        <div className="bg-red-50 border border-red-200 rounded-2xl shadow-lg p-6 mb-8">
+          <div className="flex items-center">
+            <div className="bg-red-100 rounded-2xl p-3 mr-4">
+              <span className="text-2xl">⚠️</span>
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-red-800 mb-2">Error de Configuración</h1>
+              <p className="text-red-600">El componente ScheduleManagement no está configurado correctamente. Falta la función setTasks.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {
     return (
       <div className="space-y-6">
