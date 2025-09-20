@@ -234,11 +234,18 @@ const calculateCPM = (tasks, includeWeekends = false) => {
       }
 
       task.earlyStart = toISO(maxEarlyFinish);
-      task.earlyFinish = addDays(toISO(maxEarlyFinish), task.duration, includeWeekends);
       
-      // ACTUALIZAR las fechas reales basándose en las predecesoras
-      task.startDate = task.earlyStart;
-      task.endDate = addDays(toISO(maxEarlyFinish), task.duration, includeWeekends);
+      // Para hitos: fecha de fin = fecha de inicio
+      if (task.isMilestone) {
+        task.earlyFinish = toISO(maxEarlyFinish);
+        task.startDate = task.earlyStart;
+        task.endDate = task.earlyStart; // Para hitos: fin = inicio
+      } else {
+        task.earlyFinish = addDays(toISO(maxEarlyFinish), task.duration, includeWeekends);
+        // ACTUALIZAR las fechas reales basándose en las predecesoras
+        task.startDate = task.earlyStart;
+        task.endDate = addDays(toISO(maxEarlyFinish), task.duration, includeWeekends);
+      }
 
       calculating.delete(taskId);
       visited.add(taskId);
@@ -286,9 +293,14 @@ const calculateCPM = (tasks, includeWeekends = false) => {
         task.lateFinish = toISO(minLateStart);
       }
 
-      const lateFinishDate = new Date(task.lateFinish);
-      lateFinishDate.setDate(lateFinishDate.getDate() - task.duration);
-      task.lateStart = toISO(lateFinishDate);
+      // Para hitos: lateStart = lateFinish
+      if (task.isMilestone) {
+        task.lateStart = task.lateFinish;
+      } else {
+        const lateFinishDate = new Date(task.lateFinish);
+        lateFinishDate.setDate(lateFinishDate.getDate() - task.duration);
+        task.lateStart = toISO(lateFinishDate);
+      }
 
       visited.add(taskId);
     };
@@ -309,9 +321,14 @@ const calculateCPM = (tasks, includeWeekends = false) => {
     for (const task of updatedTasks) {
       if (task.predecessors.length === 0) {
         task.lateStart = task.earlyStart;
-        const lateFinishDate = new Date(task.earlyStart);
-        lateFinishDate.setDate(lateFinishDate.getDate() + task.duration);
-        task.lateFinish = toISO(lateFinishDate);
+        // Para hitos: lateFinish = earlyStart
+        if (task.isMilestone) {
+          task.lateFinish = task.earlyStart;
+        } else {
+          const lateFinishDate = new Date(task.earlyStart);
+          lateFinishDate.setDate(lateFinishDate.getDate() + task.duration);
+          task.lateFinish = toISO(lateFinishDate);
+        }
       }
     }
   };
@@ -1130,6 +1147,11 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
       prevIncludeWeekends.current = includeWeekends;
       
       const updatedTasks = tasks.map((task, index) => {
+        // Para hitos: no recalcular fechas, mantener fin = inicio
+        if (task.isMilestone) {
+          return { ...task, endDate: task.startDate };
+        }
+        
         if (task.startDate && task.duration) {
           // Solo debuggear la primera tarea
           const debugFirstTask = index === 0;
@@ -1441,12 +1463,22 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
           case 'duration': {
             const duration = Number.isFinite(num) ? Math.max(0, Math.round(num)) : 0;
             updatedTask.duration = duration;
-            updatedTask.endDate = addDays(updatedTask.startDate, duration, includeWeekends);
+            // Para hitos: fecha de fin = fecha de inicio
+            if (updatedTask.isMilestone) {
+              updatedTask.endDate = updatedTask.startDate;
+            } else {
+              updatedTask.endDate = addDays(updatedTask.startDate, duration, includeWeekends);
+            }
             break;
           }
           case 'startDate': {
             updatedTask.startDate = value;
-            updatedTask.endDate = addDays(value, updatedTask.duration, includeWeekends);
+            // Para hitos: fecha de fin = fecha de inicio
+            if (updatedTask.isMilestone) {
+              updatedTask.endDate = value;
+            } else {
+              updatedTask.endDate = addDays(value, updatedTask.duration, includeWeekends);
+            }
             break;
           }
           case 'progress': {
@@ -1523,12 +1555,22 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
           case 'duration': {
             const duration = Number.isFinite(num) ? Math.max(0, Math.round(num)) : 0;
             updated.duration = duration;
-            updated.endDate = addDays(updated.startDate, duration, includeWeekends);
+            // Para hitos: fecha de fin = fecha de inicio
+            if (updated.isMilestone) {
+              updated.endDate = updated.startDate;
+            } else {
+              updated.endDate = addDays(updated.startDate, duration, includeWeekends);
+            }
             break;
           }
           case 'startDate': {
             updated.startDate = value;
-            updated.endDate = addDays(value, updated.duration, includeWeekends);
+            // Para hitos: fecha de fin = fecha de inicio
+            if (updated.isMilestone) {
+              updated.endDate = value;
+            } else {
+              updated.endDate = addDays(value, updated.duration, includeWeekends);
+            }
             break;
           }
           case 'progress': {
@@ -3741,28 +3783,38 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
           case 'duration':
             const duration = parseInt(newValue) || 1;
             updatedTask.duration = duration;
-            // Calcular fecha fin basándose en la duración
-            if (includeWeekends) {
-              // Incluir fines de semana
-              const startDate = new Date(updatedTask.startDate);
-              startDate.setDate(startDate.getDate() + duration - 1);
-              updatedTask.endDate = toISO(startDate);
+            // Para hitos: fecha de fin = fecha de inicio
+            if (updatedTask.isMilestone) {
+              updatedTask.endDate = updatedTask.startDate;
             } else {
-              // Solo días laborales
-              updatedTask.endDate = addDays(updatedTask.startDate, duration, includeWeekends);
+              // Calcular fecha fin basándose en la duración
+              if (includeWeekends) {
+                // Incluir fines de semana
+                const startDate = new Date(updatedTask.startDate);
+                startDate.setDate(startDate.getDate() + duration - 1);
+                updatedTask.endDate = toISO(startDate);
+              } else {
+                // Solo días laborales
+                updatedTask.endDate = addDays(updatedTask.startDate, duration, includeWeekends);
+              }
             }
             break;
           case 'startDate':
             updatedTask.startDate = newValue;
-            // Calcular fecha fin basándose en la duración
-            if (includeWeekends) {
-              // Incluir fines de semana
-              const startDate = new Date(newValue);
-              startDate.setDate(startDate.getDate() + updatedTask.duration - 1);
-              updatedTask.endDate = toISO(startDate);
+            // Para hitos: fecha de fin = fecha de inicio
+            if (updatedTask.isMilestone) {
+              updatedTask.endDate = newValue;
             } else {
-              // Solo días laborales
-              updatedTask.endDate = addDays(newValue, updatedTask.duration, includeWeekends);
+              // Calcular fecha fin basándose en la duración
+              if (includeWeekends) {
+                // Incluir fines de semana
+                const startDate = new Date(newValue);
+                startDate.setDate(startDate.getDate() + updatedTask.duration - 1);
+                updatedTask.endDate = toISO(startDate);
+              } else {
+                // Solo días laborales
+                updatedTask.endDate = addDays(newValue, updatedTask.duration, includeWeekends);
+              }
             }
             break;
           case 'endDate':
