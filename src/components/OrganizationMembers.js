@@ -91,7 +91,7 @@ const OrganizationMembers = ({
           return;
         }
 
-        // Crear invitación (el usuario se unirá cuando se registre)
+        // Crear invitación usando función personalizada
         console.log('🔍 DEBUG - Datos de inserción:', {
           organization_id: organizationId,
           user_id: null,
@@ -100,18 +100,20 @@ const OrganizationMembers = ({
           status: 'pending'
         });
         
-        const { error: insertError } = await supabaseService.supabase
-          .from('organization_members')
-          .insert({
-            organization_id: organizationId,
-            user_id: null, // Se asignará cuando el usuario se registre
-            user_email: inviteEmail,
-            role: inviteRole,
-            status: 'pending' // Estado pendiente hasta que se registre
+        const { data: inviteResult, error: insertError } = await supabaseService.supabase
+          .rpc('invite_member', {
+            p_organization_id: organizationId,
+            p_user_email: inviteEmail,
+            p_role: inviteRole
           });
 
         if (insertError) {
           throw insertError;
+        }
+
+        // Verificar el resultado de la función
+        if (inviteResult && !inviteResult.success) {
+          throw new Error(inviteResult.error || 'Error al invitar miembro');
         }
 
         // Registrar evento de auditoría
