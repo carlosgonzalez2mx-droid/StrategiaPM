@@ -602,6 +602,37 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
   // Estados principales - INDEPENDIENTES de Work Packages
   // NOTA: tasks y setTasks ahora vienen como props del componente padre
   
+  // Estados locales del componente
+  const [selectedTask, setSelectedTask] = useState(null);
+  const [tempTaskName, setTempTaskName] = useState('');
+  const [viewMode, setViewMode] = useState('excel');
+  const [showAddTaskModal, setShowAddTaskModal] = useState(false);
+  const [editingCell, setEditingCell] = useState(null); // {taskId, field}
+  const [editingValue, setEditingValue] = useState('');
+  const [selectedRow, setSelectedRow] = useState(null);
+  const [newTaskData, setNewTaskData] = useState({
+    name: '',
+    duration: 1,
+    startDate: '',
+    endDate: '',
+    description: '',
+    priority: 'medium',
+    assignedTo: '',
+    cost: 0,
+    selectedPredecessors: [],
+    selectedSuccessors: []
+  });
+  const [selectedPredecessor, setSelectedPredecessor] = useState('');
+  const [selectedSuccessor, setSelectedSuccessor] = useState('');
+  const [dependencyType, setDependencyType] = useState('finish-to-start');
+  const [ganttScale, setGanttScale] = useState('days');
+  const [showCriticalPath, setShowCriticalPath] = useState(true);
+  const [showDependencies, setShowDependencies] = useState(true);
+  const [baselineTasks, setBaselineTasks] = useState([]);
+  const [showBaseline, setShowBaseline] = useState(false);
+  const [showBusinessCase, setShowBusinessCase] = useState(false);
+  const [showResourceAnalysis, setShowResourceAnalysis] = useState(false);
+  
   // Debug: Verificar props recibidas
   console.log('🔍 ScheduleManagement - Props recibidas:', {
     tasksLength: tasks?.length || 0,
@@ -784,32 +815,16 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
     totalInvestment: projectData.totalBudget
   };
 
-  // Estados de UI
-  const [selectedTask, setSelectedTask] = useState(null);
-  const [tempTaskName, setTempTaskName] = useState('');
-  const [viewMode, setViewMode] = useState('excel');
   // includeWeekends y setIncludeWeekends ahora vienen como props desde el estado global
   
-  // NUEVOS ESTADOS PARA VISTA TABLA
-  const [editingCell, setEditingCell] = useState(null); // {taskId, field}
-  const [editingValue, setEditingValue] = useState('');
-  const [selectedRow, setSelectedRow] = useState(null);
+  // NUEVOS ESTADOS PARA VISTA TABLA (ya declarados arriba)
   
-  // Estados locales para los selects de dependencias
-  const [selectedPredecessor, setSelectedPredecessor] = useState('');
-  const [selectedSuccessor, setSelectedSuccessor] = useState('');
+  // Estados locales para los selects de dependencias (ya declarados arriba)
   
   // Refs para los selects
   const predecessorSelectRef = useRef(null);
   const successorSelectRef = useRef(null);
-  const [ganttScale, setGanttScale] = useState('days');
-  const [showCriticalPath, setShowCriticalPath] = useState(true);
-
-  const [showDependencies, setShowDependencies] = useState(true);
-  const [baselineTasks, setBaselineTasks] = useState([]);
-  const [showBaseline, setShowBaseline] = useState(false);
-  const [showBusinessCase, setShowBusinessCase] = useState(false);
-  const [showResourceAnalysis, setShowResourceAnalysis] = useState(false);
+  // Estados de visualización (ya declarados arriba)
   const [cmpError, setCmpError] = useState(null);
   
   // Estados del diagrama de red
@@ -3100,19 +3115,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
     };
   }, [tasksWithCPM, projectData]);
 
-  // SISTEMA COMPLETAMENTE NUEVO PARA AGREGAR TAREAS
-  const [showAddTaskModal, setShowAddTaskModal] = useState(false);
-  const [newTaskData, setNewTaskData] = useState({
-    name: '',
-    duration: 5,
-    startDate: toISO(new Date()),
-    endDate: addDays(toISO(new Date()), 5),
-    description: '',
-    priority: 'medium',
-    assignedTo: '',
-    cost: 0,
-    selectedPredecessors: []
-  });
+  // SISTEMA COMPLETAMENTE NUEVO PARA AGREGAR TAREAS (estados ya declarados arriba)
 
   // Función para sincronizar dependencias bidireccionalmente (SOLO PREDECESORAS)
   const syncDependencies = (taskId, predecessors, successors) => {
