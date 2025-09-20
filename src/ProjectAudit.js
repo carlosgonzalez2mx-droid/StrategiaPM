@@ -39,7 +39,7 @@ const ProjectAudit = ({
     if (currentProject.status === 'active' && !auditLog.find(e => e.action === 'project-activated')) {
       events.push({
         id: `event-${Date.now()}-1`,
-        timestamp: projectStartDate,
+        timestamp: new Date().toISOString(), // Usar fecha actual en formato ISO
         category: 'project-status',
         action: 'project-activated',
         description: `Proyecto "${currentProject.name}" activado`,
@@ -48,8 +48,8 @@ const ProjectAudit = ({
           newStatus: 'active',
           manager: currentProject.manager,
           budget: currentProject.budget,
-          startDate: currentProject.startDate,
-          endDate: currentProject.endDate
+          startDate: currentProject.startDate || 'No definida',
+          endDate: currentProject.endDate || 'No definida'
         },
         severity: 'high',
         user: currentProject.manager
@@ -61,7 +61,7 @@ const ProjectAudit = ({
       if (wp.status === 'active' || wp.status === 'in-progress' || wp.status === 'completed') {
         events.push({
           id: `event-${Date.now()}-wp-${index}`,
-          timestamp: new Date(wp.updatedAt || wp.createdAt || projectStartDate),
+          timestamp: new Date().toISOString(), // Usar fecha actual
           category: 'work-package',
           action: 'work-package-created',
           description: `Work Package "${wp.name}" creado`,

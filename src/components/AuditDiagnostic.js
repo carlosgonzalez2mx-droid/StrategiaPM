@@ -5,13 +5,20 @@ const AuditDiagnostic = ({ projectId, useSupabase = false }) => {
   const [diagnosticData, setDiagnosticData] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   
-  // Hook de auditoría para diagnóstico
+  // Hook de auditoría para diagnóstico - con manejo de errores
+  let auditHook = null;
+  try {
+    auditHook = useAuditLog(projectId, useSupabase);
+  } catch (error) {
+    console.error('Error inicializando useAuditLog:', error);
+  }
+  
   const { 
-    auditLog, 
-    isLoading: auditLoading, 
-    addAuditEvent,
-    logFinancialEvent 
-  } = useAuditLog(projectId, useSupabase);
+    auditLog = [], 
+    isLoading: auditLoading = false, 
+    addAuditEvent = () => {},
+    logFinancialEvent = () => {}
+  } = auditHook || {};
 
   useEffect(() => {
     const runDiagnostic = async () => {
@@ -26,7 +33,13 @@ const AuditDiagnostic = ({ projectId, useSupabase = false }) => {
         const hookWorking = typeof addAuditEvent === 'function' && typeof logFinancialEvent === 'function';
         
         // Verificar datos existentes
-        const existingLogs = localStorageData ? JSON.parse(localStorageData) : [];
+        let existingLogs = [];
+        try {
+          existingLogs = localStorageData ? JSON.parse(localStorageData) : [];
+        } catch (parseError) {
+          console.error('Error parseando datos de localStorage:', parseError);
+          existingLogs = [];
+        }
         
         // Probar crear un evento de prueba
         let testEventCreated = false;
@@ -47,12 +60,12 @@ const AuditDiagnostic = ({ projectId, useSupabase = false }) => {
         }
         
         setDiagnosticData({
-          projectId,
+          projectId: projectId || 'No definido',
           localStorageKey,
           localStorageDataExists: !!localStorageData,
           localStorageDataLength: existingLogs.length,
           hookWorking,
-          auditLogLength: auditLog.length,
+          auditLogLength: auditLog ? auditLog.length : 0,
           auditLoading,
           testEventCreated,
           localStorageContent: existingLogs,
@@ -70,7 +83,15 @@ const AuditDiagnostic = ({ projectId, useSupabase = false }) => {
       }
     };
 
-    runDiagnostic();
+    if (projectId) {
+      runDiagnostic();
+    } else {
+      setDiagnosticData({
+        error: 'No hay projectId definido',
+        timestamp: new Date().toISOString()
+      });
+      setIsLoading(false);
+    }
   }, [projectId, addAuditEvent, logFinancialEvent, auditLog, auditLoading]);
 
   const clearTestEvents = () => {
