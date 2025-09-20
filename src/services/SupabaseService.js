@@ -211,8 +211,33 @@ class SupabaseService {
 
       console.log(`✅ Proyectos encontrados: ${projects?.length || 0}`);
 
+      // Convertir nombres de columnas de snake_case a camelCase para compatibilidad con el frontend
+      const convertedProjects = (projects || []).map(project => ({
+        ...project,
+        // Convertir campos de snake_case a camelCase
+        startDate: project.start_date || project.startDate,
+        endDate: project.end_date || project.endDate,
+        businessCase: project.business_case || project.businessCase,
+        kickoffDate: project.kickoff_date || project.kickoffDate,
+        contingencyReserve: project.contingency_reserve || project.contingencyReserve,
+        managementReserve: project.management_reserve || project.managementReserve,
+        createdAt: project.created_at || project.createdAt,
+        updatedAt: project.updated_at || project.updatedAt,
+        // Mantener también los nombres originales para compatibilidad hacia atrás
+        start_date: project.start_date,
+        end_date: project.end_date,
+        business_case: project.business_case,
+        kickoff_date: project.kickoff_date,
+        contingency_reserve: project.contingency_reserve,
+        management_reserve: project.management_reserve,
+        created_at: project.created_at,
+        updated_at: project.updated_at
+      }));
+
+      console.log(`✅ Proyectos convertidos: ${convertedProjects?.length || 0}`);
+
       // Si no hay proyectos, crear uno de demostración
-      if (!projects || projects.length === 0) {
+      if (!convertedProjects || convertedProjects.length === 0) {
         console.log('📝 Creando proyecto de demostración...');
         
         // Generar UUID válido
@@ -252,13 +277,13 @@ class SupabaseService {
           return null;
         }
         
-        projects = [newProject];
+        convertedProjects = [newProject];
         console.log('✅ Proyecto de demostración creado');
       }
 
       // Cargar tareas por proyecto
       const tasksByProject = {};
-      for (const project of projects) {
+      for (const project of convertedProjects) {
         const { data: tasks, error: tasksError } = await this.supabase
           .from('tasks')
           .select('*')
@@ -313,7 +338,7 @@ class SupabaseService {
 
       // Cargar riesgos por proyecto
       const risksByProject = {};
-      for (const project of projects) {
+      for (const project of convertedProjects) {
         const { data: risks, error: risksError } = await this.supabase
           .from('risks')
           .select('*')
@@ -349,7 +374,7 @@ class SupabaseService {
 
       // Cargar órdenes de compra por proyecto
       const purchaseOrdersByProject = {};
-      for (const project of projects) {
+      for (const project of convertedProjects) {
         const { data: purchaseOrders, error: poError } = await this.supabase
           .from('purchase_orders')
           .select('*')
@@ -365,7 +390,7 @@ class SupabaseService {
 
       // Cargar anticipos por proyecto
       const advancesByProject = {};
-      for (const project of projects) {
+      for (const project of convertedProjects) {
         const { data: advances, error: advancesError } = await this.supabase
           .from('advances')
           .select('*')
@@ -381,7 +406,7 @@ class SupabaseService {
 
       // Cargar facturas por proyecto
       const invoicesByProject = {};
-      for (const project of projects) {
+      for (const project of convertedProjects) {
         const { data: invoices, error: invoicesError } = await this.supabase
           .from('invoices')
           .select('*')
@@ -397,7 +422,7 @@ class SupabaseService {
 
       // Cargar contratos por proyecto
       const contractsByProject = {};
-      for (const project of projects) {
+      for (const project of convertedProjects) {
         const { data: contracts, error: contractsError } = await this.supabase
           .from('contracts')
           .select('*')
@@ -413,7 +438,7 @@ class SupabaseService {
 
       // Cargar asignaciones de recursos por proyecto
       const resourceAssignmentsByProject = {};
-      for (const project of projects) {
+      for (const project of convertedProjects) {
         const { data: assignments, error: assignmentsError } = await this.supabase
           .from('resource_assignments')
           .select('*')
@@ -429,7 +454,7 @@ class SupabaseService {
 
       // Cargar logs de auditoría por proyecto
       const auditLogsByProject = {};
-      for (const project of projects) {
+      for (const project of convertedProjects) {
         const { data: auditLogs, error: auditError } = await this.supabase
           .from('audit_logs')
           .select('*')
@@ -445,7 +470,7 @@ class SupabaseService {
 
       // Cargar configuraciones de proyectos (con manejo de errores mejorado)
       const includeWeekendsByProject = {};
-      for (const project of projects) {
+      for (const project of convertedProjects) {
         try {
           const { data: config, error: configError } = await this.supabase
             .from('project_configurations')
@@ -471,7 +496,7 @@ class SupabaseService {
       }
 
       const portfolioData = {
-        projects: projects || [],
+        projects: convertedProjects || [],
         tasksByProject: tasksByProject,
         risksByProject: risksByProject,
         globalResources: globalResources || [],
@@ -483,7 +508,7 @@ class SupabaseService {
         resourceAssignmentsByProject: resourceAssignmentsByProject,
         auditLogsByProject: auditLogsByProject,
         includeWeekendsByProject: includeWeekendsByProject,
-        currentProjectId: projects && projects.length > 0 ? projects[0].id : null,
+        currentProjectId: convertedProjects && convertedProjects.length > 0 ? convertedProjects[0].id : null,
         version: '1.0.0',
         lastUpdated: new Date().toISOString()
       };
@@ -630,7 +655,7 @@ class SupabaseService {
             organization_id: this.organizationId,
             owner_id: this.currentUser.id,
             updated_at: new Date().toISOString(),
-            // Validar fechas antes de enviar
+            // Validar fechas antes de enviar - CORREGIDO: usar ambos nombres para compatibilidad
             start_date: validateDate(project.startDate || project.start_date),
             end_date: validateDate(project.endDate || project.end_date),
             created_at: validateDate(project.createdAt || project.created_at) || new Date().toISOString()
