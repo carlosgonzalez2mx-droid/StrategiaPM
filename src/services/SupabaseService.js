@@ -1322,6 +1322,264 @@ class SupabaseService {
       return { success: false, error };
     }
   }
+
+  // ========== SUPABASE STORAGE FUNCTIONS ==========
+
+  // Inicializar buckets de Storage si no existen
+  async initializeStorage() {
+    try {
+      console.log('🗂️ Inicializando Supabase Storage...');
+      
+      // Crear bucket para archivos de proyectos si no existe
+      const { data: buckets, error: listError } = await this.supabase.storage.listBuckets();
+      
+      if (listError) {
+        console.error('❌ Error listando buckets:', listError);
+        return false;
+      }
+
+      const projectFilesBucket = buckets.find(bucket => bucket.name === 'project-files');
+      
+      if (!projectFilesBucket) {
+        console.log('📁 Creando bucket project-files...');
+        const { data, error: createError } = await this.supabase.storage.createBucket('project-files', {
+          public: false,
+          allowedMimeTypes: [
+            'application/pdf',
+            'image/jpeg',
+            'image/png',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+          ],
+          fileSizeLimit: 10485760 // 10MB
+        });
+
+        if (createError) {
+          console.error('❌ Error creando bucket:', createError);
+          return false;
+        }
+        
+        console.log('✅ Bucket project-files creado');
+      } else {
+        console.log('✅ Bucket project-files ya existe');
+      }
+
+      return true;
+    } catch (error) {
+      console.error('❌ Error inicializando Storage:', error);
+      return false;
+    }
+  }
+
+  // Subir archivo a Supabase Storage
+  async uploadFileToStorage(file, projectId, category, metadata = {}) {
+    try {
+      if (!this.currentUser || !this.organizationId) {
+        console.warn('⚠️ No se puede subir archivo: usuario no autenticado');
+        return { success: false, error: 'No autenticado' };
+      }
+
+      // Generar nombre único para el archivo
+      const timestamp = Date.now();
+      const randomId = Math.random().toString(36).substr(2, 9);
+      const fileExtension = file.name.split('.').pop();
+      const fileName = `${timestamp}-${randomId}.${fileExtension}`;
+      
+      // Ruta en el bucket: organizationId/projectId/category/filename
+      const filePath = `${this.organizationId}/${projectId}/${category}/${fileName}`;
+
+      console.log(`📤 Subiendo archivo a Storage: ${filePath}`);
+
+      // Subir archivo
+      const { data, error } = await this.supabase.storage
+        .from('project-files')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false,
+          contentType: file.type
+        });
+
+      if (error) {
+        console.error('❌ Error subiendo archivo:', error);
+        return { success: false, error };
+      }
+
+      // Obtener URL pública del archivo
+      const { data: publicData } = this.supabase.storage
+        .from('project-files')
+        .getPublicUrl(filePath);
+
+      const fileRecord = {
+        id: `file-${timestamp}-${randomId}`,
+        projectId,
+        category,
+        fileName: file.name,
+        originalName: file.name,
+        fileSize: file.size,
+        mimeType: file.type,
+        uploadDate: new Date().toISOString(),
+        uploadedBy: this.currentUser.id,
+        uploadedByEmail: this.currentUser.email,
+        organizationId: this.organizationId,
+        storagePath: filePath,
+        publicUrl: publicData.publicUrl,
+        metadata: {
+          ...metadata,
+          storageProvider: 'supabase',
+          bucket: 'project-files'
+        }
+      };
+
+      console.log('✅ Archivo subido exitosamente a Storage:', fileRecord.fileName);
+      return { success: true, file: fileRecord };
+
+    } catch (error) {
+      console.error('❌ Error inesperado subiendo archivo:', error);
+      return { success: false, error };
+    }
+  }
+
+  // Descargar archivo de Supabase Storage
+  async downloadFileFromStorage(filePath) {
+    try {
+      if (!this.currentUser) {
+        console.warn('⚠️ No se puede descargar archivo: usuario no autenticado');
+        return { success: false, error: 'No autenticado' };
+      }
+
+      console.log(`📥 Descargando archivo de Storage: ${filePath}`);
+
+      const { data, error } = await this.supabase.storage
+        .from('project-files')
+        .download(filePath);
+
+      if (error) {
+        console.error('❌ Error descargando archivo:', error);
+        return { success: false, error };
+      }
+
+      console.log('✅ Archivo descargado exitosamente');
+      return { success: true, data };
+
+    } catch (error) {
+      console.error('❌ Error inesperado descargando archivo:', error);
+      return { success: false, error };
+    }
+  }
+
+  // Eliminar archivo de Supabase Storage
+  async deleteFileFromStorage(filePath) {
+    try {
+      if (!this.currentUser) {
+        console.warn('⚠️ No se puede eliminar archivo: usuario no autenticado');
+        return { success: false, error: 'No autenticado' };
+      }
+
+      console.log(`🗑️ Eliminando archivo de Storage: ${filePath}`);
+
+      const { error } = await this.supabase.storage
+        .from('project-files')
+        .remove([filePath]);
+
+      if (error) {
+        console.error('❌ Error eliminando archivo:', error);
+        return { success: false, error };
+      }
+
+      console.log('✅ Archivo eliminado exitosamente de Storage');
+      return { success: true };
+
+    } catch (error) {
+      console.error('❌ Error inesperado eliminando archivo:', error);
+      return { success: false, error };
+    }
+  }
+
+  // Listar archivos de un proyecto en Storage
+  async listProjectFiles(projectId, category = null) {
+    try {
+      if (!this.currentUser || !this.organizationId) {
+        console.warn('⚠️ No se pueden listar archivos: usuario no autenticado');
+        return { success: false, error: 'No autenticado', files: [] };
+      }
+
+      const searchPath = category 
+        ? `${this.organizationId}/${projectId}/${category}`
+        : `${this.organizationId}/${projectId}`;
+
+      console.log(`📋 Listando archivos en Storage: ${searchPath}`);
+
+      const { data, error } = await this.supabase.storage
+        .from('project-files')
+        .list(searchPath, {
+          limit: 100,
+          offset: 0
+        });
+
+      if (error) {
+        console.error('❌ Error listando archivos:', error);
+        return { success: false, error, files: [] };
+      }
+
+      // Convertir archivos de Storage a formato esperado
+      const files = (data || []).map(file => {
+        const filePath = `${searchPath}/${file.name}`;
+        const { data: publicData } = this.supabase.storage
+          .from('project-files')
+          .getPublicUrl(filePath);
+
+        return {
+          id: `file-${file.name.split('.')[0]}`,
+          projectId,
+          fileName: file.name,
+          fileSize: file.metadata?.size || 0,
+          uploadDate: file.created_at,
+          storagePath: filePath,
+          publicUrl: publicData.publicUrl,
+          metadata: {
+            storageProvider: 'supabase',
+            bucket: 'project-files',
+            ...file.metadata
+          }
+        };
+      });
+
+      console.log(`✅ ${files.length} archivos encontrados en Storage`);
+      return { success: true, files };
+
+    } catch (error) {
+      console.error('❌ Error inesperado listando archivos:', error);
+      return { success: false, error, files: [] };
+    }
+  }
+
+  // Obtener URL firmada para acceso temporal
+  async getSignedUrl(filePath, expiresIn = 3600) {
+    try {
+      if (!this.currentUser) {
+        console.warn('⚠️ No se puede obtener URL firmada: usuario no autenticado');
+        return { success: false, error: 'No autenticado' };
+      }
+
+      const { data, error } = await this.supabase.storage
+        .from('project-files')
+        .createSignedUrl(filePath, expiresIn);
+
+      if (error) {
+        console.error('❌ Error obteniendo URL firmada:', error);
+        return { success: false, error };
+      }
+
+      console.log('✅ URL firmada obtenida exitosamente');
+      return { success: true, signedUrl: data.signedUrl };
+
+    } catch (error) {
+      console.error('❌ Error inesperado obteniendo URL firmada:', error);
+      return { success: false, error };
+    }
+  }
 }
 
 // Crear instancia singleton

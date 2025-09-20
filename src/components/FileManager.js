@@ -36,20 +36,37 @@ const FileManager = ({
   const filteredFiles = useMemo(() => {
     let filtered = files;
     
-    if (category !== 'general') {
+    console.log('🔍 FileManager - Filtrado:', {
+      totalFiles: files.length,
+      category,
+      selectedCategory,
+      isContextual,
+      searchTerm
+    });
+    
+    // Si estamos en modo contextual (category específica), usar esa categoría
+    if (category !== 'general' && isContextual) {
       filtered = getFilesByCategory(category);
+      console.log('📂 Filtrado por categoría contextual:', category, 'archivos:', filtered.length);
+    } else if (selectedCategory !== 'general') {
+      // Si no estamos en modo contextual, usar la categoría seleccionada
+      filtered = getFilesByCategory(selectedCategory);
+      console.log('📂 Filtrado por categoría seleccionada:', selectedCategory, 'archivos:', filtered.length);
     }
     
     if (relatedItemId) {
       filtered = getFilesByRelatedItem(relatedItemId);
+      console.log('🔗 Filtrado por item relacionado:', relatedItemId, 'archivos:', filtered.length);
     }
     
     if (searchTerm) {
       filtered = searchFiles(searchTerm);
+      console.log('🔍 Filtrado por búsqueda:', searchTerm, 'archivos:', filtered.length);
     }
     
+    console.log('✅ Archivos finales filtrados:', filtered.length);
     return filtered.sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
-  }, [files, category, relatedItemId, searchTerm, getFilesByCategory, getFilesByRelatedItem, searchFiles]);
+  }, [files, category, selectedCategory, relatedItemId, searchTerm, isContextual, getFilesByCategory, getFilesByRelatedItem, searchFiles]);
 
   // Estadísticas de archivos
   const fileStats = useMemo(() => getFileStats(), [getFileStats]);
@@ -120,30 +137,43 @@ const FileManager = ({
 
   // Vista previa de archivo
   const previewFile = (file) => {
-    if (file.mimeType.startsWith('image/')) {
+    const mimeType = file.mimeType || file.type || '';
+    if (mimeType.startsWith('image/')) {
       window.open(file.content, '_blank');
-    } else if (file.mimeType === 'application/pdf') {
+    } else if (mimeType === 'application/pdf') {
       window.open(file.content, '_blank');
     } else {
       downloadFile(file);
     }
   };
 
-  // Obtener icono según tipo de archivo
+  // Obtener icono según tipo de archivo (para archivos procesados)
   const getFileIcon = (file) => {
-    if (file.mimeType.startsWith('image/')) return '🖼️';
-    if (file.mimeType === 'application/pdf') return '📄';
-    if (file.mimeType.includes('word')) return '📝';
-    if (file.mimeType.includes('excel')) return '📊';
+    const mimeType = file.mimeType || file.type || '';
+    if (mimeType.startsWith('image/')) return '🖼️';
+    if (mimeType === 'application/pdf') return '📄';
+    if (mimeType.includes('word')) return '📝';
+    if (mimeType.includes('excel')) return '📊';
+    return '📎';
+  };
+
+  // Obtener icono para archivos nativos del navegador
+  const getNativeFileIcon = (file) => {
+    const mimeType = file.type || '';
+    if (mimeType.startsWith('image/')) return '🖼️';
+    if (mimeType === 'application/pdf') return '📄';
+    if (mimeType.includes('word')) return '📝';
+    if (mimeType.includes('excel')) return '📊';
     return '📎';
   };
 
   // Obtener color según tipo de archivo
   const getFileColor = (file) => {
-    if (file.mimeType.startsWith('image/')) return 'from-pink-500 to-rose-500';
-    if (file.mimeType === 'application/pdf') return 'from-red-500 to-pink-500';
-    if (file.mimeType.includes('word')) return 'from-blue-500 to-indigo-500';
-    if (file.mimeType.includes('excel')) return 'from-green-500 to-emerald-500';
+    const mimeType = file.mimeType || file.type || '';
+    if (mimeType.startsWith('image/')) return 'from-pink-500 to-rose-500';
+    if (mimeType === 'application/pdf') return 'from-red-500 to-pink-500';
+    if (mimeType.includes('word')) return 'from-blue-500 to-indigo-500';
+    if (mimeType.includes('excel')) return 'from-green-500 to-emerald-500';
     return 'from-gray-500 to-slate-500';
   };
 
@@ -550,7 +580,7 @@ const FileManager = ({
                     {selectedFiles.map((file, index) => (
                       <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                         <div className="flex items-center space-x-2">
-                          <span className="text-lg">{getFileIcon(file)}</span>
+                          <span className="text-lg">{getNativeFileIcon(file)}</span>
                           <span className="text-sm font-medium text-gray-700">{file.name}</span>
                         </div>
                         <span className="text-xs text-gray-500">{formatFileSize(file.size)}</span>
