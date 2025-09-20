@@ -68,6 +68,9 @@ const OrganizationMembers = ({
       const { default: supabaseService } = await import('../services/SupabaseService');
       
       if (supabaseService.isAuthenticated()) {
+        console.log('🔍 DEBUG - Usuario autenticado:', supabaseService.getCurrentUser());
+        console.log('🔍 DEBUG - Organization ID:', organizationId);
+        
         // Verificar si el usuario ya está en la organización
         const { data: existingMember, error: memberError } = await supabaseService.supabase
           .from('organization_members')
@@ -82,6 +85,14 @@ const OrganizationMembers = ({
         }
 
         // Crear invitación (el usuario se unirá cuando se registre)
+        console.log('🔍 DEBUG - Datos de inserción:', {
+          organization_id: organizationId,
+          user_id: null,
+          user_email: inviteEmail,
+          role: inviteRole,
+          status: 'pending'
+        });
+        
         const { error: insertError } = await supabaseService.supabase
           .from('organization_members')
           .insert({
