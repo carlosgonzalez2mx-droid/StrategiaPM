@@ -10,7 +10,7 @@ const OrganizationMembers = ({
   const [invitations, setInvitations] = useState([]);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState('member');
+  const [inviteRole, setInviteRole] = useState('organization_member_write');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -150,7 +150,7 @@ ${registrationUrl}`);
         
         // Limpiar formulario
         setInviteEmail('');
-        setInviteRole('member');
+        setInviteRole('organization_member_write');
         setShowInviteModal(false);
 
         // Notificar al componente padre
@@ -436,8 +436,9 @@ ${registrationUrl}`);
                       value={inviteRole}
                       onChange={(e) => setInviteRole(e.target.value)}
                     >
-                      <option value="member">Miembro (Ver y editar proyectos)</option>
-                      <option value="admin">Administrador (Gestionar organización)</option>
+                      <option value="organization_owner">👑 Administrador (Gestionar organización)</option>
+                      <option value="organization_member_write">✏️ Miembro (Ver y editar proyectos)</option>
+                      <option value="organization_member_read">👀 Miembro (Solo lectura)</option>
                     </select>
                   </div>
                 </div>
