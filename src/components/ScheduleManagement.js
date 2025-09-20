@@ -619,7 +619,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
   // Estados principales - INDEPENDIENTES de Work Packages
   // NOTA: tasks y setTasks ahora vienen como props del componente padre
   
-  // Corregir hitos existentes cuando se cargan las tareas
+  // Corregir hitos existentes cuando se cargan las tareas (solo una vez)
   useEffect(() => {
     console.log('🔧 useEffect EJECUTÁNDOSE - TAREAS:', tasks?.length || 0);
     
@@ -659,7 +659,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         }));
       }
     }
-  }, [tasks]);
+  }, [tasks.length]); // Solo ejecutar cuando cambie el número de tareas
 
   // ELIMINADO: Sincronización con Work Packages - ya no es necesaria
 
