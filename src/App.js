@@ -23,7 +23,6 @@ import ProjectAudit from './components/ProjectAudit';
 import ProjectArchive from './components/ProjectArchive';
 import SyncIndicator from './components/SyncIndicator';
 import BackupManager from './components/BackupManager';
-import DataManager from './components/DataManager';
 import FileStatusIndicator from './components/FileStatusIndicator';
 import SupabaseAuth from './components/SupabaseAuth';
 import OrganizationMembers from './components/OrganizationMembers';
@@ -1527,20 +1526,6 @@ function MainApp() {
       )}
       <FileStatusIndicator />
       <BackupManager onRestoreData={importData} />
-      <DataManager 
-        onDataImport={importData}
-        projects={projects}
-        risksByProject={risksByProject}
-        tasksByProject={tasksByProject}
-        purchaseOrdersByProject={purchaseOrdersByProject}
-        advancesByProject={advancesByProject}
-        invoicesByProject={invoicesByProject}
-        contractsByProject={contractsByProject}
-        globalResources={globalResources}
-        resourceAssignmentsByProject={resourceAssignmentsByProject}
-        viewMode="project"
-        currentProjectId={currentProjectId}
-      />
       
       <div className="flex">
         <Sidebar 
