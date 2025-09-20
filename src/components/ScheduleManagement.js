@@ -602,9 +602,28 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
   // Estados principales - INDEPENDIENTES de Work Packages
   // NOTA: tasks y setTasks ahora vienen como props del componente padre
   
+  // Debug: Verificar props recibidas
+  console.log('🔍 ScheduleManagement - Props recibidas:', {
+    tasksLength: tasks?.length || 0,
+    hasSetTasks: typeof setTasks === 'function',
+    hasImportTasks: typeof importTasks === 'function',
+    projectData: projectData?.name || 'No project data',
+    includeWeekends: includeWeekends
+  });
+  
   // Corregir hitos existentes cuando se cargan las tareas
   useEffect(() => {
     console.log('🔧 useEffect EJECUTÁNDOSE - TAREAS:', tasks?.length || 0);
+    
+    if (!tasks || !Array.isArray(tasks)) {
+      console.warn('⚠️ ScheduleManagement: tasks no es un array válido:', tasks);
+      return;
+    }
+    
+    if (tasks.length === 0) {
+      console.log('ℹ️ ScheduleManagement: No hay tareas para procesar');
+      return;
+    }
     
     if (tasks && tasks.length > 0) {
       // Verificar si hay hitos con fechas incorrectas
@@ -4742,6 +4761,56 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
   };
 
   // Componente simplificado - sin caso de negocio redundante
+
+  // Verificar si no hay tareas
+  if (!tasks || !Array.isArray(tasks) || tasks.length === 0) {
+    return (
+      <div className="space-y-6">
+        {/* BARRA UNIFICADA - DISEÑO CON COLOR AZUL CLARO */}
+        <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 rounded-2xl shadow-lg p-6 mb-8 border border-blue-200 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-100/30 rounded-full -translate-y-16 translate-x-16"></div>
+          <div className="absolute bottom-0 left-0 w-24 h-24 bg-indigo-100/30 rounded-full translate-y-12 -translate-x-12"></div>
+          
+          <div className="relative z-10">
+            <div className="flex items-center">
+              <div className="bg-blue-100 rounded-2xl p-3 mr-4">
+                <span className="text-2xl">📅</span>
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-gray-800 mb-2">Cronograma del Proyecto</h1>
+                <p className="text-gray-600 text-lg">Gestión de tiempo, dependencias y recursos integrada con EVM</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Mensaje cuando no hay tareas */}
+        <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
+          <div className="text-6xl mb-6">📋</div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">No hay tareas en este proyecto</h2>
+          <p className="text-gray-600 mb-8 text-lg">
+            Comienza creando tu primera tarea o importa un cronograma desde Excel
+          </p>
+          <div className="flex justify-center space-x-4">
+            <button
+              onClick={() => setShowAddTaskModal(true)}
+              className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors flex items-center space-x-2"
+            >
+              <span>➕</span>
+              <span>Crear Primera Tarea</span>
+            </button>
+            <button
+              onClick={() => document.getElementById('excel-file-input')?.click()}
+              className="bg-green-600 text-white px-6 py-3 rounded-xl hover:bg-green-700 transition-colors flex items-center space-x-2"
+            >
+              <span>📥</span>
+              <span>Importar desde Excel</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
