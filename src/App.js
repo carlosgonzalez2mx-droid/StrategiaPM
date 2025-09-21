@@ -1286,7 +1286,75 @@ function MainApp() {
     };
   }, []);
 
+  // Actualizar progreso automático de proyectos cuando cambien las tareas
+  useEffect(() => {
+    if (!dataLoaded || !tasksByProject) return;
+    
+    console.log('🔄 ACTUALIZANDO PROGRESO AUTOMÁTICO DE PROYECTOS');
+    
+    // Actualizar progreso de todos los proyectos activos
+    let hasUpdates = false;
+    const updates = [];
+    
+    projects.forEach(project => {
+      if (project.status === 'active') {
+        const newProgress = calculateProjectProgress(project.id);
+        
+        // Solo actualizar si el progreso ha cambiado
+        if (newProgress !== project.progress) {
+          console.log(`📊 Actualizando progreso del proyecto ${project.name}: ${project.progress}% → ${newProgress}%`);
+          updates.push({ id: project.id, progress: newProgress });
+          hasUpdates = true;
+        }
+      }
+    });
+    
+    // Aplicar todas las actualizaciones de una vez
+    if (hasUpdates) {
+      setProjects(prev => prev.map(p => {
+        const update = updates.find(u => u.id === p.id);
+        return update 
+          ? { ...p, progress: update.progress, updatedAt: new Date().toISOString() }
+          : p;
+      }));
+    }
+  }, [tasksByProject, dataLoaded]); // Removido 'projects' de las dependencias para evitar bucle infinito
+
   // ===== FUNCIONES DE GESTIÓN DE PROYECTOS =====
+  
+  // Función para calcular el progreso automático del proyecto basado en sus tareas
+  const calculateProjectProgress = (projectId) => {
+    const projectTasks = tasksByProject[projectId] || [];
+    
+    if (projectTasks.length === 0) {
+      return 0;
+    }
+    
+    // Calcular progreso promedio de todas las tareas (excluyendo hitos)
+    const regularTasks = projectTasks.filter(task => !task.isMilestone);
+    
+    if (regularTasks.length === 0) {
+      return 0;
+    }
+    
+    const totalProgress = regularTasks.reduce((sum, task) => sum + (task.progress || 0), 0);
+    const averageProgress = Math.round(totalProgress / regularTasks.length);
+    
+    console.log('🔄 CÁLCULO PROGRESO AUTOMÁTICO:', {
+      projectId,
+      totalTasks: projectTasks.length,
+      regularTasks: regularTasks.length,
+      totalProgress,
+      averageProgress,
+      tasksDetails: regularTasks.map(t => ({ 
+        name: t.name, 
+        progress: t.progress,
+        isMilestone: t.isMilestone
+      }))
+    });
+    
+    return Math.min(100, Math.max(0, averageProgress));
+  };
   
   const createProject = (projectData) => {
     // Generar UUID válido para el proyecto
@@ -1354,6 +1422,9 @@ function MainApp() {
   };
 
   const updateProject = (projectId, updates) => {
+    // Calcular progreso automático si no se proporciona explícitamente
+    const autoProgress = updates.progress !== undefined ? updates.progress : calculateProjectProgress(projectId);
+    
     setProjects(prev => prev.map(project => 
       project.id === projectId 
         ? { 
@@ -1374,7 +1445,7 @@ function MainApp() {
             createdAt: project.createdAt,
             updatedAt: new Date().toISOString(),
             version: project.version,
-            progress: updates.progress || project.progress
+            progress: autoProgress
           }
         : project
     ));
