@@ -282,9 +282,15 @@ const ProjectManagementTabs = ({
       return { percentComplete: 0 };
     }
 
-    // Calcular progreso promedio de las tareas
-    const totalProgress = projectTasks.reduce((sum, task) => sum + (task.progress || 0), 0);
-    const percentComplete = Math.round(totalProgress / projectTasks.length);
+    // Calcular progreso promedio de las tareas (excluyendo hitos para consistencia)
+    const regularTasks = projectTasks.filter(task => !task.isMilestone);
+    
+    if (regularTasks.length === 0) {
+      return { percentComplete: 0 };
+    }
+    
+    const totalProgress = regularTasks.reduce((sum, task) => sum + (task.progress || 0), 0);
+    const percentComplete = Math.round(totalProgress / regularTasks.length);
 
     // Si hay work packages, usar métricas EVM tradicionales
     if (Array.isArray(projectWorkPackages) && projectWorkPackages.length > 0) {
