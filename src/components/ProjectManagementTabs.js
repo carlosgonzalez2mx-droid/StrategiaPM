@@ -360,18 +360,25 @@ const ProjectManagementTabs = ({
                     <span>${(currentProject.budget / 1000).toFixed(0)}K</span>
                   </span>
                   <span className="flex items-center space-x-1">
-                    <span className="text-red-500">📅</span>
-                    <span>{projectStartDate || currentProject.startDate} - {projectEndDate || currentProject.endDate}</span>
+                    <span className="text-green-500">💼</span>
                     <span className="px-2 py-1 rounded bg-blue-100 text-blue-800 ml-2">
                       {evmMetrics.percentComplete?.toFixed(1) || 0}% completado
                     </span>
                   </span>
                 </div>
-                {/* Descripción del proyecto */}
+                {/* Caso de negocio del proyecto */}
                 <div className="mt-3">
-                  <p className="text-gray-700 text-sm leading-relaxed">
-                    {currentProject.description || 'Sin descripción disponible'}
-                  </p>
+                  <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-4 border border-green-200">
+                    <div className="flex items-start space-x-2">
+                      <span className="text-green-600 text-lg">💼</span>
+                      <div>
+                        <h4 className="font-semibold text-green-800 mb-2">Caso de Negocio</h4>
+                        <p className="text-gray-700 text-sm leading-relaxed">
+                          {currentProject.businessCase || 'Sin caso de negocio definido'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
