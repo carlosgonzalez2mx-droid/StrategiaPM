@@ -273,22 +273,37 @@ const ProjectManagementTabs = ({
   
   // Calcular métricas EVM del proyecto actual
   const calculateEVMMetrics = () => {
-    if (!currentProject || !Array.isArray(projectWorkPackages) || projectWorkPackages.length === 0) return {};
+    if (!currentProject) return {};
 
-    // Usar SOLO los work packages del proyecto seleccionado
-    const BAC = projectWorkPackages.reduce((sum, wp) => sum + (wp.budget || 0), 0);
-    const PV = projectWorkPackages.reduce((sum, wp) => sum + (wp.plannedValue || 0), 0);
-    const EV = projectWorkPackages.reduce((sum, wp) => sum + (wp.earnedValue || 0), 0);
-    const AC = projectWorkPackages.reduce((sum, wp) => sum + (wp.actualCost || 0), 0);
+    // Calcular progreso basado en tareas del cronograma
+    const projectTasks = Array.isArray(tasks) ? tasks : [];
+    
+    if (projectTasks.length === 0) {
+      return { percentComplete: 0 };
+    }
 
-    const CV = EV - AC;
-    const SV = EV - PV;
-    const CPI = AC > 0 ? EV / AC : 0;
-    const SPI = PV > 0 ? EV / PV : 0;
-    const percentComplete = BAC > 0 ? (EV / BAC) * 100 : 0;
-    const percentSpent = BAC > 0 ? (AC / BAC) * 100 : 0;
+    // Calcular progreso promedio de las tareas
+    const totalProgress = projectTasks.reduce((sum, task) => sum + (task.progress || 0), 0);
+    const percentComplete = Math.round(totalProgress / projectTasks.length);
 
-    return { BAC, PV, EV, AC, CV, SV, CPI, SPI, percentComplete, percentSpent };
+    // Si hay work packages, usar métricas EVM tradicionales
+    if (Array.isArray(projectWorkPackages) && projectWorkPackages.length > 0) {
+      const BAC = projectWorkPackages.reduce((sum, wp) => sum + (wp.budget || 0), 0);
+      const PV = projectWorkPackages.reduce((sum, wp) => sum + (wp.plannedValue || 0), 0);
+      const EV = projectWorkPackages.reduce((sum, wp) => sum + (wp.earnedValue || 0), 0);
+      const AC = projectWorkPackages.reduce((sum, wp) => sum + (wp.actualCost || 0), 0);
+
+      const CV = EV - AC;
+      const SV = EV - PV;
+      const CPI = AC > 0 ? EV / AC : 0;
+      const SPI = PV > 0 ? EV / PV : 0;
+      const percentSpent = BAC > 0 ? (AC / BAC) * 100 : 0;
+
+      return { BAC, PV, EV, AC, CV, SV, CPI, SPI, percentComplete, percentSpent };
+    }
+
+    // Si no hay work packages, solo retornar el progreso basado en tareas
+    return { percentComplete };
   };
 
   const evmMetrics = calculateEVMMetrics();
