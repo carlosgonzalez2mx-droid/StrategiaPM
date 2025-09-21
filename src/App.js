@@ -790,7 +790,7 @@ function MainApp() {
         setSupabaseInitialized(supabaseReady);
         
         if (supabaseReady) {
-          if (supabaseService.isAuthenticated()) {
+          if (supabaseService.getCurrentUser()) {
             console.log('✅ Supabase inicializado con usuario autenticado');
             setUseSupabase(true);
             

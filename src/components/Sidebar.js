@@ -284,13 +284,36 @@ const Sidebar = ({
                 {/* Botón Desconectar Usuario - Solo si hay usuario conectado */}
                 {supabaseService.getCurrentUser() && (
                   <button
-                    onClick={() => {
-                      if (window.confirm('¿Estás seguro de que quieres desconectarte?')) {
-                        console.log('🚪 Desconectando usuario...');
-                        // Disparar evento para cerrar sesión
-                        window.dispatchEvent(new CustomEvent('userLogout'));
-                        // Recargar página para limpiar estado
-                        window.location.reload();
+                    onClick={async () => {
+                      if (window.confirm('¿Estás seguro de que quieres desconectarte?\n\nEsto cerrará completamente tu sesión por seguridad.')) {
+                        console.log('🚪 Cerrando sesión de Supabase...');
+                        
+                        try {
+                          // LOGOUT REAL DE SUPABASE para seguridad
+                          const result = await supabaseService.signOut();
+                          
+                          if (result.success) {
+                            console.log('✅ Logout completo exitoso');
+                            
+                            // Verificar que realmente no hay usuario
+                            const stillLoggedIn = supabaseService.getCurrentUser();
+                            if (stillLoggedIn) {
+                              console.warn('⚠️ Usuario aún detectado después del logout, forzando recarga...');
+                            }
+                            
+                            // Pequeña pausa para asegurar que el logout se procesó
+                            setTimeout(() => {
+                              console.log('🔄 Recargando página para limpiar estado...');
+                              window.location.reload();
+                            }, 500);
+                          } else {
+                            console.error('❌ Error cerrando sesión:', result.error);
+                            alert('❌ Error al cerrar sesión. Inténtalo de nuevo.');
+                          }
+                        } catch (error) {
+                          console.error('❌ Error inesperado:', error);
+                          alert('❌ Error inesperado al cerrar sesión.');
+                        }
                       }
                     }}
                     className="w-full flex items-center justify-center space-x-2 px-2 py-2 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors duration-200"
