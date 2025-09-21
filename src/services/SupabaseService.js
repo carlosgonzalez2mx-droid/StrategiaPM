@@ -24,14 +24,17 @@ class SupabaseService {
       if (user) {
         console.log('✅ Usuario autenticado:', user.email);
         
-        // DIAGNÓSTICO: Verificar si el método existe
-        console.log('🔍 ¿Método detectUserOrganization existe?', typeof this.detectUserOrganization);
-        
         try {
           // USAR DETECCIÓN AUTOMÁTICA
           console.log('🚀 Iniciando detección de organización...');
-          await this.detectUserOrganization();
-          console.log('✅ Detección de organización completada. OrganizationId:', this.organizationId);
+          const detectedOrgId = await this.detectUserOrganization();
+          if (detectedOrgId) {
+            this.organizationId = detectedOrgId;
+            console.log('✅ Detección de organización completada. OrganizationId:', this.organizationId);
+          } else {
+            console.log('⚠️ No se pudo detectar organización automáticamente');
+            this.organizationId = null;
+          }
         } catch (error) {
           console.error('❌ Error en detección de organización:', error);
           this.organizationId = null;
@@ -52,7 +55,7 @@ class SupabaseService {
   async detectUserOrganization() {
     if (!this.currentUser) {
       console.log('❌ No hay usuario para detectar organización');
-      return;
+      return null;
     }
 
     try {
@@ -68,13 +71,13 @@ class SupabaseService {
 
       if (error) {
         console.error('❌ Error buscando memberships:', error);
-        return;
+        return null;
       }
 
       if (!memberships || memberships.length === 0) {
         console.log('❌ No se encontraron memberships activos para:', this.currentUser.email);
         this.organizationId = null;
-        return;
+        return null;
       }
 
       console.log('✅ Memberships encontrados:', memberships.length);
@@ -90,7 +93,7 @@ class SupabaseService {
           id: this.organizationId,
           name: ownerMembership.organizations.name
         });
-        return;
+        return this.organizationId;
       }
 
       // Si no es owner, usar la primera organización activa
@@ -102,9 +105,12 @@ class SupabaseService {
         role: firstMembership.role
       });
 
+      return this.organizationId;
+
     } catch (error) {
       console.error('❌ Error en detectUserOrganization:', error);
       this.organizationId = null;
+      return null;
     }
   }
 
@@ -378,7 +384,7 @@ class SupabaseService {
     try {
       console.log('📊 Cargando datos del portafolio desde Supabase...');
 
-      // Verificar si existe organización, si no, crearla
+      // Verificar si existe organización, si no, intentar detectarla
       if (!this.organizationId) {
         console.log('🏢 EJECUTANDO DETECCIÓN AUTOMÁTICA DE ORGANIZACIÓN...');
         
@@ -389,24 +395,9 @@ class SupabaseService {
           this.organizationId = detectedOrgId;
           console.log('✅ Organización detectada automáticamente:', this.organizationId);
         } else {
-          console.log('🏢 Creando organización para el usuario...');
-          const { data: newOrg, error: createOrgError } = await this.supabase
-            .from('organizations')
-            .insert({
-              name: `${this.currentUser.email.split('@')[0]}'s Organization`,
-              owner_id: this.currentUser.id
-            })
-            .select('id')
-            .single();
-
-          if (createOrgError) {
-            console.error('❌ Error creando organización:', createOrgError);
-            return null;
-          }
-
-          // DETECCIÓN AUTOMÁTICA: Usar organización creada
-          this.organizationId = newOrg.id;
-          console.log('✅ Organización creada automáticamente:', this.organizationId);
+          console.error('❌ No se pudo detectar organización para el usuario:', this.currentUser.email);
+          console.error('❌ El usuario podría no tener membresía en ninguna organización');
+          return null;
         }
       }
 
@@ -1358,147 +1349,6 @@ class SupabaseService {
     return this.organizationId;
   }
 
-  // NUEVA: Detección automática mejorada de organización
-  async detectUserOrganization() {
-    console.log('🚨 MÉTODO detectUserOrganization INICIADO');
-    
-    if (!this.currentUser) {
-      console.log('❌ No hay usuario autenticado');
-      return null;
-    }
-
-    try {
-      console.log('🔍 Detectando organización automáticamente para:', this.currentUser.email);
-      console.log('🔍 Current user ID (Supabase):', this.currentUser.id);
-      console.log('🔍 Objeto currentUser completo:', this.currentUser);
-      
-      // 1. Buscar organización como owner (prioridad)
-      // Buscar ESPECÍFICAMENTE donde user_id NO sea null y coincida con owner_id
-      const { data: userMemberships, error: membershipError } = await this.supabase
-        .from('organization_members')
-        .select('user_id, organization_id, role, organizations!inner(id, name, owner_id)')
-        .eq('user_email', this.currentUser.email)
-        .not('user_id', 'is', null)
-        .order('created_at', { ascending: false });
-
-      if (membershipError) {
-        console.log('❌ Error en query de memberships:', membershipError);
-      }
-
-      console.log('✅ Memberships encontrados:', userMemberships?.length || 0);
-      if (userMemberships && userMemberships.length > 0) {
-        console.log('📊 Detalle de memberships:', userMemberships.map(m => ({
-          user_id: m.user_id,
-          org_id: m.organization_id,
-          org_name: m.organizations?.name,
-          org_owner_id: m.organizations?.owner_id,
-          role: m.role,
-          is_owner: m.user_id === m.organizations?.owner_id
-        })));
-      }
-
-      let ownedOrg = null;
-      if (userMemberships && userMemberships.length > 0) {
-        // PRIORIDAD INTELIGENTE: Buscar donde eres OWNER primero
-        const ownerMemberships = userMemberships.filter(membership => 
-          membership.organizations && 
-          membership.user_id === membership.organizations.owner_id
-        );
-        
-        if (ownerMemberships.length > 0) {
-          // Si eres owner de múltiples organizaciones, usar la MÁS ANTIGUA (primera creada)
-          const oldestOwnerMembership = ownerMemberships.reduce((oldest, current) => {
-            const oldestDate = new Date(oldest.organizations.created_at || oldest.created_at);
-            const currentDate = new Date(current.organizations.created_at || current.created_at);
-            return currentDate < oldestDate ? current : oldest;
-          });
-          
-          ownedOrg = oldestOwnerMembership.organizations;
-          console.log('✅ Encontrada organización como OWNER (más antigua):', oldestOwnerMembership.user_id, '-', ownedOrg.name);
-        } else {
-          // Si no eres owner, buscar como miembro (usar la más reciente)
-          const memberMembership = userMemberships[0]; // Ya ordenado por created_at DESC
-          if (memberMembership.organizations) {
-            ownedOrg = memberMembership.organizations;
-            console.log('✅ Encontrada organización como MIEMBRO:', memberMembership.organization_id, '-', ownedOrg.name);
-          }
-        }
-      }
-
-      // Si no encontró por custom user_id, buscar por UUID de Supabase
-      if (!ownedOrg) {
-        console.log('🔍 Buscando organización por UUID de Supabase:', this.currentUser.id);
-        const { data: uuidOrg, error: ownerError } = await this.supabase
-          .from('organizations')
-          .select('id, name')
-          .eq('owner_id', this.currentUser.id)
-          .maybeSingle();
-        
-        if (ownerError) {
-          console.log('⚠️ Error buscando por UUID:', ownerError);
-        }
-        
-        if (uuidOrg) {
-          console.log('✅ Encontrada organización por UUID:', uuidOrg.id, '-', uuidOrg.name);
-        } else {
-          console.log('❌ No se encontró organización por UUID');
-        }
-        
-        ownedOrg = uuidOrg;
-      }
-
-      if (ownedOrg) {
-        this.organizationId = ownedOrg.id;
-        console.log('✅ Organización detectada como owner:', this.organizationId, '-', ownedOrg.name);
-        return ownedOrg.id;
-      }
-
-      // 2. Buscar como miembro activo (si no es owner)
-      let membership = null;
-      if (!ownedOrg && userMemberships && userMemberships.length > 0) {
-        // Si no es owner, tomar la primera organización donde es miembro
-        const membershipRecord = userMemberships[0];
-        if (membershipRecord.organizations) {
-          membership = {
-            organization_id: membershipRecord.organization_id,
-            organizations: membershipRecord.organizations
-          };
-          console.log('✅ Encontrada organización como MIEMBRO:', membershipRecord.organization_id);
-        }
-      }
-
-      if (membership && membership.organizations) {
-        this.organizationId = membership.organization_id;
-        console.log('✅ Organización detectada como miembro:', this.organizationId, '-', membership.organizations.name);
-        return membership.organization_id;
-      }
-
-      // 3. Crear organización automáticamente si no existe
-      console.log('🏢 Creando organización automática para usuario...');
-      const userName = this.currentUser.email?.split('@')[0] || 'Usuario';
-      const { data: newOrg, error: createError } = await this.supabase
-        .from('organizations')
-        .insert({
-          name: `${userName}'s Organization`,
-          owner_id: this.currentUser.id
-        })
-        .select('id, name')
-        .single();
-
-      if (createError) {
-        console.error('❌ Error creando organización:', createError);
-        return null;
-      }
-
-      this.organizationId = newOrg.id;
-      console.log('✅ Organización creada automáticamente:', this.organizationId, '-', newOrg.name);
-      return newOrg.id;
-
-    } catch (error) {
-      console.error('❌ Error en detección automática de organización:', error);
-      return null;
-    }
-  }
 
   // Función para limpiar duplicados en Supabase
   async cleanDuplicatesInSupabase() {
