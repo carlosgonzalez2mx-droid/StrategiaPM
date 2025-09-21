@@ -295,6 +295,12 @@ const FinancialManagement = ({
   const handleSavePO = () => {
     console.log('💾 GUARDANDO OC - editingPO:', editingPO);
     
+    // Validación: Si está aprobada, debe tener fecha de aprobación
+    if (editingPO.status === 'approved' && (!editingPO.approvalDate || editingPO.approvalDate.trim() === '')) {
+      alert('⚠️ Error: Las órdenes de compra aprobadas deben tener una fecha de aprobación para el cálculo del flujo de caja.');
+      return;
+    }
+    
     // Asegurar que purchaseOrders sea un array válido
     const currentOrders = Array.isArray(purchaseOrders) ? purchaseOrders : [];
     
@@ -852,10 +858,31 @@ const FinancialManagement = ({
               purchaseOrders.map(po => (
                 <div key={po.id} className="border rounded p-3">
                   <div className="flex justify-between items-start">
-                    <div>
+                    <div className="flex-1">
                       <div className="font-medium text-sm">{po.number}</div>
                       <div className="text-xs text-gray-600">{po.supplier}</div>
                       <div className="text-xs text-gray-600">${po.totalAmount?.toLocaleString()}</div>
+                      <div className="flex items-center space-x-2 mt-1">
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          po.status === 'approved' ? 'bg-green-100 text-green-800' : 
+                          po.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
+                          'bg-red-100 text-red-800'
+                        }`}>
+                          {po.status === 'approved' ? 'Aprobada' : 
+                           po.status === 'pending' ? 'Pendiente' : 'Rechazada'}
+                        </span>
+                        {po.status === 'approved' && (
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            po.approvalDate && po.approvalDate.trim() !== '' 
+                              ? 'bg-blue-100 text-blue-800' 
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {po.approvalDate && po.approvalDate.trim() !== '' 
+                              ? `✅ ${new Date(po.approvalDate + 'T00:00:00').toLocaleDateString('es-ES')}` 
+                              : '⚠️ Sin fecha de aprobación'}
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="flex space-x-1">
                       <button
@@ -1063,6 +1090,26 @@ const FinancialManagement = ({
                     <option value="approved">Aprobada</option>
                     <option value="rejected">Rechazada</option>
                   </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Fecha de Aprobación *
+                    <span className="text-red-500 ml-1">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    className="w-full border rounded px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    value={editingPO?.approvalDate || ''}
+                    onChange={(e) => setEditingPO({
+                      ...editingPO,
+                      approvalDate: e.target.value
+                    })}
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Fecha cuando la orden fue aprobada (usada para flujo de caja)
+                  </p>
                 </div>
                 
                 <div className="md:col-span-2">

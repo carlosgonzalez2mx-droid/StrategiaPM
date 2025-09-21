@@ -17,7 +17,7 @@ const CashFlowProjection = ({
   const [showProjectionSettings, setShowProjectionSettings] = useState(false);
   const [projectionSettings, setProjectionSettings] = useState({
     // Configuración simplificada para tu flujo de negocio
-    paymentTerms: 'net30',
+    paymentTerms: 'milestone', // Cambiado a milestone para que use la fecha de aprobación directamente
     revenueRecognition: 'percentage_completion' // 'uniform' o 'percentage_completion'
   });
   
@@ -121,24 +121,89 @@ const CashFlowProjection = ({
   const calculateMonthCommittedExpense = (monthDate, daysToPayment) => {
     if (!currentProject) return 0;
 
+    console.log('🔍 CASHFLOW PROJECTION - calculateMonthCommittedExpense iniciando:', {
+      monthDate: monthDate.toISOString().substring(0, 7),
+      purchaseOrdersLength: purchaseOrders?.length || 0,
+      purchaseOrders: purchaseOrders
+    });
+
+    // DEBUG: Mostrar todas las órdenes de compra aprobadas
+    const approvedPOs = purchaseOrders?.filter(po => po.status === 'approved') || [];
+    console.log('🔍 CASHFLOW PROJECTION - Órdenes de compra aprobadas:', approvedPOs.map(po => ({
+      id: po.id,
+      number: po.number,
+      status: po.status,
+      totalAmount: po.totalAmount,
+      approvalDate: po.approvalDate,
+      requestDate: po.requestDate,
+      hasApprovalDate: !!(po.approvalDate && po.approvalDate.trim() !== ''),
+      hasRequestDate: !!(po.requestDate && po.requestDate.trim() !== '')
+    })));
+
     let committedExpense = 0;
     const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
     const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
 
-    // GASTO COMPROMETIDO: Solo órdenes de compra aprobadas
+    // Ajustar las fechas para incluir todo el día
+    monthStart.setHours(0, 0, 0, 0);
+    monthEnd.setHours(23, 59, 59, 999);
+
+    console.log('🔍 CASHFLOW PROJECTION - Rango de fechas:', {
+      monthStart: monthStart.toISOString().split('T')[0],
+      monthEnd: monthEnd.toISOString().split('T')[0]
+    });
+
+    // GASTO COMPROMETIDO: Solo órdenes de compra aprobadas con fecha de aprobación
     const monthPOs = purchaseOrders?.filter(po => {
-      if (po.status !== 'approved' && po.status !== 'delivered') return false;
+      if (po.status !== 'approved') return false;
       
-      // Usar la fecha de entrega o fecha de la orden
-      const deliveryDate = new Date(po.deliveryDate || po.date);
-      const adjustedDate = new Date(deliveryDate);
-      adjustedDate.setDate(deliveryDate.getDate() + daysToPayment);
+      // SOLO usar approvalDate - si no existe, no incluir la orden
+      if (!po.approvalDate || po.approvalDate.trim() === '') {
+        console.log('⚠️ CASHFLOW PROJECTION - OC sin fecha de aprobación:', {
+          id: po.id,
+          number: po.number,
+          status: po.status,
+          totalAmount: po.totalAmount,
+          approvalDate: po.approvalDate
+        });
+        return false;
+      }
       
-      return adjustedDate >= monthStart && adjustedDate <= monthEnd;
+      // CORREGIDO: Usar fecha local para evitar problemas de zona horaria
+      const approvalDate = new Date(po.approvalDate + 'T00:00:00');
+      const adjustedDate = new Date(approvalDate);
+      adjustedDate.setDate(approvalDate.getDate() + daysToPayment);
+      
+      const isInMonth = adjustedDate >= monthStart && adjustedDate <= monthEnd;
+      
+      console.log('🔍 CASHFLOW PROJECTION - Evaluando OC:', {
+        id: po.id,
+        number: po.number,
+        approvalDate: po.approvalDate,
+        approvalDateParsed: approvalDate.toISOString().split('T')[0],
+        adjustedDate: adjustedDate.toISOString().split('T')[0],
+        monthStart: monthStart.toISOString().split('T')[0],
+        monthEnd: monthEnd.toISOString().split('T')[0],
+        daysToPayment,
+        status: po.status,
+        totalAmount: po.totalAmount,
+        isInMonth,
+        willInclude: isInMonth
+      });
+      
+      return isInMonth;
     }) || [];
 
     // Sumar el total de las órdenes de compra del mes
-    committedExpense += monthPOs.reduce((sum, po) => sum + (po.totalAmount || 0), 0);
+    committedExpense += monthPOs.reduce((sum, po) => {
+      console.log(`✅ CASHFLOW PROJECTION - INCLUYENDO OC ${po.number}: $${po.totalAmount}`);
+      return sum + (po.totalAmount || 0);
+    }, 0);
+
+    console.log('🔍 CASHFLOW PROJECTION - Resultado final:', {
+      monthPOsCount: monthPOs.length,
+      committedExpense
+    });
 
     return committedExpense;
   };
@@ -178,6 +243,15 @@ const CashFlowProjection = ({
   const cashFlowProjection = useMemo(() => {
     if (!currentProject) return null;
 
+    console.log('🔍 CASHFLOW PROJECTION - Iniciando cálculo de proyección:', {
+      currentProject: currentProject?.name,
+      projectionPeriod,
+      projectionStartDate,
+      purchaseOrders: purchaseOrders?.length || 0,
+      advances: advances?.length || 0,
+      invoices: invoices?.length || 0
+    });
+
     const startDate = new Date(projectionStartDate);
     const months = parseInt(projectionPeriod);
     const projection = [];
@@ -204,11 +278,15 @@ const CashFlowProjection = ({
         month: 'long' 
       });
 
+      console.log(`🔍 CASHFLOW PROJECTION - Procesando mes ${i + 1}: ${monthKey} (${monthLabel})`);
+
       // Calcular gasto planificado del mes
       const monthPlannedExpense = calculateMonthPlannedExpense(currentDate);
       
       // Calcular gasto comprometido del mes (OCs)
+      console.log(`🔍 CASHFLOW PROJECTION - LLAMANDO calculateMonthCommittedExpense para mes ${monthKey}`);
       const monthCommittedExpense = calculateMonthCommittedExpense(currentDate, daysToPayment);
+      console.log(`🔍 CASHFLOW PROJECTION - RESULTADO calculateMonthCommittedExpense: $${monthCommittedExpense}`);
       
       // Calcular gasto real del mes (anticipos pagados + facturas pagadas)
       const monthRealExpense = calculateMonthRealExpense(currentDate);
@@ -285,10 +363,10 @@ const CashFlowProjection = ({
       ['Mes', 'Gasto Planificado', 'Gasto Comprometido (OCs)', 'Gasto Real', 'Saldo Acumulado'],
       ...cashFlowProjection.map(month => [
         month.monthLabel,
-        month.revenue.toFixed(2),
-        month.expenses.toFixed(2),
-        month.realExpenses.toFixed(2),
-        month.cumulativeBalance.toFixed(2)
+        formatCurrency(month.revenue),
+        formatCurrency(month.expenses),
+        formatCurrency(month.realExpenses),
+        formatCurrency(month.cumulativeBalance)
       ])
     ].map(row => row.join(',')).join('\n');
 
@@ -306,6 +384,19 @@ const CashFlowProjection = ({
       period: projectionPeriod,
       startDate: projectionStartDate
     });
+  };
+
+  // Función para formatear números con formato mexicano: $1.234.567,89
+  const formatCurrency = (value) => {
+    if (value === null || value === undefined || isNaN(value)) return '$0,00';
+    
+    // Formatear con separadores de miles (punto) y decimales (coma)
+    const formatted = new Intl.NumberFormat('es-MX', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(value);
+    
+    return `$${formatted}`;
   };
 
   // Obtener color para el flujo de caja
@@ -399,7 +490,7 @@ const CashFlowProjection = ({
             <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-orange-500">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-2xl font-bold text-gray-800">${(cashFlowMetrics.totalRevenue / 1000).toFixed(0)}K</div>
+                  <div className="text-2xl font-bold text-gray-800">{formatCurrency(cashFlowMetrics.totalRevenue)}</div>
                   <div className="text-sm text-gray-600">Gasto Planificado Total</div>
                 </div>
                 <div className="p-3 bg-orange-100 rounded-lg">
@@ -411,7 +502,7 @@ const CashFlowProjection = ({
             <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-red-500">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-2xl font-bold text-gray-800">${(cashFlowMetrics.totalExpenses / 1000).toFixed(0)}K</div>
+                  <div className="text-2xl font-bold text-gray-800">{formatCurrency(cashFlowMetrics.totalExpenses)}</div>
                   <div className="text-sm text-gray-600">Gastos Totales</div>
                 </div>
                 <div className="p-3 bg-red-100 rounded-lg">
@@ -424,7 +515,7 @@ const CashFlowProjection = ({
               <div className="flex items-center justify-between">
                 <div>
                   <div className={`text-2xl font-bold ${getCashFlowColor(cashFlowMetrics.totalNetCashFlow)}`}>
-                    ${(cashFlowMetrics.totalNetCashFlow / 1000).toFixed(0)}K
+                    {formatCurrency(cashFlowMetrics.totalNetCashFlow)}
                   </div>
                   <div className="text-sm text-gray-600">Flujo Neto</div>
                 </div>
@@ -438,7 +529,7 @@ const CashFlowProjection = ({
               <div className="flex items-center justify-between">
                 <div>
                   <div className={`text-2xl font-bold ${getBalanceColor(cashFlowMetrics.maxCashOutflow)}`}>
-                    ${(cashFlowMetrics.maxCashOutflow / 1000).toFixed(0)}K
+                    {formatCurrency(cashFlowMetrics.maxCashOutflow)}
                   </div>
                   <div className="text-sm text-gray-600">Máximo Déficit</div>
                 </div>
@@ -522,17 +613,17 @@ const CashFlowProjection = ({
                         <div className="text-sm text-gray-500">Mes {month.month}</div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-orange-600 font-medium">${month.revenue.toFixed(2)}</div>
+                        <div className="text-orange-600 font-medium">{formatCurrency(month.revenue)}</div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-blue-600 font-medium">${month.expenses.toFixed(2)}</div>
+                        <div className="text-blue-600 font-medium">{formatCurrency(month.expenses)}</div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-red-600 font-medium">${month.realExpenses.toFixed(2)}</div>
+                        <div className="text-red-600 font-medium">{formatCurrency(month.realExpenses)}</div>
                       </td>
                       <td className="px-6 py-4">
                         <div className={`font-medium ${getBalanceColor(month.cumulativeBalance)}`}>
-                          ${month.cumulativeBalance.toFixed(2)}
+                          {formatCurrency(month.cumulativeBalance)}
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -599,7 +690,7 @@ const CashFlowProjection = ({
                         }}
                       ></div>
                       <div className={`text-xs font-medium mt-1 ${getCashFlowColor(month.netCashFlow)}`}>
-                        ${(month.netCashFlow / 1000).toFixed(1)}K
+                        {formatCurrency(month.netCashFlow)}
                       </div>
                     </div>
                   );
@@ -721,8 +812,13 @@ const CashFlowProjection = ({
                     <option value="milestone">Por hitos</option>
                   </select>
                   <p className="text-xs text-gray-500 mt-1">
-                    Define cuándo se registran los gastos de las órdenes de compra
+                    Define cuándo se registran los gastos de las órdenes de compra en el flujo de caja
                   </p>
+                  <div className="text-xs text-gray-400 mt-2 space-y-1">
+                    <div>• <strong>Por hitos:</strong> Usa la fecha de aprobación directamente</div>
+                    <div>• <strong>Net 30/60/90:</strong> Fecha de aprobación + días de pago</div>
+                    <div>• <strong>Anticipado:</strong> Fecha de aprobación - 15 días</div>
+                  </div>
                 </div>
                 
                 <div>

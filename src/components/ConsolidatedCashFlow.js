@@ -30,6 +30,22 @@ const ConsolidatedCashFlow = ({
     activeProjectIds: activeProjects.map(p => p.id)
   });
   
+  // Log detallado de órdenes de compra
+  Object.keys(purchaseOrdersByProject || {}).forEach(projectId => {
+    const pos = purchaseOrdersByProject[projectId] || [];
+    console.log(`🔍 ÓRDENES DE COMPRA para proyecto ${projectId}:`, {
+      total: pos.length,
+      orders: pos.map(po => ({
+        id: po.id,
+        number: po.number,
+        approvalDate: po.approvalDate,
+        date: po.date,
+        status: po.status,
+        totalAmount: po.totalAmount
+      }))
+    });
+  });
+  
   // Calcular gasto planificado del mes basado en costos del cronograma
   const calculateMonthPlannedExpense = (tasks, monthDate) => {
     if (!tasks || tasks.length === 0) return 0;
@@ -51,17 +67,97 @@ const ConsolidatedCashFlow = ({
   
   // Calcular gasto comprometido del mes (ordenes de compra aprobadas)
   const calculateMonthCommittedExpense = (purchaseOrders, monthDate) => {
-    if (!purchaseOrders || purchaseOrders.length === 0) return 0;
+    console.log('🔍 CALCULANDO GASTO COMPROMETIDO - Iniciando función:', {
+      purchaseOrdersLength: purchaseOrders?.length || 0,
+      monthDate: monthDate.toISOString().substring(0, 7),
+      purchaseOrders: purchaseOrders
+    });
+    
+    if (!purchaseOrders || purchaseOrders.length === 0) {
+      console.log('🔍 No hay órdenes de compra para calcular gasto comprometido');
+      return 0;
+    }
     
     const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
     const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
     
+    // Ajustar las fechas para incluir todo el día
+    monthStart.setHours(0, 0, 0, 0);
+    monthEnd.setHours(23, 59, 59, 999);
+    
+    console.log('🔍 Calculando gasto comprometido para mes:', {
+      month: monthDate.toISOString().substring(0, 7),
+      monthStart: monthStart.toISOString().split('T')[0],
+      monthEnd: monthEnd.toISOString().split('T')[0],
+      totalPOs: purchaseOrders.length
+    });
+    
+    // Log detallado de cada orden de compra ANTES del reduce
+    console.log('🔍 DETALLE COMPLETO DE ÓRDENES DE COMPRA:');
+    purchaseOrders.forEach((po, index) => {
+      console.log(`🔍 OC ${index + 1}:`, {
+        id: po.id,
+        number: po.number,
+        approvalDate: po.approvalDate,
+        date: po.date,
+        status: po.status,
+        totalAmount: po.totalAmount,
+        allFields: Object.keys(po)
+      });
+    });
+    
     return purchaseOrders.reduce((total, po) => {
-      const poDate = new Date(po.date);
-      const isInMonth = poDate >= monthStart && poDate <= monthEnd;
+      // Validar que la orden esté aprobada
       const isApproved = po.status === 'approved' || po.status === 'delivered';
+      if (!isApproved) return total;
       
-      if (isInMonth && isApproved) {
+      // Validar y crear fecha de forma segura
+      let poDate;
+      if (po.approvalDate && po.approvalDate.trim() !== '') {
+        poDate = new Date(po.approvalDate + 'T00:00:00');
+      } else if (po.date && po.date.trim() !== '') {
+        poDate = new Date(po.date + 'T00:00:00');
+      } else {
+        console.log('⚠️ OC sin fecha válida:', {
+          id: po.id,
+          number: po.number,
+          approvalDate: po.approvalDate,
+          date: po.date
+        });
+        return total;
+      }
+      
+      // Verificar que la fecha sea válida
+      if (isNaN(poDate.getTime())) {
+        console.log('⚠️ OC con fecha inválida:', {
+          id: po.id,
+          number: po.number,
+          approvalDate: po.approvalDate,
+          date: po.date,
+          poDate: poDate
+        });
+        return total;
+      }
+      
+      const isInMonth = poDate >= monthStart && poDate <= monthEnd;
+      
+      console.log('🔍 Evaluando OC:', {
+        id: po.id,
+        number: po.number,
+        approvalDate: po.approvalDate,
+        date: po.date,
+        poDate: poDate.toISOString().split('T')[0],
+        monthStart: monthStart.toISOString().split('T')[0],
+        monthEnd: monthEnd.toISOString().split('T')[0],
+        status: po.status,
+        totalAmount: po.totalAmount,
+        isInMonth,
+        isApproved,
+        willInclude: isInMonth && isApproved
+      });
+      
+      if (isInMonth) {
+        console.log(`✅ INCLUYENDO OC ${po.number}: $${po.totalAmount} en mes ${monthDate.toISOString().substring(0, 7)}`);
         return total + (po.totalAmount || 0);
       }
       return total;
@@ -80,7 +176,11 @@ const ConsolidatedCashFlow = ({
     // Sumar anticipos pagados
     if (advances && advances.length > 0) {
       totalReal += advances.reduce((sum, advance) => {
-        const advanceDate = new Date(advance.paymentDate);
+        if (!advance.paymentDate || advance.paymentDate.trim() === '') return sum;
+        
+        const advanceDate = new Date(advance.paymentDate + 'T00:00:00');
+        if (isNaN(advanceDate.getTime())) return sum;
+        
         const isInMonth = advanceDate >= monthStart && advanceDate <= monthEnd;
         const isPaid = advance.status === 'paid';
         
@@ -94,7 +194,11 @@ const ConsolidatedCashFlow = ({
     // Sumar facturas pagadas
     if (invoices && invoices.length > 0) {
       totalReal += invoices.reduce((sum, invoice) => {
-        const invoiceDate = new Date(invoice.paymentDate);
+        if (!invoice.paymentDate || invoice.paymentDate.trim() === '') return sum;
+        
+        const invoiceDate = new Date(invoice.paymentDate + 'T00:00:00');
+        if (isNaN(invoiceDate.getTime())) return sum;
+        
         const isInMonth = invoiceDate >= monthStart && invoiceDate <= monthEnd;
         const isPaid = invoice.status === 'pagada';
         
@@ -142,7 +246,9 @@ const ConsolidatedCashFlow = ({
         totalPlannedExpense += monthPlannedExpense;
         
         // Calcular gasto comprometido del mes (ordenes de compra aprobadas)
+        console.log(`🔍 LLAMANDO calculateMonthCommittedExpense para proyecto ${project.id} en mes ${monthKey}`);
         const monthCommittedExpense = calculateMonthCommittedExpense(projectPurchaseOrders, monthDate);
+        console.log(`🔍 RESULTADO calculateMonthCommittedExpense: $${monthCommittedExpense}`);
         totalCommittedExpense += monthCommittedExpense;
         
         // Calcular gasto real del mes (anticipos pagados + facturas pagadas)
