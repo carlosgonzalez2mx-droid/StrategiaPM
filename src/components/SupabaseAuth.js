@@ -29,10 +29,24 @@ const SupabaseAuth = ({ onAuthSuccess, onAuthCancel }) => {
         // Iniciar sesión
         result = await supabaseService.signIn(email, password);
         if (result.success) {
-          setSuccess('¡Sesión iniciada exitosamente!');
-          setTimeout(() => {
-            onAuthSuccess && onAuthSuccess(result.user);
-          }, 1000);
+          // Verificar si se activaron invitaciones durante el login
+          const activationResult = result.invitationActivation;
+          
+          if (activationResult && activationResult.activated > 0) {
+            const orgNames = activationResult.organizations.map(org => org.name).join(', ');
+            setSuccess(`¡Sesión iniciada exitosamente! 🎉
+
+¡Nuevas invitaciones activadas!
+Ahora tienes acceso a: ${orgNames}`);
+            setTimeout(() => {
+              onAuthSuccess && onAuthSuccess(result.user);
+            }, 3000);
+          } else {
+            setSuccess('¡Sesión iniciada exitosamente!');
+            setTimeout(() => {
+              onAuthSuccess && onAuthSuccess(result.user);
+            }, 1000);
+          }
         } else {
           setError(result.error || 'Error al iniciar sesión');
         }
@@ -46,10 +60,23 @@ const SupabaseAuth = ({ onAuthSuccess, onAuthCancel }) => {
         
         result = await supabaseService.signUp(email, password, name);
         if (result.success) {
-          setSuccess('¡Cuenta creada exitosamente! Revisa tu correo para confirmar.');
+          // Verificar si se activaron invitaciones
+          const activationResult = result.invitationActivation;
+          
+          if (activationResult && activationResult.activated > 0) {
+            const orgNames = activationResult.organizations.map(org => org.name).join(', ');
+            setSuccess(`¡Cuenta creada exitosamente! 🎉
+            
+Has sido agregado automáticamente a: ${orgNames}
+            
+Ya puedes acceder a los proyectos de tu organización.`);
+          } else {
+            setSuccess('¡Cuenta creada exitosamente! Revisa tu correo para confirmar.');
+          }
+          
           setTimeout(() => {
             onAuthSuccess && onAuthSuccess(result.user);
-          }, 2000);
+          }, 3000);
         } else {
           setError(result.error || 'Error al crear la cuenta');
         }

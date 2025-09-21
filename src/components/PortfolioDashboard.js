@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import PortfolioCharts from './PortfolioCharts';
 import CorporateAlerts from './CorporateAlerts';
 import FileManager from './FileManager';
+import usePermissions from '../hooks/usePermissions';
 
 // Componente para mostrar errores de validación
 const ErrorMessage = ({ error }) => {
@@ -29,6 +30,9 @@ const PortfolioDashboard = ({
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
   const [errors, setErrors] = useState({});
+  
+  // Hook de permisos
+  const { permissions, isReadOnly, isLoading: permissionsLoading } = usePermissions();
   
   const getPriorityColor = (priority) => {
     switch(priority) {
@@ -367,13 +371,21 @@ const PortfolioDashboard = ({
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-800">Acciones del Portfolio</h2>
           <div className="flex space-x-2">
-            <button
-              onClick={handleNewProject}
-              className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center space-x-2"
-            >
-              <span>➕</span>
-              <span>Nuevo Proyecto</span>
-            </button>
+            {/* Solo mostrar botón crear si tiene permisos */}
+            {permissions.canEdit && (
+              <button
+                onClick={handleNewProject}
+                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center space-x-2"
+              >
+                <span>➕</span>
+                <span>Nuevo Proyecto</span>
+              </button>
+            )}
+            {isReadOnly() && (
+              <div className="text-sm text-gray-500 italic bg-gray-50 px-3 py-2 rounded-lg border">
+                <span>👀</span> Modo solo lectura
+              </div>
+            )}
           </div>
         </div>
       </div>

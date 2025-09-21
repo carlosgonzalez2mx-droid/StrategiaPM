@@ -7,6 +7,7 @@ import FileManager from './FileManager';
 import ProjectAudit from './ProjectAudit';
 import ChangeManagement from './ChangeManagement';
 import CashFlowProjection from './CashFlowProjection';
+import usePermissions from '../hooks/usePermissions';
 
 const ProjectManagementTabs = ({
   projects,
@@ -34,9 +35,33 @@ const ProjectManagementTabs = ({
   resourceAssignments,
   useSupabase = false
 }) => {
+  // Hook de permisos
+  const { permissions, isReadOnly } = usePermissions();
+  
   const [activeTab, setActiveTab] = useState('summary');
   const [scheduleData, setScheduleData] = useState(null); // Nuevo estado para datos del cronograma
   const [archivedProjects, setArchivedProjects] = useState([]); // Estado para proyectos archivados
+
+  // Definir pestañas con permisos ANTES de los useEffect
+  const allProjectTabs = [
+    { id: 'summary', name: 'Dashboard Resumen', icon: '📊', requiresEdit: false },
+    { id: 'risks', name: 'Gestión de Riesgos', icon: '🛡️', requiresEdit: true },
+    { id: 'schedule', name: 'Cronograma', icon: '📅', requiresEdit: true },
+    { id: 'financial', name: 'Gestión Financiera', icon: '💰', requiresEdit: true },
+    { id: 'resources', name: 'Gestión de Recursos', icon: '👥', requiresEdit: true },
+    { id: 'changes', name: 'Control de Cambios', icon: '🔄', requiresEdit: true },
+    { id: 'cashflow', name: 'Flujo de Caja', icon: '💸', requiresEdit: false },
+    { id: 'files', name: 'Archivos', icon: '📎', requiresEdit: false },
+    { id: 'audit', name: 'Auditoría Documental', icon: '📋', requiresEdit: false }
+  ];
+
+  // Filtrar pestañas basado en permisos del usuario
+  const projectTabs = allProjectTabs.filter(tab => {
+    if (tab.requiresEdit && isReadOnly()) {
+      return false; // Ocultar pestañas de gestión para usuarios de solo lectura
+    }
+    return true;
+  });
 
   // Escuchar eventos para cambiar de pestaña desde otros componentes
   useEffect(() => {
@@ -52,6 +77,17 @@ const ProjectManagementTabs = ({
       window.removeEventListener('changeTab', handleTabChange);
     };
   }, [activeTab]);
+
+  // Redirigir a pestaña válida si el usuario está en una pestaña oculta
+  useEffect(() => {
+    const availableTabIds = projectTabs.map(tab => tab.id);
+    if (!availableTabIds.includes(activeTab)) {
+      // Si la pestaña actual no está disponible, ir a la primera disponible
+      if (availableTabIds.length > 0) {
+        setActiveTab(availableTabIds[0]);
+      }
+    }
+  }, [projectTabs, activeTab]);
 
   // Función para calcular el progreso de tareas entre hitos
   const calculateMilestoneProgress = (milestone, allTasks) => {
@@ -229,18 +265,6 @@ const ProjectManagementTabs = ({
   // 8. Resource Assignments: Usar la función setResourceAssignments que ya filtra por proyecto
   const projectResourceAssignments = Array.isArray(resourceAssignments) ? resourceAssignments : [];
 
-  const projectTabs = [
-  { id: 'summary', name: 'Dashboard Resumen', icon: '📊' },
-  { id: 'risks', name: 'Gestión de Riesgos', icon: '🛡️' },
-  { id: 'schedule', name: 'Cronograma', icon: '📅' },
-  { id: 'financial', name: 'Gestión Financiera', icon: '💰' },
-  { id: 'resources', name: 'Gestión de Recursos', icon: '👥' },
-  { id: 'changes', name: 'Control de Cambios', icon: '🔄' },
-  { id: 'cashflow', name: 'Flujo de Caja', icon: '💸' },
-  { id: 'files', name: 'Archivos', icon: '📎' },
-  { id: 'audit', name: 'Auditoría Documental', icon: '📋' }
-];
-
   // Solo mostrar proyectos activos
   const activeProjects = projects?.filter(p => p.status === 'active') || [];
 
@@ -373,33 +397,15 @@ const ProjectManagementTabs = ({
           <label className="block text-sm font-medium text-gray-700">
             Proyecto Activo
           </label>
-          <button
-            onClick={() => {
-              if (useSupabase) {
-                // Si ya está activo, desactivar
-                console.log('🔄 Desactivando Supabase...');
-                window.dispatchEvent(new CustomEvent('toggleSupabase', { 
-                  detail: { useSupabase: false } 
-                }));
-                alert('⚠️ Supabase desactivado\n\nLos datos se guardarán solo localmente.');
-              } else {
-                // Si no está activo, verificar autenticación y activar
-                console.log('🔄 Intentando activar Supabase...');
-                
-                // Disparar evento para abrir modal de autenticación
-                window.dispatchEvent(new CustomEvent('requestSupabaseAuth', { 
-                  detail: { action: 'activate' } 
-                }));
-              }
-            }}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+          <div
+            className={`px-4 py-2 rounded-lg text-sm font-medium ${
               useSupabase 
-                ? 'bg-green-100 text-green-800 border border-green-300 hover:bg-green-200' 
-                : 'bg-blue-100 text-blue-800 border border-blue-300 hover:bg-blue-200'
+                ? 'bg-green-100 text-green-800 border border-green-300' 
+                : 'bg-red-100 text-red-800 border border-red-300'
             }`}
           >
-            {useSupabase ? '🟢 Supabase Activo' : '🔵 Activar Supabase'}
-          </button>
+            {useSupabase ? '🟢 Estado: Online' : '🔴 Estado: Offline'}
+          </div>
         </div>
         <select
           value={currentProjectId}
@@ -687,42 +693,55 @@ const ProjectManagementTabs = ({
                           </div>
                         </div>
                         <div className="flex items-center space-x-2">
-                          <select
-                            value={milestone.status || 'in-progress'}
-                            onChange={(e) => {
-                              const newStatus = e.target.value;
-                              console.log('🎯 CAMBIO DE ESTADO DE HITO:', {
-                                milestoneId: milestone.id,
-                                milestoneName: milestone.name,
-                                oldStatus: milestone.status,
-                                newStatus: newStatus,
-                                currentProjectId: currentProjectId
-                              });
-                              
-                              const updatedTasks = projectTasks.map(task => 
-                                task.id === milestone.id 
-                                  ? { ...task, status: newStatus }
-                                  : task
-                              );
-                              
-                              console.log('🎯 TAREAS ACTUALIZADAS:', {
-                                totalTasks: updatedTasks.length,
-                                milestoneTasks: updatedTasks.filter(t => t.isMilestone).length,
-                                updatedMilestone: updatedTasks.find(t => t.id === milestone.id)
-                              });
-                              
-                              setTasks(updatedTasks);
-                            }}
-                            className={`px-3 py-1 rounded-full text-xs font-medium border-0 focus:ring-2 focus:ring-blue-500 ${
+                          {permissions.canEdit ? (
+                            <select
+                              value={milestone.status || 'in-progress'}
+                              onChange={(e) => {
+                                const newStatus = e.target.value;
+                                console.log('🎯 CAMBIO DE ESTADO DE HITO:', {
+                                  milestoneId: milestone.id,
+                                  milestoneName: milestone.name,
+                                  oldStatus: milestone.status,
+                                  newStatus: newStatus,
+                                  currentProjectId: currentProjectId
+                                });
+                                
+                                const updatedTasks = projectTasks.map(task => 
+                                  task.id === milestone.id 
+                                    ? { ...task, status: newStatus }
+                                    : task
+                                );
+                                
+                                console.log('🎯 TAREAS ACTUALIZADAS:', {
+                                  totalTasks: updatedTasks.length,
+                                  milestoneTasks: updatedTasks.filter(t => t.isMilestone).length,
+                                  updatedMilestone: updatedTasks.find(t => t.id === milestone.id)
+                                });
+                                
+                                setTasks(updatedTasks);
+                              }}
+                              className={`px-3 py-1 rounded-full text-xs font-medium border-0 focus:ring-2 focus:ring-blue-500 ${
+                                milestone.status === 'completed' ? 'bg-green-100 text-green-800' : 
+                                milestone.status === 'in-progress' ? 'bg-yellow-100 text-yellow-800' : 
+                                milestone.status === 'delayed' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
+                              }`}
+                            >
+                              <option value="in-progress" className="bg-yellow-100 text-yellow-800">En Proceso</option>
+                              <option value="completed" className="bg-green-100 text-green-800">Realizado</option>
+                              <option value="delayed" className="bg-red-100 text-red-800">Atrasado</option>
+                            </select>
+                          ) : (
+                            <div className={`px-3 py-1 rounded-full text-xs font-medium ${
                               milestone.status === 'completed' ? 'bg-green-100 text-green-800' : 
                               milestone.status === 'in-progress' ? 'bg-yellow-100 text-yellow-800' : 
                               milestone.status === 'delayed' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
-                            }`}
-                          >
-                            <option value="in-progress" className="bg-yellow-100 text-yellow-800">En Proceso</option>
-                            <option value="completed" className="bg-green-100 text-green-800">Realizado</option>
-                            <option value="delayed" className="bg-red-100 text-red-800">Atrasado</option>
-                          </select>
+                            }`}>
+                              {milestone.status === 'completed' ? 'Realizado' : 
+                               milestone.status === 'in-progress' ? 'En Proceso' : 
+                               milestone.status === 'delayed' ? 'Atrasado' : 'Pendiente'}
+                              <span className="ml-1 text-gray-500">👀</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

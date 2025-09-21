@@ -1,6 +1,7 @@
 import React from 'react';
 import supabaseService from '../services/SupabaseService';
 import AutoBackupIndicator from './AutoBackupIndicator';
+import usePermissions from '../hooks/usePermissions';
 
 const Sidebar = ({ 
   activeSection, 
@@ -14,6 +15,9 @@ const Sidebar = ({
   isCollapsed = false, // Prop para estado colapsado
   onToggleCollapse // Función para alternar el estado
 }) => {
+  
+  // Hook de permisos
+  const { permissions, isReadOnly } = usePermissions();
   
   // Estado para el backup
   const [isBackingUp, setIsBackingUp] = React.useState(false);
@@ -178,12 +182,20 @@ const Sidebar = ({
     loadBackupStats();
   }, []);
   
-  const navigation = [
-    { id: 'portfolio', name: 'Portafolio de Proyectos', icon: '🏢' },
-    { id: 'project-management', name: 'Gestión de Proyectos', icon: '📊' },
-    { id: 'executive', name: 'Dashboard Ejecutivo', icon: '📈' },
-    { id: 'user-management', name: 'Gestión de Usuarios', icon: '👥' }
+  const allNavigation = [
+    { id: 'portfolio', name: 'Portafolio de Proyectos', icon: '🏢', requiresEdit: true },
+    { id: 'project-management', name: 'Gestión de Proyectos', icon: '📊', requiresEdit: false },
+    { id: 'executive', name: 'Dashboard Ejecutivo', icon: '📈', requiresEdit: false },
+    { id: 'user-management', name: 'Gestión de Usuarios', icon: '👥', requiresEdit: true }
   ];
+
+  // Filtrar navegación basado en permisos del usuario
+  const navigation = allNavigation.filter(section => {
+    if (section.requiresEdit && isReadOnly()) {
+      return false; // Ocultar secciones que requieren edición para usuarios de solo lectura
+    }
+    return true;
+  });
 
   const getSectionDescription = (sectionId) => {
     switch(sectionId) {
@@ -237,31 +249,101 @@ const Sidebar = ({
           </div>
           
           {!isCollapsed && (
-            <div className="text-sm text-gray-600">
+            <div className="text-sm text-gray-600 space-y-2">
               <p className="font-medium">Gestión de Proyectos</p>
+              {/* Usuario activo */}
+              <div className="flex items-center space-x-2 px-2 py-1 bg-blue-50 rounded-lg border border-blue-200">
+                <span className="text-blue-600">👤</span>
+                <div className="flex flex-col">
+                  <span className="text-xs font-medium text-blue-800">
+                    {supabaseService.getCurrentUser()?.email || 'Usuario no autenticado'}
+                  </span>
+                  <span className="text-xs text-blue-600">
+                    {supabaseService.getCurrentUser() ? '🟢 Conectado' : '🔴 Desconectado'}
+                  </span>
+                </div>
+              </div>
+              
+              {/* Indicador de modo solo lectura */}
+              {isReadOnly() && (
+                <div className="flex items-center space-x-2 px-2 py-1 bg-orange-50 rounded-lg border border-orange-200">
+                  <span className="text-orange-600">👀</span>
+                  <div className="flex flex-col">
+                    <span className="text-xs font-medium text-orange-800">
+                      Modo Solo Lectura
+                    </span>
+                    <span className="text-xs text-orange-600">
+                      Acceso limitado a visualización
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Botones de Conexión */}
+              <div className="space-y-2">
+                {/* Botón Desconectar Usuario - Solo si hay usuario conectado */}
+                {supabaseService.getCurrentUser() && (
+                  <button
+                    onClick={() => {
+                      if (window.confirm('¿Estás seguro de que quieres desconectarte?')) {
+                        console.log('🚪 Desconectando usuario...');
+                        // Disparar evento para cerrar sesión
+                        window.dispatchEvent(new CustomEvent('userLogout'));
+                        // Recargar página para limpiar estado
+                        window.location.reload();
+                      }
+                    }}
+                    className="w-full flex items-center justify-center space-x-2 px-2 py-2 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors duration-200"
+                  >
+                    <span className="text-red-600">🚪</span>
+                    <span className="text-xs font-medium text-red-800">
+                      Desconectar Usuario
+                    </span>
+                  </button>
+                )}
+
+                {/* Botón Conectar Usuario - Solo si NO hay usuario conectado */}
+                {!supabaseService.getCurrentUser() && (
+                  <button
+                    onClick={() => {
+                      console.log('🔑 Abriendo modal de autenticación...');
+                      // Disparar evento para abrir modal de autenticación
+                      window.dispatchEvent(new CustomEvent('requestSupabaseAuth', { 
+                        detail: { action: 'login' } 
+                      }));
+                    }}
+                    className="w-full flex items-center justify-center space-x-2 px-2 py-2 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors duration-200"
+                  >
+                    <span className="text-green-600">🔑</span>
+                    <span className="text-xs font-medium text-green-800">
+                      Conectar Usuario
+                    </span>
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>
 
         {/* Navigation */}
         {!isCollapsed && (
-          <nav className="p-4">
-            <ul className="space-y-2">
+          <nav className="p-3">
+            <ul className="space-y-1">
               {navigation.map(section => (
                 <li key={section.id}>
                   <button
                     onClick={() => onSectionChange(section.id)}
                     className={`
-                      w-full flex items-center px-4 py-3 text-left rounded-lg transition-colors
+                      w-full flex items-center px-3 py-2 text-left rounded-lg transition-colors
                       ${activeSection === section.id
                         ? 'bg-blue-100 text-blue-700 border-l-4 border-blue-500'
                         : 'text-gray-700 hover:bg-gray-100'
                       }
                     `}
                   >
-                    <span className="text-xl mr-3">{section.icon}</span>
+                    <span className="text-lg mr-2">{section.icon}</span>
                     <div>
-                      <div className="font-medium">{section.name}</div>
+                      <div className="font-medium text-sm">{section.name}</div>
                       <div className="text-xs text-gray-500">
                         {getSectionDescription(section.id)}
                       </div>
@@ -273,90 +355,92 @@ const Sidebar = ({
           </nav>
         )}
 
-        {/* Footer con botones de backup */}
-        <div className={`border-t border-gray-200 mt-auto ${isCollapsed ? 'p-2' : 'p-4'}`}>
-          {!isCollapsed ? (
-            <div className="space-y-2">
-              {/* Botón de Backup */}
-              <button
-                onClick={handleDatabaseBackup}
-                disabled={isBackingUp}
-                className={`w-full px-4 py-3 rounded-lg transition-colors duration-200 flex items-center justify-center space-x-2 shadow-md hover:shadow-lg ${
-                  isBackingUp 
-                    ? 'bg-gray-400 cursor-not-allowed' 
-                    : 'bg-blue-600 hover:bg-blue-700 text-white'
-                }`}
-                title="Descargar backup completo de la base de datos (archivo JSON)"
-              >
-                <span className="text-lg">
-                  {isBackingUp ? '⏳' : '🗄️'}
-                </span>
-                <span className="font-medium">
-                  {isBackingUp ? 'Descargando...' : 'Descargar Backup'}
-                </span>
-              </button>
+        {/* Footer con botones de backup - Solo para usuarios con permisos de administración */}
+        {!isReadOnly() && (
+          <div className={`border-t border-gray-200 mt-auto ${isCollapsed ? 'p-2' : 'p-4'}`}>
+            {!isCollapsed ? (
+              <div className="space-y-2">
+                {/* Botón de Backup */}
+                <button
+                  onClick={handleDatabaseBackup}
+                  disabled={isBackingUp}
+                  className={`w-full px-4 py-3 rounded-lg transition-colors duration-200 flex items-center justify-center space-x-2 shadow-md hover:shadow-lg ${
+                    isBackingUp 
+                      ? 'bg-gray-400 cursor-not-allowed' 
+                      : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  }`}
+                  title="Descargar backup completo de la base de datos (archivo JSON)"
+                >
+                  <span className="text-lg">
+                    {isBackingUp ? '⏳' : '🗄️'}
+                  </span>
+                  <span className="font-medium">
+                    {isBackingUp ? 'Descargando...' : 'Descargar Backup'}
+                  </span>
+                </button>
 
-              {/* Botón de Restaurar */}
-              <button
-                onClick={() => setShowRestoreModal(true)}
-                disabled={isRestoring}
-                className={`w-full px-4 py-3 rounded-lg transition-colors duration-200 flex items-center justify-center space-x-2 shadow-md hover:shadow-lg ${
-                  isRestoring 
-                    ? 'bg-gray-400 cursor-not-allowed' 
-                    : 'bg-green-600 hover:bg-green-700 text-white'
-                }`}
-                title="Restaurar datos desde un archivo de backup"
-              >
-                <span className="text-lg">
-                  {isRestoring ? '⏳' : '🔄'}
-                </span>
-                <span className="font-medium">
-                  {isRestoring ? 'Restaurando...' : 'Restaurar Backup'}
-                </span>
-              </button>
+                {/* Botón de Restaurar */}
+                <button
+                  onClick={() => setShowRestoreModal(true)}
+                  disabled={isRestoring}
+                  className={`w-full px-4 py-3 rounded-lg transition-colors duration-200 flex items-center justify-center space-x-2 shadow-md hover:shadow-lg ${
+                    isRestoring 
+                      ? 'bg-gray-400 cursor-not-allowed' 
+                      : 'bg-green-600 hover:bg-green-700 text-white'
+                  }`}
+                  title="Restaurar datos desde un archivo de backup"
+                >
+                  <span className="text-lg">
+                    {isRestoring ? '⏳' : '🔄'}
+                  </span>
+                  <span className="font-medium">
+                    {isRestoring ? 'Restaurando...' : 'Restaurar Backup'}
+                  </span>
+                </button>
               
-              {/* Estadísticas de backup */}
-              {backupStats && (
-                <div className="mt-2 text-xs text-gray-500 text-center">
-                  <div>📊 {backupStats.totalRecords} registros en {backupStats.tablesCount} tablas</div>
-                  {backupStats.stats && (
-                    <div className="mt-1">
-                      Proyectos: {backupStats.stats.projects || 0} | 
-                      Riesgos: {backupStats.stats.risks || 0} | 
-                      Tareas: {backupStats.stats.tasks || 0}
-                    </div>
-                  )}
+                {/* Estadísticas de backup */}
+                {backupStats && (
+                  <div className="mt-2 text-xs text-gray-500 text-center">
+                    <div>📊 {backupStats.totalRecords} registros en {backupStats.tablesCount} tablas</div>
+                    {backupStats.stats && (
+                      <div className="mt-1">
+                        Proyectos: {backupStats.stats.projects || 0} | 
+                        Riesgos: {backupStats.stats.risks || 0} | 
+                        Tareas: {backupStats.stats.tasks || 0}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Indicador de backup automático */}
+                <div className="mt-2 pt-2 border-t border-gray-100">
+                  <AutoBackupIndicator className="justify-center" />
                 </div>
-              )}
-
-              {/* Indicador de backup automático */}
-              <div className="mt-2 pt-2 border-t border-gray-100">
-                <AutoBackupIndicator className="justify-center" />
               </div>
-            </div>
-          ) : (
-            /* Botones colapsados */
-            <div className="space-y-2">
-              <button
-                onClick={handleDatabaseBackup}
-                disabled={isBackingUp}
-                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white p-3 rounded-lg transition-colors duration-200 flex items-center justify-center"
-                title="Descargar backup"
-              >
-                <span className="text-lg">🗄️</span>
-              </button>
-              
-              <button
-                onClick={() => setShowRestoreModal(true)}
-                disabled={isRestoring}
-                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white p-3 rounded-lg transition-colors duration-200 flex items-center justify-center"
-                title="Restaurar backup"
-              >
-                <span className="text-lg">🔄</span>
-              </button>
-            </div>
-          )}
-        </div>
+            ) : (
+              /* Botones colapsados */
+              <div className="space-y-2">
+                <button
+                  onClick={handleDatabaseBackup}
+                  disabled={isBackingUp}
+                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white p-3 rounded-lg transition-colors duration-200 flex items-center justify-center"
+                  title="Descargar backup"
+                >
+                  <span className="text-lg">🗄️</span>
+                </button>
+                
+                <button
+                  onClick={() => setShowRestoreModal(true)}
+                  disabled={isRestoring}
+                  className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white p-3 rounded-lg transition-colors duration-200 flex items-center justify-center"
+                  title="Restaurar backup"
+                >
+                  <span className="text-lg">🔄</span>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Modal de Restauración */}
         {showRestoreModal && (

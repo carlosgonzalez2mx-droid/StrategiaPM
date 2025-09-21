@@ -3,6 +3,18 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
+import supabaseService from './services/SupabaseService';
+
+// Hacer supabaseService disponible globalmente para debugging
+window.supabaseService = supabaseService;
+
+// Debug function para verificar estado de la app
+window.debugAppState = () => {
+  console.log('=== DEBUG APP STATE ===');
+  console.log('Supabase service:', window.supabaseService);
+  console.log('Current user:', window.supabaseService?.getCurrentUser());
+  console.log('Current organization:', window.supabaseService?.getCurrentOrganization());
+};
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(

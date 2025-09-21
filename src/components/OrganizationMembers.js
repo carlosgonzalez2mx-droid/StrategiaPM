@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import useAuditLog from '../hooks/useAuditLog';
+import supabaseService from '../services/SupabaseService';
 
 const OrganizationMembers = ({ 
   currentProject, 
@@ -11,14 +12,32 @@ const OrganizationMembers = ({
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('organization_member_write');
+  
+  // Estados para editar roles
+  const [showEditRoleModal, setShowEditRoleModal] = useState(false);
+  const [editingMember, setEditingMember] = useState(null);
+  const [newRole, setNewRole] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
   // Hook de auditoría
   const { addAuditEvent } = useAuditLog(currentProject?.id, useSupabase);
 
-  // TEMPORAL: Usar organization_id fijo hasta que se resuelva la sincronización
-  const organizationId = currentProject?.organization_id || '73bf164f-f3e8-4207-95a6-e3e3d385148d';
+  // DETECCIÓN AUTOMÁTICA: Usar organization_id del servicio o fallback
+  const [organizationId, setOrganizationId] = useState(
+    currentProject?.organization_id || '73bf164f-f3e8-4207-95a6-e3e3d385148d'
+  );
+
+  // Detectar organización automáticamente cuando se use Supabase
+  useEffect(() => {
+    if (useSupabase && supabaseService?.getCurrentOrganization()) {
+      const detectedOrgId = supabaseService.getCurrentOrganization();
+      if (detectedOrgId && detectedOrgId !== organizationId) {
+        console.log('🔄 Actualizando organization ID detectado:', detectedOrgId);
+        setOrganizationId(detectedOrgId);
+      }
+    }
+  }, [useSupabase, organizationId]);
 
   // Cargar miembros de la organización
   const loadOrganizationMembers = async () => {
@@ -75,6 +94,15 @@ const OrganizationMembers = ({
   const inviteMember = async (e) => {
     e.preventDefault();
     if (!inviteEmail || !organizationId) return;
+    
+    // VERIFICAR PERMISOS: Solo owners y admins pueden invitar miembros
+    const currentUserMembership = members.find(m => m.user_email === supabaseService.getCurrentUser()?.email);
+    const isOwnerOrAdmin = currentUserMembership?.role === 'owner' || currentUserMembership?.role === 'admin';
+    
+    if (!isOwnerOrAdmin) {
+      alert('❌ No tienes permisos para invitar miembros. Solo owners y administradores pueden realizar esta acción.');
+      return;
+    }
 
     try {
       setIsLoading(true);
@@ -183,6 +211,15 @@ ${registrationUrl}`);
 
   // Eliminar miembro
   const removeMember = async (memberId, memberEmail) => {
+    // VERIFICAR PERMISOS: Solo owners y admins pueden eliminar miembros
+    const currentUserMembership = members.find(m => m.user_email === supabaseService.getCurrentUser()?.email);
+    const isOwnerOrAdmin = currentUserMembership?.role === 'owner' || currentUserMembership?.role === 'admin';
+    
+    if (!isOwnerOrAdmin) {
+      alert('❌ No tienes permisos para eliminar miembros. Solo owners y administradores pueden realizar esta acción.');
+      return;
+    }
+    
     if (!window.confirm(`¿Estás seguro de que quieres eliminar a ${memberEmail} de la organización?`)) {
       return;
     }
@@ -227,6 +264,81 @@ ${registrationUrl}`);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Editar rol de miembro
+  const editMemberRole = async () => {
+    if (!editingMember || !newRole) return;
+    
+    // VERIFICAR PERMISOS: Solo owners y admins pueden cambiar roles
+    const currentUserMembership = members.find(m => m.user_email === supabaseService.getCurrentUser()?.email);
+    const isOwnerOrAdmin = currentUserMembership?.role === 'owner' || currentUserMembership?.role === 'admin';
+    
+    if (!isOwnerOrAdmin) {
+      alert('❌ No tienes permisos para cambiar roles. Solo owners y administradores pueden realizar esta acción.');
+      return;
+    }
+    
+    // No permitir cambiar el rol del owner
+    if (editingMember.role === 'owner') {
+      alert('❌ No se puede cambiar el rol del propietario de la organización.');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const { default: supabaseService } = await import('../services/SupabaseService');
+      
+      if (supabaseService.isAuthenticated()) {
+        const { error } = await supabaseService.supabase
+          .from('organization_members')
+          .update({ role: newRole })
+          .eq('id', editingMember.id);
+
+        if (error) {
+          throw error;
+        }
+
+        // Registrar evento de auditoría
+        if (addAuditEvent) {
+          addAuditEvent({
+            category: 'organization',
+            action: 'member-role-updated',
+            description: `Rol de "${editingMember.user_email}" cambiado a "${getRoleLabel(newRole)}"`,
+            details: {
+              userEmail: editingMember.user_email,
+              oldRole: editingMember.role,
+              newRole: newRole,
+              organizationId: organizationId
+            },
+            severity: 'medium',
+            user: supabaseService.getCurrentUser()?.email || 'Sistema'
+          });
+        }
+
+        alert(`✅ Rol de ${editingMember.user_email} actualizado exitosamente`);
+        
+        // Recargar miembros
+        await loadOrganizationMembers();
+        
+        // Cerrar modal
+        setShowEditRoleModal(false);
+        setEditingMember(null);
+        setNewRole('');
+      }
+    } catch (error) {
+      console.error('Error actualizando rol:', error);
+      setError(`Error actualizando rol: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Abrir modal de edición de rol
+  const openEditRoleModal = (member) => {
+    setEditingMember(member);
+    setNewRole(member.role);
+    setShowEditRoleModal(true);
   };
 
   // Cargar miembros al montar el componente
@@ -292,13 +404,25 @@ ${registrationUrl}`);
           <h2 className="text-2xl font-bold text-gray-800">Miembros de la Organización</h2>
           <p className="text-gray-600">Gestiona quién puede ver y editar los proyectos de tu organización</p>
         </div>
-        <button
-          onClick={() => setShowInviteModal(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center space-x-2"
-        >
-          <span>+</span>
-          <span>Invitar Miembro</span>
-        </button>
+        {/* Solo mostrar botón invitar si es owner o admin */}
+        {(() => {
+          const currentUserMembership = members.find(m => m.user_email === supabaseService.getCurrentUser()?.email);
+          const isOwnerOrAdmin = currentUserMembership?.role === 'owner' || currentUserMembership?.role === 'admin';
+          
+          return isOwnerOrAdmin ? (
+            <button
+              onClick={() => setShowInviteModal(true)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center space-x-2"
+            >
+              <span>+</span>
+              <span>Invitar Miembro</span>
+            </button>
+          ) : (
+            <div className="text-sm text-gray-500 italic bg-gray-50 px-3 py-2 rounded-lg border">
+              <span>🔒</span> Solo administradores pueden invitar miembros
+            </div>
+          );
+        })()}
       </div>
 
       {/* Error Message */}
@@ -343,13 +467,21 @@ ${registrationUrl}`);
                     Pendiente
                   </span>
                   
-                  <button
-                    onClick={() => removeMember(invitation.id, invitation.user_email)}
-                    className="text-red-600 hover:text-red-800 text-sm"
-                    title="Cancelar invitación"
-                  >
-                    🗑️
-                  </button>
+                  {/* Solo mostrar botón eliminar si es owner o admin */}
+                  {(() => {
+                    const currentUserMembership = members.find(m => m.user_email === supabaseService.getCurrentUser()?.email);
+                    const isOwnerOrAdmin = currentUserMembership?.role === 'owner' || currentUserMembership?.role === 'admin';
+                    
+                    return isOwnerOrAdmin ? (
+                      <button
+                        onClick={() => removeMember(invitation.id, invitation.user_email)}
+                        className="text-red-600 hover:text-red-800 text-sm"
+                        title="Cancelar invitación"
+                      >
+                        🗑️
+                      </button>
+                    ) : null;
+                  })()}
                 </div>
               </div>
             ))}
@@ -399,15 +531,37 @@ ${registrationUrl}`);
                     {getRoleLabel(member.role)}
                   </span>
                   
-                  {member.role !== 'owner' && (
-                    <button
-                      onClick={() => removeMember(member.id, member.user_email)}
-                      className="text-red-600 hover:text-red-800 text-sm"
-                      title="Eliminar miembro"
-                    >
-                      🗑️
-                    </button>
-                  )}
+                  {/* Botones de acción para owners y admins */}
+                  {(() => {
+                    const currentUserMembership = members.find(m => m.user_email === supabaseService.getCurrentUser()?.email);
+                    const isOwnerOrAdmin = currentUserMembership?.role === 'owner' || currentUserMembership?.role === 'admin';
+                    
+                    return isOwnerOrAdmin ? (
+                      <div className="flex items-center space-x-2">
+                        {/* Botón editar rol (no para owners) */}
+                        {member.role !== 'owner' && (
+                          <button
+                            onClick={() => openEditRoleModal(member)}
+                            className="text-blue-600 hover:text-blue-800 text-sm"
+                            title="Cambiar rol"
+                          >
+                            ✏️
+                          </button>
+                        )}
+                        
+                        {/* Botón eliminar (no para owners) */}
+                        {member.role !== 'owner' && (
+                          <button
+                            onClick={() => removeMember(member.id, member.user_email)}
+                            className="text-red-600 hover:text-red-800 text-sm"
+                            title="Eliminar miembro"
+                          >
+                            🗑️
+                          </button>
+                        )}
+                      </div>
+                    ) : null;
+                  })()}
                 </div>
               </div>
             ))
@@ -480,6 +634,80 @@ ${registrationUrl}`);
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para editar rol */}
+      {showEditRoleModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg max-w-md w-full mx-4">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold">Cambiar Rol de Usuario</h2>
+                <button 
+                  onClick={() => {
+                    setShowEditRoleModal(false);
+                    setEditingMember(null);
+                    setNewRole('');
+                  }}
+                  className="text-gray-500 hover:text-gray-700 text-xl"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="mb-4">
+                <p className="text-gray-600 mb-2">
+                  Cambiando rol de: <strong>{editingMember?.user_email}</strong>
+                </p>
+                <p className="text-sm text-gray-500">
+                  Rol actual: <span className="font-medium">{editingMember ? getRoleLabel(editingMember.role) : ''}</span>
+                </p>
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Nuevo Rol
+                </label>
+                <select
+                  value={newRole}
+                  onChange={(e) => setNewRole(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="organization_member_write">✏️ Miembro (Ver y editar proyectos)</option>
+                  <option value="organization_member_read">👀 Miembro (Solo lectura)</option>
+                  <option value="admin">👑 Administrador</option>
+                </select>
+                
+                <div className="mt-2 text-xs text-gray-500">
+                  <p><strong>Solo lectura:</strong> Puede ver proyectos pero no editarlos</p>
+                  <p><strong>Editar:</strong> Puede ver y modificar proyectos</p>
+                  <p><strong>Administrador:</strong> Puede gestionar usuarios y proyectos</p>
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => {
+                    setShowEditRoleModal(false);
+                    setEditingMember(null);
+                    setNewRole('');
+                  }}
+                  className="px-4 py-2 text-gray-600 border border-gray-300 rounded hover:bg-gray-50"
+                  disabled={isLoading}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={editMemberRole}
+                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                  disabled={isLoading || !newRole || newRole === editingMember?.role}
+                >
+                  {isLoading ? 'Actualizando...' : 'Cambiar Rol'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

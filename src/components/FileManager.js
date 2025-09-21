@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import useFileStorage from '../hooks/useFileStorage';
+import usePermissions from '../hooks/usePermissions';
 
 const FileManager = ({ 
   projectId, 
@@ -10,6 +11,9 @@ const FileManager = ({
   isContextual = false, // Para mostrar si es vista contextual
   title = '📎 Gestión de Archivos' // Título personalizable
 }) => {
+  // Hook de permisos
+  const { permissions } = usePermissions();
+  
   const {
     files,
     isLoading,
@@ -28,6 +32,9 @@ const FileManager = ({
   const [selectedCategory, setSelectedCategory] = useState(category);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadDescription, setUploadDescription] = useState('');
+  
+  // Determinar si se puede mostrar área de subida basado en permisos
+  const canUploadFiles = showUploadArea && permissions.canEdit;
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' o 'list'
   const fileInputRef = useRef(null);
@@ -228,7 +235,7 @@ const FileManager = ({
             </div>
             
             {/* Botón de upload */}
-            {showUploadArea && (
+            {canUploadFiles && (
               <button
                 onClick={() => fileInputRef.current?.click()}
                 className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
@@ -289,8 +296,23 @@ const FileManager = ({
         )}
       </div>
 
+      {/* Indicador para usuarios de solo lectura */}
+      {!permissions.canEdit && showUploadArea && (
+        <div className="bg-orange-50 border border-orange-200 rounded-xl p-6 text-center">
+          <div className="flex items-center justify-center space-x-3 text-orange-700">
+            <span className="text-2xl">👀</span>
+            <div>
+              <p className="font-medium text-lg">Modo Solo Lectura</p>
+              <p className="text-sm text-orange-600">
+                Puedes visualizar y descargar archivos, pero no subir nuevos
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Área de upload (drag & drop) - Diseño mejorado */}
-      {showUploadArea && (
+      {canUploadFiles && (
         <div
           className={`border-2 border-dashed rounded-xl p-12 text-center transition-all duration-300 ${
             dragActive 
