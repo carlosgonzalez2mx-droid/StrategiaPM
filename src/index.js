@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
-import './debug-logger.js'; // Debug logger para capturar todos los logs
+// import './debug-logger.js'; // Debug logger para capturar todos los logs - Comentado para producción
 import supabaseService from './services/SupabaseService';
 
 // Hacer supabaseService disponible globalmente para debugging
