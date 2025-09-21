@@ -376,7 +376,7 @@ const ProjectManagementTabs = ({
                   </span>
                   <span className="flex items-center space-x-1">
                     <span className="text-green-500">💼</span>
-                    <span className="px-2 py-1 rounded bg-blue-100 text-blue-800 ml-2">
+                    <span className="px-2 py-1 rounded bg-gray-100 text-gray-800 ml-2">
                       {evmMetrics.percentComplete?.toFixed(1) || 0}% completado
                     </span>
                   </span>
