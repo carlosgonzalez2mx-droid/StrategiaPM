@@ -362,19 +362,16 @@ const ProjectManagementTabs = ({
                   <span className="flex items-center space-x-1">
                     <span className="text-red-500">📅</span>
                     <span>{projectStartDate || currentProject.startDate} - {projectEndDate || currentProject.endDate}</span>
+                    <span className="px-2 py-1 rounded bg-blue-100 text-blue-800 ml-2">
+                      {evmMetrics.percentComplete?.toFixed(1) || 0}% completado
+                    </span>
                   </span>
                 </div>
-                {/* KPIs en tiempo real */}
-                <div className="flex items-center space-x-4 mt-2 text-xs">
-                  <span className={`px-2 py-1 rounded ${(evmMetrics.CPI || 0) >= 1 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                    CPI: {evmMetrics.CPI?.toFixed(2) || 'N/A'}
-                  </span>
-                  <span className={`px-2 py-1 rounded ${(evmMetrics.SPI || 0) >= 1 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                    SPI: {evmMetrics.SPI?.toFixed(2) || 'N/A'}
-                  </span>
-                  <span className="px-2 py-1 rounded bg-blue-100 text-blue-800">
-                    {evmMetrics.percentComplete?.toFixed(1) || 0}% completado
-                  </span>
+                {/* Descripción del proyecto */}
+                <div className="mt-3">
+                  <p className="text-gray-700 text-sm leading-relaxed">
+                    {currentProject.description || 'Sin descripción disponible'}
+                  </p>
                 </div>
               </div>
             </div>
