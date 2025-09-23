@@ -10,6 +10,54 @@ const DAY = 1000 * 60 * 60 * 24;
 const ROW_H = 50;
 const PADDING_TOP = 10;
 
+// ===== Funciones de Validación y Seguridad =====
+const sanitizeInput = (input) => {
+  if (typeof input !== 'string') return input;
+
+  return input
+    .replace(/<script[^>]*>.*?<\/script>/gi, '') // Remover scripts
+    .replace(/javascript:/gi, '') // Remover javascript:
+    .replace(/on\w+=/gi, '') // Remover event handlers
+    .replace(/[<>]/g, '') // Remover < y >
+    .trim()
+    .substring(0, 1000); // Limitar longitud
+};
+
+const validateTaskName = (name) => {
+  if (!name || typeof name !== 'string') return { valid: false, error: 'Nombre de tarea requerido' };
+  if (name.length < 2) return { valid: false, error: 'Nombre debe tener al menos 2 caracteres' };
+  if (name.length > 255) return { valid: false, error: 'Nombre muy largo (máximo 255 caracteres)' };
+  return { valid: true, sanitized: sanitizeInput(name) };
+};
+
+const validateDuration = (duration) => {
+  const num = parseInt(duration);
+  if (isNaN(num) || num < 0 || num > 365) {
+    return { valid: false, error: 'Duración debe ser un número entre 0 y 365 días' };
+  }
+  return { valid: true, value: num };
+};
+
+const validateDate = (date) => {
+  if (!date) return { valid: false, error: 'Fecha requerida' };
+  const dateObj = new Date(date);
+  if (isNaN(dateObj.getTime())) return { valid: false, error: 'Fecha inválida' };
+  const currentYear = new Date().getFullYear();
+  if (dateObj.getFullYear() < 2020 || dateObj.getFullYear() > currentYear + 10) {
+    return { valid: false, error: 'Fecha fuera del rango permitido (2020-' + (currentYear + 10) + ')' };
+  }
+  return { valid: true, value: toISO(dateObj) };
+};
+
+// Función para encontrar el primer día laboral desde una fecha
+const findFirstWorkingDay = (startDate) => {
+  let current = new Date(startDate);
+  while (!isWorkingDay(current)) {
+    current.setDate(current.getDate() + 1);
+  }
+  return toISO(current);
+};
+
 const toISO = (d) => {
   if (!d) return new Date().toISOString().split('T')[0];
   const date = new Date(d);
@@ -26,7 +74,7 @@ const isWorkingDay = (date) => {
 };
 
 // Función para añadir días (laborales o calendario)
-const addDays = (date, days, includeWeekends = false, debugFirstTask = false) => {
+const addDays = (date, days, includeWeekends = false) => {
   // Si la duración es 0, devolver la misma fecha
   if (days === 0) {
     return date;
@@ -39,15 +87,12 @@ const addDays = (date, days, includeWeekends = false, debugFirstTask = false) =>
     return toISO(d);
   } else {
     // Nuevo comportamiento: solo días laborales
-    return addWorkingDays(date, days, debugFirstTask);
+    return addWorkingDays(date, days);
   }
 };
 
 // Función para añadir días laborales (excluye sábados y domingos)
-const addWorkingDays = (date, days, debugFirstTask = false) => {
-  if (debugFirstTask) {
-    console.log('🔧 addWorkingDays llamado:', { date, days });
-  }
+const addWorkingDays = (date, days) => {
   
   // Si la duración es 0, devolver la misma fecha
   if (days === 0) {
@@ -57,18 +102,12 @@ const addWorkingDays = (date, days, debugFirstTask = false) => {
   let currentDate = new Date(date + 'T00:00:00');
   let daysAdded = 0;
   
-  if (debugFirstTask) {
-    console.log('🔧 Fecha inicial:', currentDate.toISOString().split('T')[0]);
-  }
   
   while (daysAdded < days) {
     currentDate.setDate(currentDate.getDate() + 1);
     const isWorking = isWorkingDay(currentDate);
     const dayName = currentDate.toLocaleDateString('es-ES', { weekday: 'long' });
     
-    if (debugFirstTask) {
-      console.log('🔧 Día:', currentDate.toISOString().split('T')[0], dayName, 'es laboral:', isWorking, 'días agregados:', daysAdded);
-    }
     
     if (isWorking) {
       daysAdded++;
@@ -76,71 +115,97 @@ const addWorkingDays = (date, days, debugFirstTask = false) => {
   }
   
   const result = toISO(currentDate);
-  if (debugFirstTask) {
-    console.log('🔧 addWorkingDays resultado:', { date, days, result });
-  }
   return result;
 };
 
 // Función para calcular diferencia de días (exclusivo)
 const diffDaysExclusive = (a, b, includeWeekends = false) => {
   if (includeWeekends) {
-    // Comportamiento original
-  const d1 = new Date(toISO(a));
-  const d2 = new Date(toISO(b));
-  return Math.max(0, Math.round((d2.getTime() - d1.getTime()) / DAY));
+    // Comportamiento original: días calendario
+    const d1 = new Date(toISO(a));
+    const d2 = new Date(toISO(b));
+    return Math.max(0, Math.round((d2.getTime() - d1.getTime()) / DAY));
   } else {
-    // Nuevo comportamiento: solo días laborales
-    return diffWorkingDaysExclusive(a, b);
+    // Comportamiento corregido: contar posiciones de columnas visibles
+    return diffVisibleColumnsExclusive(a, b);
   }
 };
 
-// Función para calcular diferencia de días laborales (exclusivo)
-const diffWorkingDaysExclusive = (a, b) => {
-  const startDate = new Date(toISO(a));
-  const endDate = new Date(toISO(b));
-  let workingDays = 0;
-  
-  let currentDate = new Date(startDate);
-  currentDate.setDate(currentDate.getDate() + 1); // Empezar desde el día siguiente
-  
-  while (currentDate < endDate) {
-    if (isWorkingDay(currentDate)) {
-      workingDays++;
-    }
-    currentDate.setDate(currentDate.getDate() + 1);
+// Función para encontrar el índice de columna de una fecha
+const findColumnIndex = (targetDate, referenceStartDate, includeWeekends) => {
+  const target = new Date(toISO(targetDate));
+  const start = new Date(referenceStartDate);
+  let columnIndex = 0;
+  let current = new Date(start);
+
+  // Debug temporal
+  const shouldDebug = toISO(targetDate).includes('2025-09-01');
+  if (shouldDebug) {
+    console.log('🔍 findColumnIndex DEBUG:');
+    console.log('   targetDate:', toISO(targetDate));
+    console.log('   referenceStartDate:', referenceStartDate);
+    console.log('   includeWeekends:', includeWeekends);
+    console.log('   isTargetBeforeStart:', target < start);
   }
-  
-  return workingDays;
+
+  // CASO ESPECIAL: Si target es anterior al start, calcular índice negativo
+  if (target < start) {
+    let tempCurrent = new Date(target);
+    while (tempCurrent < start) {
+      if (includeWeekends || isWorkingDay(tempCurrent)) {
+        columnIndex--;
+        if (shouldDebug) {
+          console.log('📅 Columna negativa:', toISO(tempCurrent), 'índice:', columnIndex);
+        }
+      }
+      tempCurrent.setDate(tempCurrent.getDate() + 1);
+    }
+  } else {
+    // CASO NORMAL: target igual o posterior al start
+    while (current < target) {
+      // Solo contar días que se muestran como columnas
+      if (includeWeekends || isWorkingDay(current)) {
+        columnIndex++;
+        if (shouldDebug) {
+          console.log('📅 Columna contada:', toISO(current), 'índice:', columnIndex);
+        }
+      } else if (shouldDebug) {
+        console.log('📅 Día saltado (fin de semana):', toISO(current));
+      }
+      current.setDate(current.getDate() + 1);
+    }
+  }
+
+  if (shouldDebug) {
+    console.log('🎯 findColumnIndex resultado final:', columnIndex);
+  }
+
+  return columnIndex;
+};
+
+// Función reemplazada por findColumnIndex en el componente
+const diffVisibleColumnsExclusive = (a, b) => {
+  const d1 = new Date(toISO(a));
+  const d2 = new Date(toISO(b));
+  return Math.max(0, Math.round((d2.getTime() - d1.getTime()) / DAY));
 };
 
 // Función para calcular duración de días (inclusivo)
 const durationDaysInclusive = (start, end, includeWeekends = false) => {
   if (includeWeekends) {
-    // Comportamiento original
+    // Comportamiento original: días calendario
     return diffDaysExclusive(start, addDays(end, 1, true), true);
   } else {
-    // Nuevo comportamiento: solo días laborales
-    return durationWorkingDaysInclusive(start, end);
+    // Comportamiento corregido: contar columnas visibles que abarca la tarea
+    return durationVisibleColumnsInclusive(start, end);
   }
 };
 
-// Función para calcular duración de días laborales (inclusivo)
-const durationWorkingDaysInclusive = (start, end) => {
-  const startDate = new Date(toISO(start));
-  const endDate = new Date(toISO(end));
-  let workingDays = 0;
-  
-  let currentDate = new Date(startDate);
-  
-  while (currentDate <= endDate) {
-    if (isWorkingDay(currentDate)) {
-      workingDays++;
-    }
-    currentDate.setDate(currentDate.getDate() + 1);
-  }
-  
-  return workingDays;
+// Función reemplazada por findColumnIndex en el componente
+const durationVisibleColumnsInclusive = (start, end) => {
+  const d1 = new Date(toISO(start));
+  const d2 = new Date(toISO(end));
+  return Math.max(1, Math.round((d2.getTime() - d1.getTime()) / DAY) + 1);
 };
 const clamp01 = (x) => Math.min(1, Math.max(0, x));
 
@@ -1205,13 +1270,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         }
         
         if (task.startDate && task.duration) {
-          // Solo debuggear la primera tarea
-          const debugFirstTask = index === 0;
-          const newEndDate = addDays(task.startDate, task.duration, includeWeekends, debugFirstTask);
-          
-          if (debugFirstTask) {
-            console.log('🔄 PRIMERA TAREA:', task.name, 'duración:', task.duration, 'fecha antigua:', task.endDate, 'fecha nueva:', newEndDate);
-          }
+          const newEndDate = addDays(task.startDate, task.duration, includeWeekends);
           return { ...task, endDate: newEndDate };
         }
         return task;
@@ -2472,10 +2531,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         tagName: e.target.tagName
       };
       
-      // Guardar en localStorage
-      const existingLogs = JSON.parse(localStorage.getItem('dependencyLogs') || '[]');
-      existingLogs.push(logData);
-      localStorage.setItem('dependencyLogs', JSON.stringify(existingLogs));
+      // Log removido por seguridad - no almacenar datos sensibles en localStorage
       
       // Log de todos los eventos para diagnóstico
       console.log('🔍 EVENTO GLOBAL CAPTURADO:', logData);
@@ -2629,7 +2685,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
             if (!currentSelectedTask) {
               console.warn('🚨 selectedTask no encontrado, creando uno temporal...');
               currentSelectedTask = {
-                id: 'TEMP-' + Date.now(),
+                id: crypto.randomUUID(),
                 name: 'Tarea Temporal',
                 successors: [],
                 predecessors: []
@@ -2649,7 +2705,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
             
             // VERIFICACIÓN FINAL: Asegurar que currentSelectedTask tenga un ID válido
             if (!currentSelectedTask.id) {
-              currentSelectedTask.id = 'TEMP-' + Date.now();
+              currentSelectedTask.id = crypto.randomUUID();
               console.warn('🚨 currentSelectedTask.id inicializado como:', currentSelectedTask.id);
             }
             
@@ -2771,14 +2827,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
     // Log de confirmación
     console.log('🔧 EVENT LISTENERS AGREGADOS AL DOCUMENTO');
     
-    // Función para mostrar logs guardados
-    const showStoredLogs = () => {
-      const logs = JSON.parse(localStorage.getItem('dependencyLogs') || '[]');
-      console.log('📋 LOGS GUARDADOS EN LOCALSTORAGE:', logs);
-    };
-    
-    // Mostrar logs existentes
-    showStoredLogs();
+    // Función de logs removida por seguridad
 
     return () => {
       document.removeEventListener('change', handleGlobalChange);
@@ -3054,10 +3103,21 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
   const projectDates = useMemo(() => {
     if (tasksWithCPM.length === 0) return { start: new Date(), end: new Date() };
     const dates = tasksWithCPM.flatMap((t) => [new Date(t.startDate), new Date(t.endDate)]);
-    return {
+    const result = {
       start: new Date(Math.min(...dates.map((d) => d.getTime()))),
       end: new Date(Math.max(...dates.map((d) => d.getTime()))),
     };
+
+    // Debug temporal para verificar el rango del proyecto
+    console.log('📅 PROJECT DATES CALCULADO:', {
+      start: toISO(result.start),
+      end: toISO(result.end),
+      totalTasks: tasksWithCPM.length,
+      firstTaskDate: tasksWithCPM[0]?.startDate,
+      lastTaskDate: tasksWithCPM[tasksWithCPM.length - 1]?.endDate
+    });
+
+    return result;
   }, [tasksWithCPM]);
 
   const totalDays = useMemo(() => {
@@ -3448,7 +3508,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
       
       // Procesar datos (saltar encabezados)
       const newTasks = [];
-      const fileTimestamp = Date.now(); // Timestamp fijo para todas las tareas del archivo
+      const fileTimestamp = new Date().toISOString(); // Timestamp fijo para todas las tareas del archivo
       
       for (let i = 1; i < jsonData.length; i++) {
         const row = jsonData[i];
@@ -3492,17 +3552,37 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         const startDate = parseDate(row[columnMap.inicio]);
         const endDate = isMilestone ? startDate : parseDate(row[columnMap.fin]);
         
+        // Validar y sanitizar datos de entrada
+        const rawName = row[columnMap.nombre] || `Tarea ${i}`;
+        const nameValidation = validateTaskName(rawName);
+        if (!nameValidation.valid) {
+          console.error(`❌ Error en fila ${i + 1}: ${nameValidation.error}`);
+          continue; // Saltar esta fila si el nombre es inválido
+        }
+
+        const durationValidation = validateDuration(duration);
+        if (!durationValidation.valid) {
+          console.error(`❌ Error en fila ${i + 1}: ${durationValidation.error}`);
+          continue; // Saltar esta fila si la duración es inválida
+        }
+
+        const startValidation = validateDate(startDate);
+        if (!startValidation.valid) {
+          console.error(`❌ Error en fila ${i + 1}: ${startValidation.error}`);
+          continue; // Saltar esta fila si la fecha es inválida
+        }
+
         const task = {
-          id: `task-${fileTimestamp}-${i}`,
+          id: crypto.randomUUID(), // Ya corregido anteriormente
           wbsCode: `${i}`,
-          name: row[columnMap.nombre] || `Tarea ${i}`,
+          name: nameValidation.sanitized,
           duration: isMilestone ? 0 : Math.max(1, durationDaysInclusive(startDate, endDate, includeWeekends)),
-          startDate: startDate,
+          startDate: startValidation.value,
           endDate: endDate,
-          progress: parseInt(row[columnMap.progreso]) || 0,
-          priority: row[columnMap.prioridad] || 'medium',
-          assignedTo: row[columnMap.asignado] || '',
-          cost: parseFloat(row[columnMap.costo]) || 0,
+          progress: Math.max(0, Math.min(100, parseInt(row[columnMap.progreso]) || 0)), // Limitar 0-100
+          priority: sanitizeInput(row[columnMap.prioridad] || 'medium'),
+          assignedTo: sanitizeInput(row[columnMap.asignado] || ''),
+          cost: Math.max(0, parseFloat(row[columnMap.costo]) || 0), // Solo valores positivos
           predecessors: [],
           successors: [],
           isMilestone: isMilestone,
@@ -4085,7 +4165,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
     const newEndDate = addDays(newStartDate, 5, includeWeekends);
     
     const newTask = {
-      id: `task-${Date.now()}`,
+      id: crypto.randomUUID(),
       name: 'Nueva Tarea',
       duration: 5,
       startDate: newStartDate,
@@ -4503,29 +4583,54 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
 
   // Línea "Hoy"
   const todayLeftPx = useMemo(() => {
-    const pStartISO = toISO(projectDates.start);
+    // Usar exactamente el mismo punto de referencia que headers y barras
+    const pStartISO = includeWeekends ?
+      toISO(projectDates.start) :
+      findFirstWorkingDay(projectDates.start);
     const todayISO = toISO(new Date());
-    // Para la línea "HOY" siempre usar días calendario (includeWeekends = true)
-    const days = diffDaysExclusive(pStartISO, todayISO, true);
+    // Para la línea "HOY" usar la misma configuración que las barras
+    // NUEVO ALGORITMO: Usar índice de columnas
+    const days = findColumnIndex(todayISO, pStartISO, includeWeekends);
     
-    console.log('🔍 Cálculo línea HOY:', {
-      projectStart: pStartISO,
-      today: todayISO,
-      days: days,
-      pxPerDay: pxPerDay,
-      includeWeekends: includeWeekends,
-      calculatedPosition: days * pxPerDay
-    });
     
     return Math.min(Math.max(0, days * pxPerDay), chartWidthPx);
   }, [projectDates, pxPerDay, chartWidthPx, includeWeekends]);
 
   // Barras Gantt
   const generateGanttBars = () => {
-    const pStart = toISO(projectDates.start);
+    // Usar exactamente la misma fecha de referencia que generateTimelineHeaders
+    const pStart = includeWeekends ?
+      toISO(projectDates.start) :
+      findFirstWorkingDay(projectDates.start);
+
     return tasksWithCPM.map((task) => {
-      const leftDays = diffDaysExclusive(pStart, task.startDate, includeWeekends);
-      const durDays = durationDaysInclusive(task.startDate, task.endDate, includeWeekends);
+      // NUEVO ALGORITMO: Contar índices de columnas en lugar de días
+      const leftDays = findColumnIndex(task.startDate, pStart, includeWeekends);
+      const durDays = findColumnIndex(task.endDate, task.startDate, includeWeekends) +
+                      (includeWeekends || isWorkingDay(new Date(task.endDate)) ? 1 : 0);
+
+      // Debug temporal para verificar que el nuevo algoritmo funciona
+      if (task.name.includes('Aprobación')) {
+        console.log('🆕 NUEVO ALGORITMO EJECUTÁNDOSE:');
+        console.log('   taskName:', task.name);
+        console.log('   taskStart:', task.startDate);
+        console.log('   taskEnd:', task.endDate);
+        console.log('   projectStart:', pStart);
+        console.log('   leftDays:', leftDays);
+        console.log('   durDays:', durDays);
+        console.log('   includeWeekends:', includeWeekends);
+        console.log('   pxPerDay:', pxPerDay);
+        console.log('   leftPx calculado:', leftDays * pxPerDay);
+
+        // Debug para comparar con lo que muestra la tabla
+        const tableDisplayStart = new Date(task.startDate).toLocaleDateString('es-ES');
+        const tableDisplayEnd = new Date(task.endDate).toLocaleDateString('es-ES');
+        console.log('   📋 TABLA DEBERÍA MOSTRAR:');
+        console.log('   - Inicio formateado:', tableDisplayStart);
+        console.log('   - Fin formateado:', tableDisplayEnd);
+      }
+
+
       return {
         id: task.id,
         wbsCode: task.wbsCode,
@@ -4859,17 +4964,31 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
   // Encabezados de timeline
   const generateTimelineHeaders = () => {
     const headers = [];
-    const start = new Date(toISO(projectDates.start));
+    // Usar el mismo punto de referencia que las barras Gantt
+    const startReference = includeWeekends ?
+      toISO(projectDates.start) :
+      findFirstWorkingDay(projectDates.start);
+    const start = new Date(startReference);
     const end = new Date(toISO(projectDates.end));
+
+    // Debug temporal para verificar el rango de headers
+    console.log('🏁 TIMELINE HEADERS RANGO:', {
+      startDate: toISO(start),
+      endDate: toISO(end),
+      ganttScale: ganttScale
+    });
 
     if (ganttScale === 'days') {
       const cur = new Date(start);
       while (cur <= end) {
-        headers.push({ 
-          label: cur.getDate(), 
-          sub: cur.toLocaleDateString('es', { month: 'short' }), 
-          width: pxPerDay 
-        });
+        // Solo mostrar días que deben ser incluidos según la configuración
+        if (includeWeekends || isWorkingDay(cur)) {
+          headers.push({
+            label: cur.getDate(),
+            sub: cur.toLocaleDateString('es', { month: 'short' }),
+            width: pxPerDay
+          });
+        }
         cur.setDate(cur.getDate() + 1);
       }
     } else if (ganttScale === 'weeks') {
@@ -5231,22 +5350,22 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
           </div>
           
             {/* Tabla tipo Excel */}
-            <div className="overflow-x-auto overflow-y-auto max-h-[70vh] border border-gray-200 rounded-lg">
+            <div className="overflow-x-auto overflow-y-auto max-h-[85vh] border border-gray-200 rounded-lg">
               <table className="w-full border-collapse border border-gray-300">
                 <thead>
                   <tr className="bg-gray-50">
-                    <th className="border border-gray-300 px-2 py-2 text-left text-sm font-medium text-gray-700 w-8">#</th>
-                    <th className="border border-gray-300 px-2 py-2 text-left text-sm font-medium text-gray-700 w-12">Acción</th>
-                    <th className="border border-gray-300 px-2 py-2 text-left text-sm font-medium text-gray-700 w-48">Tarea</th>
-                    <th className="border border-gray-300 px-2 py-2 text-left text-sm font-medium text-gray-700 w-12">🏹</th>
-                    <th className="border border-gray-300 px-2 py-2 text-left text-sm font-medium text-gray-700 w-16">Duración</th>
-                    <th className="border border-gray-300 px-2 py-2 text-left text-sm font-medium text-gray-700 w-24">Inicio</th>
-                    <th className="border border-gray-300 px-2 py-2 text-left text-sm font-medium text-gray-700 w-24">Fin</th>
-                    <th className="border border-gray-300 px-2 py-2 text-left text-sm font-medium text-gray-700 w-16">Progreso</th>
-                    <th className="border border-gray-300 px-2 py-2 text-left text-sm font-medium text-gray-700 w-16">Prioridad</th>
-                    <th className="border border-gray-300 px-2 py-2 text-left text-sm font-medium text-gray-700 w-24">Asignado</th>
-                    <th className="border border-gray-300 px-2 py-2 text-left text-sm font-medium text-gray-700 w-16">Costo</th>
-                    <th className="border border-gray-300 px-2 py-2 text-left text-sm font-medium text-gray-700 w-20">Predecesoras</th>
+                    <th className="border border-gray-300 px-2 py-1.5 text-left text-sm font-medium text-gray-700 w-8">#</th>
+                    <th className="border border-gray-300 px-2 py-1.5 text-left text-sm font-medium text-gray-700 w-12">Acción</th>
+                    <th className="border border-gray-300 px-2 py-1.5 text-left text-sm font-medium text-gray-700 w-48">Tarea</th>
+                    <th className="border border-gray-300 px-2 py-1.5 text-left text-sm font-medium text-gray-700 w-12">🏹</th>
+                    <th className="border border-gray-300 px-2 py-1.5 text-left text-sm font-medium text-gray-700 w-16">Duración</th>
+                    <th className="border border-gray-300 px-2 py-1.5 text-left text-sm font-medium text-gray-700 w-24">Inicio</th>
+                    <th className="border border-gray-300 px-2 py-1.5 text-left text-sm font-medium text-gray-700 w-24">Fin</th>
+                    <th className="border border-gray-300 px-2 py-1.5 text-left text-sm font-medium text-gray-700 w-16">Progreso</th>
+                    <th className="border border-gray-300 px-2 py-1.5 text-left text-sm font-medium text-gray-700 w-16">Prioridad</th>
+                    <th className="border border-gray-300 px-2 py-1.5 text-left text-sm font-medium text-gray-700 w-24">Asignado</th>
+                    <th className="border border-gray-300 px-2 py-1.5 text-left text-sm font-medium text-gray-700 w-16">Costo</th>
+                    <th className="border border-gray-300 px-2 py-1.5 text-left text-sm font-medium text-gray-700 w-20">Predecesoras</th>
                   </tr>
                 </thead>
                 <tbody onKeyDown={handleKeyDown}>
@@ -5274,12 +5393,12 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                       onClick={() => setSelectedRow(task.id)}
                     >
                       {/* Número de fila */}
-                      <td className="border border-gray-300 px-2 py-2 text-sm text-gray-600 text-center">
+                      <td className="border border-gray-300 px-2 py-1 text-sm text-gray-600 text-center">
                         {index + 1}
                       </td>
                       
                       {/* Acciones */}
-                      <td className="border border-gray-300 px-2 py-2">
+                      <td className="border border-gray-300 px-2 py-1">
                         <div className="flex space-x-1">
                           <button
                             onClick={(e) => {
@@ -5305,7 +5424,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                       </td>
                       
                       {/* Nombre de la tarea */}
-                      <td className="border border-gray-300 px-2 py-2">
+                      <td className="border border-gray-300 px-2 py-1">
                         {editingCell?.taskId === task.id && editingCell?.field === 'name' ? (
                           <input
                             type="text"
@@ -5327,7 +5446,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                       </td>
 
                       {/* Hito */}
-                      <td className="border border-gray-300 px-2 py-2 text-center">
+                      <td className="border border-gray-300 px-2 py-1 text-center">
                         <button
                           onClick={() => toggleMilestone(task.id)}
                           className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all duration-200 ${
@@ -5342,7 +5461,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                       </td>
                       
                       {/* Duración */}
-                      <td className="border border-gray-300 px-2 py-2">
+                      <td className="border border-gray-300 px-2 py-1">
                         {task.isMilestone ? (
                           <div className="px-2 py-1 rounded bg-purple-100 text-purple-800 text-center font-medium">
                             0d
@@ -5368,7 +5487,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                       </td>
                       
                       {/* Fecha de inicio */}
-                      <td className="border border-gray-300 px-2 py-2">
+                      <td className="border border-gray-300 px-2 py-1">
                         {editingCell?.taskId === task.id && editingCell?.field === 'startDate' ? (
                           <input
                             type="date"
@@ -5390,7 +5509,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                       </td>
                       
                       {/* Fecha de fin */}
-                      <td className="border border-gray-300 px-2 py-2">
+                      <td className="border border-gray-300 px-2 py-1">
                         {task.isMilestone ? (
                           <div className="px-2 py-1 rounded bg-purple-100 text-purple-800 text-center font-medium text-sm">
                             {(() => {
@@ -5422,7 +5541,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                       </td>
                       
                       {/* Progreso */}
-                      <td className="border border-gray-300 px-2 py-2">
+                      <td className="border border-gray-300 px-2 py-1">
                         {editingCell?.taskId === task.id && editingCell?.field === 'progress' ? (
                           <input
                             type="number"
@@ -5454,7 +5573,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                       </td>
                       
                       {/* Prioridad */}
-                      <td className="border border-gray-300 px-2 py-2">
+                      <td className="border border-gray-300 px-2 py-1">
                         {editingCell?.taskId === task.id && editingCell?.field === 'priority' ? (
                           <select
                             value={editingValue}
@@ -5488,7 +5607,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                       </td>
                       
                       {/* Asignado */}
-                      <td className="border border-gray-300 px-2 py-2">
+                      <td className="border border-gray-300 px-2 py-1">
                         {editingCell?.taskId === task.id && editingCell?.field === 'assignedTo' ? (
                           <input
                             type="text"
@@ -5510,7 +5629,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                       </td>
                       
                       {/* Costo */}
-                      <td className="border border-gray-300 px-2 py-2">
+                      <td className="border border-gray-300 px-2 py-1">
                         {editingCell?.taskId === task.id && editingCell?.field === 'cost' ? (
                           <input
                             type="number"
@@ -5533,7 +5652,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                       </td>
                       
                       {/* Predecesoras */}
-                      <td className="border border-gray-300 px-2 py-2">
+                      <td className="border border-gray-300 px-2 py-1">
                         {editingCell?.taskId === task.id && editingCell?.field === 'dependencies' ? (
                           <div className="space-y-2">
                             <div className="text-xs text-gray-600 mb-1">Escribe los números de fila separados por comas (ej: 1, 2, 3)</div>
