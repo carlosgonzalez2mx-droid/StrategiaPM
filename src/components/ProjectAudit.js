@@ -1,17 +1,18 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import useAuditLog from '../hooks/useAuditLog';
 
-const ProjectAudit = ({ 
-  projects, 
-  currentProjectId, 
-  workPackages, 
-  risks, 
-  tasks, 
-  purchaseOrders, 
-  advances, 
-  invoices, 
+const ProjectAudit = ({
+  projects,
+  currentProjectId,
+  workPackages,
+  risks,
+  tasks,
+  purchaseOrders,
+  advances,
+  invoices,
   contracts,
-  resourceAssignments 
+  resourceAssignments,
+  useSupabase = true
 }) => {
   const [activeTab, setActiveTab] = useState('overview');
   const [dateFilter, setDateFilter] = useState('all');
@@ -21,7 +22,8 @@ const ProjectAudit = ({
   const currentProject = projects.find(p => p.id === currentProjectId);
   
   // Usar el hook de auditoría
-  const { auditLog, exportAuditLog, clearAuditLog } = useAuditLog(currentProjectId);
+  const { auditLog, exportAuditLog, clearAuditLog } = useAuditLog(currentProjectId, useSupabase);
+
 
   // Combinar eventos generados automáticamente con el log de auditoría
   const auditEvents = useMemo(() => {
@@ -223,7 +225,7 @@ const ProjectAudit = ({
 
     // Ordenar eventos por fecha (más recientes primero)
     return events.sort((a, b) => b.timestamp - a.timestamp);
-  }, [currentProject, workPackages, risks, tasks, purchaseOrders, advances, invoices, contracts, resourceAssignments]);
+  }, [currentProject, workPackages, risks, tasks, purchaseOrders, advances, invoices, contracts, resourceAssignments, auditLog]);
 
   // Filtrar eventos
   const filteredEvents = useMemo(() => {
@@ -238,7 +240,7 @@ const ProjectAudit = ({
     if (dateFilter !== 'all') {
       const now = new Date();
       const filterDate = new Date();
-      
+
       switch (dateFilter) {
         case 'today':
           filterDate.setHours(0, 0, 0, 0);
@@ -261,7 +263,7 @@ const ProjectAudit = ({
 
     // Filtro por búsqueda
     if (searchTerm) {
-      filtered = filtered.filter(event => 
+      filtered = filtered.filter(event =>
         event.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
         event.details?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         event.category.toLowerCase().includes(searchTerm.toLowerCase())
@@ -280,7 +282,8 @@ const ProjectAudit = ({
       case 'financial': return '💰';
       case 'contracts': return '📋';
       case 'resources': return '👥';
-      default: return '📝';
+      case 'minutes': return '📝';
+      default: return '📄';
     }
   };
 
@@ -304,6 +307,10 @@ const ProjectAudit = ({
       case 'invoice-created': return 'Factura Creada';
       case 'contract-created': return 'Contrato Creado';
       case 'resource-assigned': return 'Recurso Asignado';
+      case 'minute-task-created': return 'Tarea de Minuta Creada';
+      case 'minute-task-updated': return 'Tarea de Minuta Actualizada';
+      case 'created': return 'Creado';
+      case 'modified': return 'Modificado';
       default: return action;
     }
   };
@@ -382,6 +389,7 @@ const ProjectAudit = ({
               <option value="financial">Financiero</option>
               <option value="contracts">Contratos</option>
               <option value="resources">Recursos</option>
+              <option value="minutes">Minutas</option>
             </select>
           </div>
           

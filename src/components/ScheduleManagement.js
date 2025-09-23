@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import * as XLSX from 'xlsx';
+import MinutaModal from './MinutaModal';
+import EditMinutaModal from './EditMinutaModal';
+import supabaseService from '../services/SupabaseService';
+import useAuditLog from '../hooks/useAuditLog';
 
 // ===== Utilidades de tiempo =====
 const DAY = 1000 * 60 * 60 * 24;
@@ -221,30 +225,35 @@ const calculateCPM = (tasks, includeWeekends = false) => {
       if (!task) return;
 
       let maxEarlyFinish = new Date(task.startDate);
-      
+
       for (const predId of task.predecessors) {
         calculateEarly(predId);
         const pred = taskMap.get(predId);
         if (pred) {
-          const predFinish = new Date(pred.earlyFinish);
+          let predFinish = new Date(pred.earlyFinish);
           if (predFinish > maxEarlyFinish) {
             maxEarlyFinish = predFinish;
           }
         }
       }
 
+      // Aplicar regla de dependencias DESPUÉS de encontrar la fecha máxima
+      if (task.predecessors.length > 0 && !task.isMilestone) {
+        // Solo para tareas normales: empezar al día siguiente del predecesor
+        maxEarlyFinish.setDate(maxEarlyFinish.getDate() + 1);
+      }
+
       task.earlyStart = toISO(maxEarlyFinish);
-      
-      // Para hitos: fecha de fin = fecha de inicio
+
+      // Para hitos: fecha de fin = fecha de inicio (exactamente igual)
       if (task.isMilestone) {
-        task.earlyFinish = toISO(maxEarlyFinish);
+        task.earlyFinish = task.earlyStart;  // MISMO día
         task.startDate = task.earlyStart;
-        task.endDate = task.earlyStart; // Para hitos: fin = inicio
+        task.endDate = task.earlyStart;     // MISMO día
       } else {
-        task.earlyFinish = addDays(toISO(maxEarlyFinish), task.duration, includeWeekends);
-        // ACTUALIZAR las fechas reales basándose en las predecesoras
+        task.earlyFinish = addDays(task.earlyStart, task.duration, includeWeekends);
         task.startDate = task.earlyStart;
-        task.endDate = addDays(toISO(maxEarlyFinish), task.duration, includeWeekends);
+        task.endDate = addDays(task.earlyStart, task.duration, includeWeekends);
       }
 
       calculating.delete(taskId);
@@ -284,7 +293,12 @@ const calculateCPM = (tasks, includeWeekends = false) => {
           calculateLate(succId);
           const succ = taskMap.get(succId);
           if (succ) {
-            const succLateStart = new Date(succ.lateStart);
+            let succLateStart = new Date(succ.lateStart);
+            // Para tareas normales, la predecesora debe terminar un día antes
+            // Para hitos sucesores, pueden compartir el mismo día
+            if (!succ.isMilestone) {
+              succLateStart.setDate(succLateStart.getDate() - 1);
+            }
             if (succLateStart < minLateStart) {
               minLateStart = succLateStart;
             }
@@ -614,8 +628,8 @@ const calculateProjectMetrics = (tasks, criticalTasks) => {
 
 // ===== Funciones de Control de Costos EVM - se definen después de tasksWithCPM =====
 
-const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onScheduleDataChange, includeWeekends, setIncludeWeekends }) => {
-  
+const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onScheduleDataChange, includeWeekends, setIncludeWeekends, useSupabase = true }) => {
+
   // Estados principales - INDEPENDIENTES de Work Packages
   // NOTA: tasks y setTasks ahora vienen como props del componente padre
   
@@ -809,7 +823,22 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
   const [showBusinessCase, setShowBusinessCase] = useState(false);
   const [showResourceAnalysis, setShowResourceAnalysis] = useState(false);
   const [cmpError, setCmpError] = useState(null);
-  
+
+  // Estado para el modal de minutas
+  const [isMinutaModalOpen, setIsMinutaModalOpen] = useState(false);
+  const [minutasTasks, setMinutasTasks] = useState([]);
+  const [loadingMinutas, setLoadingMinutas] = useState(false);
+
+  // Estados para edición de minutas
+  const [editingMinuta, setEditingMinuta] = useState(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+  // Hook de auditoría para minutas
+  const { logMinutaTaskCreated, logMinutaTaskUpdated } = useAuditLog(
+    projectData?.id,
+    useSupabase
+  );
+
   // Estados del diagrama de red
   const [networkLayout, setNetworkLayout] = useState('hierarchical');
   const [networkOrientation, setNetworkOrientation] = useState('TB');
@@ -922,10 +951,33 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
       criticalPathLength: cpmResult.criticalPathLength,
       tasks: tasksWithForcedDeps
     };
-  }, [tasks, includeWeekends, tasks.map(t => t.endDate).join(',')]);
-  const tasksWithCPM = cmpResult.tasks;
-  
-  
+  }, [tasks, includeWeekends, tasks.length]);
+  // CORRECCIÓN FINAL: Asegurar que todos los hitos tengan fecha inicio = fecha fin
+  const tasksWithCPM = useMemo(() => {
+    return cmpResult.tasks.map(task => {
+      if (task.isMilestone) {
+        // DEBUG: Ver qué fechas tiene el hito
+        console.log('🔍 HITO DETECTADO:', {
+          id: task.id,
+          name: task.name,
+          startDate: task.startDate,
+          endDate: task.endDate,
+          isMilestone: task.isMilestone
+        });
+
+        if (task.startDate !== task.endDate) {
+          console.log('🔧 CORRIGIENDO HITO - FORZANDO endDate = startDate');
+          return {
+            ...task,
+            endDate: task.startDate // FORZAR: fecha fin = fecha inicio para hitos
+          };
+        }
+      }
+      return task;
+    });
+  }, [cmpResult.tasks]);
+
+
   // ===== Funciones de Control de Costos EVM =====
   
   // Solo mantenemos las funciones básicas necesarias para la compresión del cronograma
@@ -1407,6 +1459,41 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
       svg.setAttribute('viewBox', `${networkPan.x} ${networkPan.y} ${1200 / networkZoom} ${600 / networkZoom}`);
     }
   }, [networkZoom, networkPan, viewMode]);
+
+  // Cargar minutas desde Supabase o portfolioData cuando se carga el proyecto
+  useEffect(() => {
+    const loadMinutas = async () => {
+      if (!projectData?.id) return;
+
+      setLoadingMinutas(true);
+      try {
+        if (useSupabase) {
+          // Cargar desde Supabase si está habilitado
+          console.log('🔍 DEBUG: Cargando minutas para proyecto:', projectData.id);
+          const { success, minutas } = await supabaseService.loadMinutasByProject(projectData.id);
+          if (success) {
+            console.log(`🔍 DEBUG: Minutas recibidas de Supabase:`, minutas);
+            setMinutasTasks(minutas);
+            console.log(`✅ Minutas cargadas desde Supabase: ${minutas.length}`);
+          } else {
+            console.warn('⚠️ Error cargando minutas desde Supabase');
+          }
+        } else {
+          // Cargar desde portfolioData si está en modo local
+          const portfolioData = JSON.parse(localStorage.getItem('portfolioData') || '{}');
+          const minutasFromStorage = portfolioData.minutasByProject?.[projectData.id] || [];
+          setMinutasTasks(minutasFromStorage);
+          console.log(`✅ Minutas cargadas desde localStorage: ${minutasFromStorage.length}`);
+        }
+      } catch (error) {
+        console.error('❌ Error cargando minutas:', error);
+      } finally {
+        setLoadingMinutas(false);
+      }
+    };
+
+    loadMinutas();
+  }, [projectData?.id, useSupabase]);
 
   // Scroll sincronizado
   const onLeftScroll = (e) => {
@@ -3634,6 +3721,119 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
     });
   };
 
+  // Funciones para el manejo de minutas
+  const handleOpenMinutaModal = () => {
+    setIsMinutaModalOpen(true);
+  };
+
+  const handleCloseMinutaModal = () => {
+    setIsMinutaModalOpen(false);
+  };
+
+  const handleSaveMinuta = async (minutaTasks) => {
+    console.log('💾 Guardando tareas de minuta:', minutaTasks);
+
+    try {
+      // Si está usando Supabase, guardar en la base de datos
+      if (useSupabase && projectData?.id) {
+        const result = await supabaseService.saveMinutas(projectData.id, minutaTasks);
+
+        if (result.success) {
+          // Actualizar el estado local con los datos de Supabase
+          setMinutasTasks(prev => [...prev, ...minutaTasks]);
+
+          // Registrar eventos de auditoría para cada minuta guardada
+          minutaTasks.forEach(minuta => {
+            logMinutaTaskCreated(minuta, projectData);
+          });
+
+          alert(`✅ Se han guardado ${minutaTasks.length} tareas de la minuta en Supabase.`);
+        } else {
+          console.error('❌ Error guardando en Supabase:', result.error);
+          alert(`❌ Error guardando las minutas: ${result.error.message || 'Error desconocido'}`);
+          return;
+        }
+      } else {
+        // Modo local: solo agregar al estado
+        setMinutasTasks(prev => [...prev, ...minutaTasks]);
+        alert(`📝 Se han guardado ${minutaTasks.length} tareas de la minuta localmente.`);
+      }
+
+      // Sincronizar con el data change event para backups automáticos
+      if (typeof window !== 'undefined') {
+        const dataChangeEvent = new CustomEvent('dataChange', {
+          detail: {
+            type: 'minutasUpdated',
+            projectId: projectData?.id,
+            minutasCount: minutaTasks.length
+          }
+        });
+        window.dispatchEvent(dataChangeEvent);
+      }
+
+    } catch (error) {
+      console.error('❌ Error guardando minutas:', error);
+      alert(`❌ Error guardando las minutas: ${error.message}`);
+    }
+  };
+
+  // Funciones para edición de minutas
+  const handleEditMinuta = (minuta) => {
+    setEditingMinuta(minuta);
+    setIsEditModalOpen(true);
+  };
+
+  const handleCloseEditModal = () => {
+    setEditingMinuta(null);
+    setIsEditModalOpen(false);
+  };
+
+  const handleUpdateMinuta = async (updatedMinuta) => {
+    try {
+      if (useSupabase) {
+        // Actualizar en Supabase
+        const updateResult = await supabaseService.updateMinuta(updatedMinuta.id, {
+          task_description: updatedMinuta.tarea,
+          responsible_person: updatedMinuta.responsable,
+          due_date: updatedMinuta.fecha,
+          milestone_id: updatedMinuta.hitoId,
+          status: updatedMinuta.estatus
+        });
+
+        if (updateResult.success) {
+          // Actualizar estado local
+          setMinutasTasks(prev =>
+            prev.map(m => m.id === updatedMinuta.id ? updatedMinuta : m)
+          );
+
+          // Registrar evento de auditoría para la actualización
+          const changes = {
+            task_description: updatedMinuta.tarea,
+            responsible_person: updatedMinuta.responsable,
+            due_date: updatedMinuta.fecha,
+            milestone_id: updatedMinuta.hitoId,
+            status: updatedMinuta.estatus
+          };
+          logMinutaTaskUpdated(updatedMinuta, changes, projectData);
+
+          alert('✅ Minuta actualizada correctamente');
+        } else {
+          console.error('❌ Error actualizando minuta:', updateResult.error);
+          alert(`❌ Error actualizando minuta: ${updateResult.error.message || 'Error desconocido'}`);
+        }
+      } else {
+        // Actualizar solo en estado local
+        setMinutasTasks(prev =>
+          prev.map(m => m.id === updatedMinuta.id ? updatedMinuta : m)
+        );
+        alert('✅ Minuta actualizada localmente');
+      }
+    } catch (error) {
+      console.error('❌ Error actualizando minuta:', error);
+      alert(`❌ Error actualizando minuta: ${error.message}`);
+    }
+  };
+
   // Función para alternar hito
   const toggleMilestone = (taskId) => {
     setTasks(prev => prev.map(task => {
@@ -4755,6 +4955,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                   <span>🔧</span>
                   <span>Corregir Hitos</span>
                 </button>
+
                 </div>
                 </div>
 
@@ -4883,13 +5084,25 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
               <button
                     onClick={() => setViewMode('network')}
                     className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-300 flex items-center space-x-2 ${
-                      viewMode === 'network' 
-                        ? 'bg-indigo-600 text-white shadow-md hover:shadow-lg' 
+                      viewMode === 'network'
+                        ? 'bg-indigo-600 text-white shadow-md hover:shadow-lg'
                         : 'bg-white text-gray-600 hover:bg-indigo-50 hover:text-indigo-700 border border-gray-300 hover:border-indigo-300'
                     }`}
                   >
                     <span>🔗</span>
                     <span>Red</span>
+              </button>
+
+              <button
+                    onClick={() => setViewMode('minutas')}
+                    className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-300 flex items-center space-x-2 ${
+                      viewMode === 'minutas'
+                        ? 'bg-indigo-600 text-white shadow-md hover:shadow-lg'
+                        : 'bg-white text-gray-600 hover:bg-indigo-50 hover:text-indigo-700 border border-gray-300 hover:border-indigo-300'
+                    }`}
+                  >
+                    <span>📋</span>
+                    <span>Tareas de minutas</span>
               </button>
                 </div>
             </div>
@@ -5180,7 +5393,10 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                       <td className="border border-gray-300 px-2 py-2">
                         {task.isMilestone ? (
                           <div className="px-2 py-1 rounded bg-purple-100 text-purple-800 text-center font-medium text-sm">
-                            {new Date(task.startDate).toLocaleDateString('es')}
+                            {(() => {
+                              const [year, month, day] = task.startDate.split('-');
+                              return new Date(year, month - 1, day).toLocaleDateString('es');
+                            })()}
                     </div>
                         ) : editingCell?.taskId === task.id && editingCell?.field === 'endDate' ? (
                           <input
@@ -6372,7 +6588,273 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
           </div>
         )}
 
-        
+        {/* Vista de Tareas de Minutas */}
+        {viewMode === 'minutas' && (
+          <div className="bg-white rounded-lg shadow-lg p-6 mb-6 pb-32">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-800">📋 Tareas de Minutas</h2>
+              <button
+                onClick={handleOpenMinutaModal}
+                className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 flex items-center space-x-2 transition-all duration-300"
+              >
+                <span>➕</span>
+                <span>Nueva Minuta</span>
+              </button>
+            </div>
+
+            {loadingMinutas ? (
+              <div className="text-center py-12">
+                <div className="bg-gray-100 rounded-xl p-8">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                  <h3 className="text-xl font-semibold text-gray-600 mb-2">Cargando minutas...</h3>
+                  <p className="text-gray-500">Obteniendo datos desde {useSupabase ? 'Supabase' : 'localStorage'}</p>
+                </div>
+              </div>
+            ) : minutasTasks.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="bg-gray-100 rounded-xl p-8">
+                  <span className="text-6xl mb-4 block">📝</span>
+                  <h3 className="text-xl font-semibold text-gray-600 mb-2">No hay tareas de minutas</h3>
+                  <p className="text-gray-500 mb-4">Crea tu primera minuta haciendo clic en "Nueva Minuta"</p>
+                  <button
+                    onClick={handleOpenMinutaModal}
+                    className="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 transition-colors"
+                  >
+                    ➕ Crear Primera Minuta
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Organizar por hitos */}
+                {tasks.filter(task => task.isMilestone).map(hito => {
+                  const tareasDelHito = minutasTasks.filter(tarea => tarea.hitoId === hito.id);
+
+                  if (tareasDelHito.length === 0) return null;
+
+                  return (
+                    <div key={hito.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                      <div className="bg-blue-50 px-4 py-3 border-b border-gray-200">
+                        <h3 className="font-semibold text-gray-800">
+                          🎯 {hito.wbsCode} - {hito.name}
+                        </h3>
+                      </div>
+
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 w-1/3">Tarea</th>
+                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 w-1/6">Responsable</th>
+                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 w-1/8">Fecha</th>
+                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 w-1/8">Estatus</th>
+                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 w-1/8">Creada</th>
+                              <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 w-1/8">Acciones</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {tareasDelHito
+                              .sort((a, b) => new Date(a.fecha) - new Date(b.fecha))
+                              .map((tarea, index) => (
+                                <tr key={tarea.id} className="hover:bg-gray-50">
+                                  <td className="px-4 py-3 text-sm text-gray-900">{tarea.tarea}</td>
+                                  <td className="px-4 py-3 text-sm text-gray-700">{tarea.responsable}</td>
+                                  <td className="px-4 py-3 text-sm text-gray-700">
+                                    {(() => {
+                                      try {
+                                        const fecha = new Date(tarea.fecha);
+                                        return isNaN(fecha.getTime()) ? 'Fecha inválida' : fecha.toLocaleDateString('es-ES');
+                                      } catch (error) {
+                                        return 'Fecha inválida';
+                                      }
+                                    })()}
+                                  </td>
+                                  <td className="px-4 py-3 text-sm">
+                                    <select
+                                      value={tarea.estatus}
+                                      onChange={async (e) => {
+                                        const newStatus = e.target.value;
+
+                                        // Actualizar inmediatamente en el estado local
+                                        setMinutasTasks(prev =>
+                                          prev.map(t => t.id === tarea.id ? { ...t, estatus: newStatus } : t)
+                                        );
+
+                                        // Si usa Supabase, actualizar en la base de datos
+                                        if (useSupabase) {
+                                          try {
+                                            const result = await supabaseService.updateMinutaStatus(tarea.id, newStatus);
+                                            if (!result.success) {
+                                              console.error('❌ Error actualizando estatus en Supabase:', result.error);
+                                              // Revertir el cambio local en caso de error
+                                              setMinutasTasks(prev =>
+                                                prev.map(t => t.id === tarea.id ? { ...t, estatus: tarea.estatus } : t)
+                                              );
+                                            }
+                                          } catch (error) {
+                                            console.error('❌ Error actualizando estatus:', error);
+                                          }
+                                        }
+                                      }}
+                                      className={`px-3 py-1 rounded-full text-xs font-medium border-none ${
+                                        tarea.estatus === 'Pendiente' ? 'bg-yellow-100 text-yellow-800' :
+                                        tarea.estatus === 'En Proceso' ? 'bg-blue-100 text-blue-800' :
+                                        'bg-green-100 text-green-800'
+                                      }`}
+                                    >
+                                      <option value="Pendiente">Pendiente</option>
+                                      <option value="En Proceso">En Proceso</option>
+                                      <option value="Completado">Completado</option>
+                                    </select>
+                                  </td>
+                                  <td className="px-4 py-3 text-sm text-gray-500">
+                                    {(() => {
+                                      try {
+                                        const fecha = new Date(tarea.fechaCreacion);
+                                        return isNaN(fecha.getTime()) ? 'Fecha inválida' : fecha.toLocaleDateString('es-ES');
+                                      } catch (error) {
+                                        return 'Fecha inválida';
+                                      }
+                                    })()}
+                                  </td>
+                                  <td className="px-4 py-3 text-sm">
+                                    <button
+                                      onClick={() => handleEditMinuta(tarea)}
+                                      className="text-blue-600 hover:text-blue-800 transition-colors"
+                                      title="Editar minuta"
+                                    >
+                                      ✏️ Editar
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Mostrar tareas sin hito asignado */}
+                {(() => {
+                  const tareasSinHito = minutasTasks.filter(tarea => {
+                    if (!tarea.hitoId) return true;
+                    const hitoEncontrado = tasks.find(t => t.id === tarea.hitoId && t.isMilestone);
+                    if (!hitoEncontrado) {
+                      console.log(`🔍 DEBUG: Tarea ${tarea.id} busca hito ${tarea.hitoId} pero no se encuentra`);
+                      console.log(`🔍 DEBUG: Hitos disponibles:`, tasks.filter(t => t.isMilestone).map(h => ({id: h.id, name: h.name})));
+                    }
+                    return !hitoEncontrado;
+                  });
+                  return tareasSinHito.length > 0;
+                })() && (
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                      <h3 className="font-semibold text-gray-800">📋 Sin hito asignado</h3>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 w-1/3">Tarea</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 w-1/6">Responsable</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 w-1/8">Fecha</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 w-1/8">Estatus</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 w-1/8">Creada</th>
+                            <th className="px-4 py-3 text-left text-sm font-medium text-gray-700 w-1/8">Acciones</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {minutasTasks
+                            .filter(tarea => {
+                              if (!tarea.hitoId) return true;
+                              const hitoEncontrado = tasks.find(t => t.id === tarea.hitoId && t.isMilestone);
+                              return !hitoEncontrado;
+                            })
+                            .sort((a, b) => new Date(a.fecha) - new Date(b.fecha))
+                            .map((tarea) => (
+                              <tr key={tarea.id} className="hover:bg-gray-50">
+                                <td className="px-4 py-3 text-sm text-gray-900">{tarea.tarea}</td>
+                                <td className="px-4 py-3 text-sm text-gray-700">{tarea.responsable}</td>
+                                <td className="px-4 py-3 text-sm text-gray-700">
+                                  {(() => {
+                                    try {
+                                      const fecha = new Date(tarea.fecha);
+                                      return isNaN(fecha.getTime()) ? 'Fecha inválida' : fecha.toLocaleDateString('es-ES');
+                                    } catch (error) {
+                                      return 'Fecha inválida';
+                                    }
+                                  })()}
+                                </td>
+                                <td className="px-4 py-3 text-sm">
+                                  <select
+                                    value={tarea.estatus}
+                                    onChange={async (e) => {
+                                      const newStatus = e.target.value;
+
+                                      // Actualizar inmediatamente en el estado local
+                                      setMinutasTasks(prev =>
+                                        prev.map(t => t.id === tarea.id ? { ...t, estatus: newStatus } : t)
+                                      );
+
+                                      // Si usa Supabase, actualizar en la base de datos
+                                      if (useSupabase) {
+                                        try {
+                                          const result = await supabaseService.updateMinutaStatus(tarea.id, newStatus);
+                                          if (!result.success) {
+                                            console.error('❌ Error actualizando estatus en Supabase:', result.error);
+                                            // Revertir el cambio local en caso de error
+                                            setMinutasTasks(prev =>
+                                              prev.map(t => t.id === tarea.id ? { ...t, estatus: tarea.estatus } : t)
+                                            );
+                                          }
+                                        } catch (error) {
+                                          console.error('❌ Error actualizando estatus:', error);
+                                        }
+                                      }
+                                    }}
+                                    className={`px-3 py-1 rounded-full text-xs font-medium border-none ${
+                                      tarea.estatus === 'Pendiente' ? 'bg-yellow-100 text-yellow-800' :
+                                      tarea.estatus === 'En Proceso' ? 'bg-blue-100 text-blue-800' :
+                                      'bg-green-100 text-green-800'
+                                    }`}
+                                  >
+                                    <option value="Pendiente">Pendiente</option>
+                                    <option value="En Proceso">En Proceso</option>
+                                    <option value="Completado">Completado</option>
+                                  </select>
+                                </td>
+                                <td className="px-4 py-3 text-sm text-gray-500">
+                                  {(() => {
+                                    try {
+                                      const fecha = new Date(tarea.fechaCreacion);
+                                      return isNaN(fecha.getTime()) ? 'Fecha inválida' : fecha.toLocaleDateString('es-ES');
+                                    } catch (error) {
+                                      return 'Fecha inválida';
+                                    }
+                                  })()}
+                                </td>
+                                <td className="px-4 py-3 text-sm">
+                                  <button
+                                    onClick={() => handleEditMinuta(tarea)}
+                                    className="text-blue-600 hover:text-blue-800 transition-colors"
+                                    title="Editar minuta"
+                                  >
+                                    ✏️ Editar
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* MODAL INFORMATIVO PARA VISTA GANTT */}
         {selectedTask && viewMode === 'gantt' && (
@@ -8407,28 +8889,24 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                         {task.duration} {ganttScale === 'days' ? 'días' : ganttScale === 'weeks' ? 'semanas' : 'meses'}
                       </td>
                       <td className="py-3 px-6 text-left">
-                        {new Date(task.startDate).toLocaleDateString('es')}
+                        {(() => {
+                          // Usar formato consistente para evitar problemas de zona horaria
+                          const [year, month, day] = task.startDate.split('-');
+                          return new Date(year, month - 1, day).toLocaleDateString('es');
+                        })()}
                       </td>
                       <td className="py-3 px-6 text-left">
                         {(() => {
                           // Para hitos, usar la fecha de inicio como fecha de fin
                           if (task.isMilestone) {
-                            const startDate = new Date(task.startDate);
-                            console.log('🔍 DEBUG - Hito renderizado:', {
-                              taskId: task.id,
-                              taskName: task.name,
-                              startDate: task.startDate,
-                              endDate: task.endDate,
-                              startDateObj: startDate.toISOString().split('T')[0],
-                              formattedStart: startDate.toLocaleDateString('es'),
-                              duration: task.duration
-                            });
-                            return startDate.toLocaleDateString('es');
+                            // Usar formato consistente para evitar problemas de zona horaria
+                            const [year, month, day] = task.startDate.split('-');
+                            return new Date(year, month - 1, day).toLocaleDateString('es');
                           }
                           
-                          // Para tareas normales, usar la fecha de fin
-                          const endDate = new Date(task.endDate);
-                          return endDate.toLocaleDateString('es');
+                          // Para tareas normales, usar la fecha de fin con formato consistente
+                          const [year, month, day] = task.endDate.split('-');
+                          return new Date(year, month - 1, day).toLocaleDateString('es');
                         })()}
                       </td>
                       <td className="py-3 px-6 text-left">
@@ -8910,6 +9388,23 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
           </div>
         </div>
       )}
+
+      {/* Modal de Minuta */}
+      <MinutaModal
+        isOpen={isMinutaModalOpen}
+        onClose={handleCloseMinutaModal}
+        hitos={tasks.filter(task => task.isMilestone)}
+        onSave={handleSaveMinuta}
+      />
+
+      {/* Modal de Edición de Minuta */}
+      <EditMinutaModal
+        isOpen={isEditModalOpen}
+        onClose={handleCloseEditModal}
+        minuta={editingMinuta}
+        hitos={tasks.filter(task => task.isMilestone)}
+        onUpdate={handleUpdateMinuta}
+      />
     </div>
   );
 };

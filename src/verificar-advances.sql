@@ -1,9 +1,0 @@
--- Verificar estructura de la tabla advances
-SELECT 
-    column_name,
-    data_type,
-    is_nullable,
-    column_default
-FROM information_schema.columns 
-WHERE table_name = 'advances' 
-ORDER BY ordinal_position;

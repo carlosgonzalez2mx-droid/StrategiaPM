@@ -252,7 +252,7 @@ Este proyecto está bajo la licencia MIT.
 
 ## 👥 Autores
 
-- **Carlos González López**
+- **Carlos Alberto González López**
 - **Dashboard PMO Integrado**
 - **Versión**: 1.0.0
 - **Fecha**: 2025

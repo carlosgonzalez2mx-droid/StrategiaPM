@@ -655,19 +655,28 @@ class SupabaseService {
         }
       }
 
-      // Cargar logs de auditoría por proyecto
+      // NOTA: Los logs de auditoría se cargan desde localStorage
+      // No desde la tabla 'audit_logs' de Supabase
       const auditLogsByProject = {};
+
+      // Cargar minutas por proyecto
+      const minutasByProject = {};
       for (const project of convertedProjects) {
-        const { data: auditLogs, error: auditError } = await this.supabase
-          .from('audit_logs')
-          .select('*')
-          .eq('project_id', project.id);
-        
-        if (auditError) {
-          console.warn(`⚠️ Error cargando logs de auditoría para proyecto ${project.id}:`, auditError);
-          auditLogsByProject[project.id] = [];
+        const { success, minutas } = await this.loadMinutasByProject(project.id);
+
+        if (success) {
+          // Convertir de formato Supabase a formato frontend
+          minutasByProject[project.id] = (minutas || []).map(minuta => ({
+            id: minuta.id,
+            tarea: minuta.task_description,
+            responsable: minuta.responsible_person,
+            fecha: minuta.due_date,
+            hitoId: minuta.milestone_id,
+            estatus: minuta.status,
+            fechaCreacion: minuta.created_at
+          }));
         } else {
-          auditLogsByProject[project.id] = auditLogs || [];
+          minutasByProject[project.id] = [];
         }
       }
 
@@ -710,6 +719,7 @@ class SupabaseService {
         contractsByProject: contractsByProject,
         resourceAssignmentsByProject: resourceAssignmentsByProject,
         auditLogsByProject: auditLogsByProject,
+        minutasByProject: minutasByProject,
         includeWeekendsByProject: includeWeekendsByProject,
         currentProjectId: convertedProjects && convertedProjects.length > 0 ? convertedProjects[0].id : null,
         version: '1.0.0',
@@ -755,15 +765,9 @@ class SupabaseService {
         console.warn('⚠️ Error eliminando configuración del proyecto:', configError);
       }
 
-      // Eliminar logs de auditoría del proyecto
-      const { error: auditError } = await this.supabase
-        .from('audit_logs')
-        .delete()
-        .eq('project_id', projectId);
-
-      if (auditError) {
-        console.warn('⚠️ Error eliminando logs de auditoría del proyecto:', auditError);
-      }
+      // NOTA: Los logs de auditoría se manejan en localStorage
+      // No se eliminan de tabla 'audit_logs' porque no existe con estructura correcta
+      console.log('📋 Los logs de auditoría se mantienen en localStorage');
 
       // Eliminar el proyecto
       const { error: projectError } = await this.supabase
@@ -986,24 +990,11 @@ class SupabaseService {
             console.error(`🚨 Total duplicados: ${duplicateIds.length} de ${tasksToUpsert.length} tareas`);
           }
           
-          // PRIMERO: Eliminar todas las tareas existentes del proyecto
-          console.log(`🗑️ Eliminando tareas existentes para proyecto ${projectId}...`);
-          const { error: deleteError } = await this.supabase
-            .from('tasks')
-            .delete()
-            .eq('project_id', projectId);
-
-          if (deleteError) {
-            console.warn(`⚠️ Error eliminando tareas existentes para proyecto ${projectId}:`, deleteError);
-          } else {
-            console.log(`✅ Tareas existentes eliminadas para proyecto ${projectId}`);
-          }
-
-          // SEGUNDO: Insertar las nuevas tareas (no upsert)
-          console.log(`📝 Insertando ${tasksToUpsert.length} tareas nuevas para proyecto ${projectId}...`);
+          // UPSERT SEGURO: Actualizar o insertar tareas sin eliminar existentes
+          console.log(`📝 Actualizando/insertando ${tasksToUpsert.length} tareas para proyecto ${projectId}...`);
           const { error: tasksError } = await this.supabase
             .from('tasks')
-            .insert(tasksToUpsert);
+            .upsert(tasksToUpsert, { onConflict: 'id' });
 
           if (tasksError) {
             console.error(`❌ Error guardando tareas para proyecto ${projectId}:`, tasksError);
@@ -1253,23 +1244,35 @@ class SupabaseService {
         }
       }
 
-      // Guardar/actualizar logs de auditoría
-      for (const projectId in data.auditLogsByProject) {
-        const auditLogs = data.auditLogsByProject[projectId];
-        if (auditLogs && auditLogs.length > 0) {
-          const auditLogsToUpsert = auditLogs.map(log => ({
-            ...log,
-            project_id: projectId,
-            user_id: this.currentUser.id,
-            timestamp: log.timestamp || new Date().toISOString()
-          }));
+      // NOTA: Los logs de auditoría se guardan en localStorage solamente
+      // La tabla 'audit_logs' en Supabase no tiene la estructura correcta
+      // Los logs se manejan a través de useAuditLog hook y localStorage
+      if (data.auditLogsByProject) {
+        console.log(`📋 Audit logs detectados pero no se guardan en Supabase (se usan localStorage)`);
+      }
 
-          const { error: auditError } = await this.supabase
-            .from('audit_logs')
-            .upsert(auditLogsToUpsert, { onConflict: 'id' });
+      // Guardar/actualizar minutas por proyecto
+      if (data.minutasByProject) {
+        for (const projectId in data.minutasByProject) {
+          const minutas = data.minutasByProject[projectId];
+          if (minutas && minutas.length > 0) {
+            console.log(`📋 Guardando minutas para proyecto ${projectId}: ${minutas.length} minutas`);
 
-          if (auditError) {
-            console.warn(`⚠️ Error guardando logs de auditoría para proyecto ${projectId}:`, auditError);
+            // Eliminar minutas existentes del proyecto
+            const { error: deleteError } = await this.supabase
+              .from('minute_tasks')
+              .delete()
+              .eq('project_id', projectId);
+
+            if (deleteError) {
+              console.warn(`⚠️ Error eliminando minutas existentes para proyecto ${projectId}:`, deleteError);
+            }
+
+            // Insertar nuevas minutas
+            const result = await this.saveMinutas(projectId, minutas);
+            if (!result.success) {
+              console.warn(`⚠️ Error guardando minutas para proyecto ${projectId}:`, result.error);
+            }
           }
         }
       }
@@ -1277,14 +1280,14 @@ class SupabaseService {
       // Guardar/actualizar configuraciones de proyectos
       for (const projectId in data.includeWeekendsByProject) {
         const includeWeekends = data.includeWeekendsByProject[projectId];
-        
+
         // Verificar si el projectId es un UUID válido
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
         if (!uuidRegex.test(projectId)) {
           console.log(`⚠️ Saltando configuración para proyecto con ID inválido: ${projectId}`);
           continue;
         }
-        
+
         const configToUpsert = {
           project_id: projectId,
           include_weekends: includeWeekends,
@@ -1295,7 +1298,7 @@ class SupabaseService {
         const { error: insertError } = await this.supabase
           .from('project_configurations')
           .insert(configToUpsert);
-        
+
         let configError = null;
         if (insertError && insertError.code === '23505') {
           // Si es error de duplicado, actualizar
@@ -2095,6 +2098,293 @@ class SupabaseService {
         success: false,
         error: error.message
       };
+    }
+  }
+
+  // ========== GESTIÓN DE MINUTAS ==========
+
+  // Cargar minutas por proyecto
+  async loadMinutasByProject(projectId) {
+    try {
+      if (!this.currentUser || !this.organizationId) {
+        console.warn('⚠️ No se pueden cargar minutas: usuario no autenticado');
+        return { success: false, error: 'No autenticado', minutas: [] };
+      }
+
+      console.log(`📋 Cargando minutas para proyecto: ${projectId}`);
+
+      const { data, error } = await this.supabase
+        .from('minute_tasks')
+        .select('*')
+        .eq('project_id', projectId)
+        .eq('organization_id', this.organizationId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('❌ Error cargando minutas:', error);
+        return { success: false, error, minutas: [] };
+      }
+
+      // Mapear datos de Supabase a formato frontend
+      const minutasMapeadas = (data || []).map(minuta => ({
+        id: minuta.id,
+        tarea: minuta.task_description,
+        responsable: minuta.responsible_person,
+        fecha: minuta.due_date,
+        hitoId: minuta.milestone_id,
+        estatus: minuta.status,
+        fechaCreacion: minuta.created_at
+      }));
+
+      console.log(`✅ Minutas cargadas: ${minutasMapeadas.length}`);
+      return { success: true, minutas: minutasMapeadas };
+
+    } catch (error) {
+      console.error('❌ Error inesperado cargando minutas:', error);
+      return { success: false, error, minutas: [] };
+    }
+  }
+
+  // Guardar minutas en Supabase
+  async saveMinutas(projectId, minutaTasks) {
+    try {
+      if (!this.currentUser || !this.organizationId) {
+        console.warn('⚠️ No se pueden guardar minutas: usuario no autenticado');
+        return { success: false, error: 'No autenticado' };
+      }
+
+      console.log(`💾 Guardando ${minutaTasks.length} minutas para proyecto: ${projectId}`);
+
+      // Preparar datos para insertar
+      const minutasToInsert = minutaTasks.map(minuta => ({
+        id: minuta.id,
+        project_id: projectId,
+        organization_id: this.organizationId,
+        user_id: this.currentUser.id,
+        task_description: minuta.tarea,
+        responsible_person: minuta.responsable,
+        due_date: minuta.fecha,
+        milestone_id: minuta.hitoId,
+        status: minuta.estatus || 'Pendiente',
+        created_at: minuta.fechaCreacion || new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }));
+
+      const { data, error } = await this.supabase
+        .from('minute_tasks')
+        .insert(minutasToInsert)
+        .select('*');
+
+      if (error) {
+        console.error('❌ Error guardando minutas:', error);
+        return { success: false, error };
+      }
+
+      console.log(`✅ Minutas guardadas: ${data?.length || 0}`);
+
+
+      return { success: true, data };
+
+    } catch (error) {
+      console.error('❌ Error inesperado guardando minutas:', error);
+      return { success: false, error };
+    }
+  }
+
+  // Actualizar estatus de una minuta
+  async updateMinutaStatus(minutaId, newStatus) {
+    try {
+      if (!this.currentUser) {
+        console.warn('⚠️ No se puede actualizar minuta: usuario no autenticado');
+        return { success: false, error: 'No autenticado' };
+      }
+
+      console.log(`🔄 Actualizando estatus de minuta ${minutaId} a: ${newStatus}`);
+
+      const { data, error } = await this.supabase
+        .from('minute_tasks')
+        .update({
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', minutaId)
+        .eq('user_id', this.currentUser.id)
+        .select('*');
+
+      if (error) {
+        console.error('❌ Error actualizando minuta:', error);
+        return { success: false, error };
+      }
+
+      console.log(`✅ Minuta actualizada`);
+      return { success: true, data };
+
+    } catch (error) {
+      console.error('❌ Error inesperado actualizando minuta:', error);
+      return { success: false, error };
+    }
+  }
+
+  // Actualizar una minuta completa
+  async updateMinuta(minutaId, updateData) {
+    try {
+      if (!this.currentUser) {
+        console.warn('⚠️ No se puede actualizar minuta: usuario no autenticado');
+        return { success: false, error: 'No autenticado' };
+      }
+
+      console.log(`🔄 Actualizando minuta ${minutaId}:`, updateData);
+
+      const { data, error } = await this.supabase
+        .from('minute_tasks')
+        .update({
+          ...updateData,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', minutaId)
+        .eq('user_id', this.currentUser.id)
+        .select('*');
+
+      if (error) {
+        console.error('❌ Error actualizando minuta:', error);
+        return { success: false, error };
+      }
+
+      console.log(`✅ Minuta actualizada completamente`);
+
+
+      return { success: true, data };
+
+    } catch (error) {
+      console.error('❌ Error inesperado actualizando minuta:', error);
+      return { success: false, error };
+    }
+  }
+
+  // Eliminar una minuta
+  async deleteMinuta(minutaId) {
+    try {
+      if (!this.currentUser) {
+        console.warn('⚠️ No se puede eliminar minuta: usuario no autenticado');
+        return { success: false, error: 'No autenticado' };
+      }
+
+      console.log(`🗑️ Eliminando minuta: ${minutaId}`);
+
+      const { error } = await this.supabase
+        .from('minute_tasks')
+        .delete()
+        .eq('id', minutaId)
+        .eq('user_id', this.currentUser.id);
+
+      if (error) {
+        console.error('❌ Error eliminando minuta:', error);
+        return { success: false, error };
+      }
+
+      console.log(`✅ Minuta eliminada`);
+      return { success: true };
+
+    } catch (error) {
+      console.error('❌ Error inesperado eliminando minuta:', error);
+      return { success: false, error };
+    }
+  }
+
+  // ========== AUDIT LOGS CON ESTRUCTURA CORRECTA ==========
+
+  // Guardar eventos de auditoría en una estructura que funcione
+  async saveAuditEvents(projectId, auditEvents) {
+    try {
+      if (!this.currentUser || !this.organizationId) {
+        console.warn('⚠️ No se pueden guardar eventos de auditoría: usuario no autenticado');
+        return { success: false, error: 'No autenticado' };
+      }
+
+      if (!auditEvents || auditEvents.length === 0) {
+        return { success: true, data: [] };
+      }
+
+      console.log(`📋 Guardando ${auditEvents.length} eventos de auditoría para proyecto: ${projectId}`);
+
+      // Preparar eventos para insertar con estructura simple
+      const eventsToInsert = auditEvents.map(event => ({
+        id: event.id || crypto.randomUUID(),
+        project_id: projectId,
+        organization_id: this.organizationId,
+        user_id: this.currentUser.id,
+        timestamp: event.timestamp || new Date().toISOString(),
+        event_category: event.category || 'general',
+        event_action: event.action || 'unknown',
+        event_description: event.description || '',
+        event_details: JSON.stringify(event.details || {}),
+        event_severity: event.severity || 'medium',
+        event_user: event.user || this.currentUser.email,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }));
+
+      // Usar UPSERT para evitar errores de clave duplicada
+      const { data, error } = await this.supabase
+        .from('project_audit_events')
+        .upsert(eventsToInsert, { onConflict: 'id' })
+        .select('*');
+
+      if (error) {
+        console.error('❌ Error guardando eventos de auditoría:', error);
+        return { success: false, error };
+      }
+
+      console.log(`✅ Eventos de auditoría guardados: ${data?.length || 0}`);
+      return { success: true, data };
+
+    } catch (error) {
+      console.error('❌ Error inesperado guardando eventos de auditoría:', error);
+      return { success: false, error };
+    }
+  }
+
+  // Cargar eventos de auditoría
+  async loadAuditEvents(projectId) {
+    try {
+      if (!this.currentUser) {
+        console.warn('⚠️ No se pueden cargar eventos de auditoría: usuario no autenticado');
+        return { success: false, error: 'No autenticado', events: [] };
+      }
+
+      console.log(`📋 Cargando eventos de auditoría para proyecto: ${projectId}`);
+
+      const { data, error } = await this.supabase
+        .from('project_audit_events')
+        .select('*')
+        .eq('project_id', projectId)
+        .eq('organization_id', this.organizationId)
+        .order('timestamp', { ascending: false });
+
+      if (error) {
+        console.error('❌ Error cargando eventos de auditoría:', error);
+        return { success: false, error, events: [] };
+      }
+
+      // Convertir de vuelta al formato esperado por useAuditLog
+      const events = (data || []).map(event => ({
+        id: event.id,
+        timestamp: event.timestamp,
+        projectId: event.project_id,
+        category: event.event_category,
+        action: event.event_action,
+        description: event.event_description,
+        details: JSON.parse(event.event_details || '{}'),
+        severity: event.event_severity,
+        user: event.event_user
+      }));
+
+      console.log(`✅ Eventos de auditoría cargados: ${events.length}`);
+      return { success: true, events };
+
+    } catch (error) {
+      console.error('❌ Error inesperado cargando eventos de auditoría:', error);
+      return { success: false, error, events: [] };
     }
   }
 

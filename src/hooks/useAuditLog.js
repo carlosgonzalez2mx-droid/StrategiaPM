@@ -13,21 +13,29 @@ const useAuditLog = (projectId, useSupabase = false) => {
       
       try {
         if (useSupabase) {
-          // Cargar desde Supabase
+          // Cargar desde Supabase usando los nuevos métodos
           const { default: supabaseService } = await import('../services/SupabaseService');
           if (supabaseService.isAuthenticated()) {
-            const savedData = await supabaseService.loadPortfolioData();
-            if (savedData && savedData.auditLogsByProject && savedData.auditLogsByProject[projectId]) {
-              setAuditLog(savedData.auditLogsByProject[projectId]);
-              console.log(`✅ Logs de auditoría cargados desde Supabase para proyecto ${projectId}: ${savedData.auditLogsByProject[projectId].length} eventos`);
+            const result = await supabaseService.loadAuditEvents(projectId);
+            if (result.success) {
+              setAuditLog(result.events);
+              console.log(`✅ Logs de auditoría cargados desde Supabase para proyecto ${projectId}: ${result.events.length} eventos`);
             } else {
-              setAuditLog([]);
+              // Fallback a localStorage si Supabase falla
+              const savedLog = localStorage.getItem(`audit-log-${projectId}`);
+              if (savedLog) {
+                setAuditLog(JSON.parse(savedLog));
+              } else {
+                setAuditLog([]);
+              }
             }
           } else {
             // Fallback a localStorage si no hay autenticación
             const savedLog = localStorage.getItem(`audit-log-${projectId}`);
             if (savedLog) {
               setAuditLog(JSON.parse(savedLog));
+            } else {
+              setAuditLog([]);
             }
           }
         } else {
@@ -35,6 +43,8 @@ const useAuditLog = (projectId, useSupabase = false) => {
           const savedLog = localStorage.getItem(`audit-log-${projectId}`);
           if (savedLog) {
             setAuditLog(JSON.parse(savedLog));
+          } else {
+            setAuditLog([]);
           }
         }
       } catch (error) {
@@ -56,34 +66,36 @@ const useAuditLog = (projectId, useSupabase = false) => {
   const saveAuditLog = useCallback(async (log) => {
     // Siempre guardar en localStorage como backup
     localStorage.setItem(`audit-log-${projectId}`, JSON.stringify(log));
-    
-    // Si está habilitado Supabase, también guardar ahí
-    if (useSupabase) {
-      try {
-        const { default: supabaseService } = await import('../services/SupabaseService');
-        if (supabaseService.isAuthenticated()) {
-          // Crear objeto de datos del portafolio con solo los logs de auditoría
-          const portfolioData = {
-            auditLogsByProject: {
-              [projectId]: log
-            }
-          };
-          
-          // Guardar en Supabase
-          await supabaseService.savePortfolioData(portfolioData);
-          console.log(`✅ Logs de auditoría guardados en Supabase para proyecto ${projectId}: ${log.length} eventos`);
+
+    // NOTA: La sincronización con Supabase se hace individualmente por evento
+    // No enviamos toda la lista para evitar duplicados
+    console.log(`📋 Logs de auditoría guardados en localStorage para proyecto ${projectId}: ${log.length} eventos`);
+  }, [projectId]);
+
+  // Guardar un evento individual en Supabase
+  const saveEventToSupabase = useCallback(async (event) => {
+    if (!useSupabase) return;
+
+    try {
+      const { default: supabaseService } = await import('../services/SupabaseService');
+      if (supabaseService.isAuthenticated()) {
+        // Guardar solo este evento específico
+        const result = await supabaseService.saveAuditEvents(projectId, [event]);
+        if (result.success) {
+          console.log(`✅ Evento de auditoría guardado en Supabase: ${event.action}`);
+        } else {
+          console.warn('⚠️ Error guardando evento en Supabase:', result.error);
         }
-      } catch (error) {
-        console.error('Error guardando logs de auditoría en Supabase:', error);
-        // No fallar si Supabase falla, localStorage ya está guardado
       }
+    } catch (error) {
+      console.error('Error guardando evento en Supabase:', error);
     }
   }, [projectId, useSupabase]);
 
   // Agregar evento de auditoría
   const addAuditEvent = useCallback(async (event) => {
     const newEvent = {
-      id: `audit-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: crypto.randomUUID(), // Generar UUID válido para Supabase
       timestamp: new Date().toISOString(),
       projectId,
       ...event
@@ -91,13 +103,16 @@ const useAuditLog = (projectId, useSupabase = false) => {
 
     setAuditLog(prevLog => {
       const updatedLog = [newEvent, ...prevLog];
-      // Guardar de forma asíncrona
+      // Guardar de forma asíncrona en localStorage
       saveAuditLog(updatedLog);
       return updatedLog;
     });
 
+    // Guardar este evento específico en Supabase
+    saveEventToSupabase(newEvent);
+
     return newEvent;
-  }, [projectId, saveAuditLog]);
+  }, [projectId, saveAuditLog, saveEventToSupabase]);
 
   // Registrar cambio de estado del proyecto
   const logProjectStatusChange = useCallback((previousStatus, newStatus, projectData) => {
@@ -244,6 +259,42 @@ const useAuditLog = (projectId, useSupabase = false) => {
     });
   }, [addAuditEvent]);
 
+  // Registrar creación de tarea de minuta
+  const logMinutaTaskCreated = useCallback((minutaTask, projectData) => {
+    addAuditEvent({
+      category: 'minutes',
+      action: 'minute-task-created',
+      description: `Tarea de minuta "${minutaTask.tarea}" creada`,
+      details: {
+        taskId: minutaTask.id,
+        tarea: minutaTask.tarea,
+        responsable: minutaTask.responsable,
+        fecha: minutaTask.fecha,
+        hitoId: minutaTask.hitoId,
+        estatus: minutaTask.estatus
+      },
+      severity: 'medium',
+      user: projectData.manager || 'Sistema'
+    });
+  }, [addAuditEvent]);
+
+  // Registrar actualización de tarea de minuta
+  const logMinutaTaskUpdated = useCallback((minutaTask, changes, projectData) => {
+    addAuditEvent({
+      category: 'minutes',
+      action: 'minute-task-updated',
+      description: `Tarea de minuta "${minutaTask.tarea}" actualizada`,
+      details: {
+        taskId: minutaTask.id,
+        tarea: minutaTask.tarea,
+        changes: changes,
+        newStatus: minutaTask.estatus
+      },
+      severity: 'medium',
+      user: projectData.manager || 'Sistema'
+    });
+  }, [addAuditEvent]);
+
   // Limpiar log de auditoría
   const clearAuditLog = useCallback(() => {
     setAuditLog([]);
@@ -280,6 +331,8 @@ const useAuditLog = (projectId, useSupabase = false) => {
     logRiskCreated,
     logFinancialEvent,
     logResourceAssignment,
+    logMinutaTaskCreated,
+    logMinutaTaskUpdated,
     clearAuditLog,
     exportAuditLog
   };
