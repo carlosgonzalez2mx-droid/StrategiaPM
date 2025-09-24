@@ -3074,36 +3074,6 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
     XLSX.writeFile(wb, `Cronograma-${projectData.projectName}-${new Date().toISOString().split('T')[0]}.xlsx`);
   }, [tasksWithCPM, projectData]);
 
-  // Guardar proyecto completo
-  const saveProject = useCallback(() => {
-    const projectDataToSave = {
-      version: '1.0',
-      timestamp: new Date().toISOString(),
-      projectInfo: {
-        name: projectData.projectName,
-        startDate: projectData.startDate,
-        endDate: projectData.endDate,
-        totalBudget: projectData.totalBudget
-      },
-      tasks: tasksWithCPM,
-      baseline: baselineTasks,
-      settings: {
-        viewMode,
-        ganttScale,
-        showCriticalPath,
-        showDependencies,
-        showBaseline
-      }
-    };
-
-    const blob = new Blob([JSON.stringify(projectDataToSave, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${projectData.projectName}-${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [tasksWithCPM, baselineTasks, projectData, viewMode, ganttScale, showCriticalPath, showDependencies, showBaseline]);
 
   // Cargar proyecto
   const loadProject = useCallback((e) => {
@@ -5917,10 +5887,6 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                     >
                       <span>🧹</span>
                       <span>Limpiar Dependencias Circulares</span>
-                    </button>
-                    <button onClick={saveProject} className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center space-x-2">
-                      <span>💾</span>
-                      <span>Guardar Proyecto</span>
                     </button>
                   </div>
                 </div>
