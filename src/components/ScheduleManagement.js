@@ -1553,11 +1553,47 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
   }, [projectData?.id, useSupabase]);
 
   // Scroll sincronizado
+  const headerRef = useRef(null);
+  const isScrolling = useRef(false);
+  
   const onLeftScroll = (e) => {
     if (rightRef.current) rightRef.current.scrollTop = e.currentTarget.scrollTop;
   };
+  
   const onRightScroll = (e) => {
     if (leftRef.current) leftRef.current.scrollTop = e.currentTarget.scrollTop;
+    
+    // Sincronizar scroll horizontal con los headers fijos
+    if (headerRef.current && !isScrolling.current) {
+      isScrolling.current = true;
+      console.log('🔄 SINCRONIZANDO HEADERS - scrollLeft:', e.currentTarget.scrollLeft);
+      console.log('📏 ANCHOS CONTENEDORES:', {
+        headerContainerWidth: headerRef.current.scrollWidth,
+        headerContainerClientWidth: headerRef.current.clientWidth,
+        rightContainerWidth: e.currentTarget.scrollWidth,
+        rightContainerClientWidth: e.currentTarget.clientWidth,
+        chartWidthPx: chartWidthPx
+      });
+      headerRef.current.scrollLeft = e.currentTarget.scrollLeft;
+      setTimeout(() => { isScrolling.current = false; }, 10);
+    }
+  };
+  
+  const onHeaderScroll = (e) => {
+    // Sincronizar scroll horizontal del contenido con los headers
+    if (rightRef.current && !isScrolling.current) {
+      isScrolling.current = true;
+      console.log('🔄 SINCRONIZANDO CONTENIDO - scrollLeft:', e.currentTarget.scrollLeft);
+      console.log('📏 ANCHOS CONTENEDORES (desde headers):', {
+        headerContainerWidth: e.currentTarget.scrollWidth,
+        headerContainerClientWidth: e.currentTarget.clientWidth,
+        rightContainerWidth: rightRef.current.scrollWidth,
+        rightContainerClientWidth: rightRef.current.clientWidth,
+        chartWidthPx: chartWidthPx
+      });
+      rightRef.current.scrollLeft = e.currentTarget.scrollLeft;
+      setTimeout(() => { isScrolling.current = false; }, 10);
+    }
   };
 
   // Actualizar tarea y sincronizar con Work Packages del EVM
@@ -3113,7 +3149,10 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
       end: toISO(result.end),
       totalTasks: tasks.length,
       firstTaskDate: tasks[0]?.startDate,
-      lastTaskDate: tasks[tasks.length - 1]?.endDate
+      lastTaskDate: tasks[tasks.length - 1]?.endDate,
+      allStartDates: tasks.map(t => t.startDate),
+      minStartDate: Math.min(...tasks.map(t => new Date(t.startDate).getTime())),
+      minStartDateISO: toISO(new Date(Math.min(...tasks.map(t => new Date(t.startDate).getTime()))))
     });
 
     return result;
@@ -4582,9 +4621,24 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
 
   // Función centralizada para obtener la fecha de referencia del timeline
   const getTimelineReferenceDate = useMemo(() => {
-    return includeWeekends ?
-      toISO(projectDates.start) :
-      findFirstWorkingDay(projectDates.start);
+    const originalStart = toISO(projectDates.start);
+    
+    // CORRECCIÓN: Usar siempre la fecha original del proyecto, sin aplicar findFirstWorkingDay
+    // Esto asegura que las barras del Gantt se alineen exactamente con las fechas de la tabla
+    const referenceDate = originalStart;
+    
+    // Debug para verificar el desplazamiento de fechas
+    console.log('🎯 TIMELINE REFERENCE DATE CALCULADO (CORREGIDO):', {
+      originalProjectStart: originalStart,
+      includeWeekends: includeWeekends,
+      referenceDate: referenceDate,
+      isShifted: originalStart !== referenceDate,
+      shiftDays: originalStart !== referenceDate ? 
+        Math.round((new Date(referenceDate) - new Date(originalStart)) / (1000 * 60 * 60 * 24)) : 0,
+      note: 'Usando fecha original sin aplicar findFirstWorkingDay para alineación perfecta con tabla'
+    });
+    
+    return referenceDate;
   }, [projectDates.start, includeWeekends]);
 
   // Línea "Hoy"
@@ -4613,30 +4667,58 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
     });
 
     return tasksWithCPM.map((task) => {
-      // NUEVO ALGORITMO: Contar índices de columnas en lugar de días
-      const leftDays = findColumnIndex(task.startDate, pStart, includeWeekends);
-      const durDays = findColumnIndex(task.endDate, task.startDate, includeWeekends) +
-                      (includeWeekends || isWorkingDay(new Date(task.endDate)) ? 1 : 0);
+      // CORRECCIÓN: Usar siempre las fechas originales de la tabla, NO las calculadas por CPM
+      // Las fechas que rigen son las de la vista tabla (startDate y endDate)
+      const tableStartDate = task.startDate; // Fecha original de la tabla
+      const tableEndDate = task.endDate;     // Fecha original de la tabla
+      
+      // CORRECCIÓN: Usar siempre días calendario para fechas de tareas, independientemente de includeWeekends
+      // Las fechas de las tareas en la tabla son días calendario, no días laborales
+      const leftDays = findColumnIndex(tableStartDate, pStart, true); // Siempre true para días calendario
+      const durDays = findColumnIndex(tableEndDate, tableStartDate, true) + 1; // +1 para incluir el día final
 
       // Debug temporal para verificar que el nuevo algoritmo funciona
-      if (task.name.includes('Aprobación')) {
-        console.log('🆕 NUEVO ALGORITMO EJECUTÁNDOSE:');
+      if (task.name.includes('Aprobación') || task.name.includes('Generación') || task.name.includes('Envío') || task.name.includes('Solución')) {
+        console.log('🆕 GANTT USANDO FECHAS DE TABLA (CORREGIDO):');
         console.log('   taskName:', task.name);
-        console.log('   taskStart:', task.startDate);
-        console.log('   taskEnd:', task.endDate);
-        console.log('   projectStart:', pStart);
-        console.log('   leftDays:', leftDays);
-        console.log('   durDays:', durDays);
-        console.log('   includeWeekends:', includeWeekends);
-        console.log('   pxPerDay:', pxPerDay);
-        console.log('   leftPx calculado:', leftDays * pxPerDay);
+        console.log('   📋 FECHAS DE TABLA (las que rigen):');
+        console.log('   - tableStartDate:', tableStartDate);
+        console.log('   - tableEndDate:', tableEndDate);
+        console.log('   🧮 FECHAS CALCULADAS POR CPM (solo informativas):');
+        console.log('   - earlyStart:', task.earlyStart);
+        console.log('   - earlyFinish:', task.earlyFinish);
+        console.log('   📊 CÁLCULOS GANTT (usando días calendario):');
+        console.log('   - projectStart:', pStart);
+        console.log('   - leftDays (días calendario):', leftDays);
+        console.log('   - durDays (días calendario):', durDays);
+        console.log('   - leftPx calculado:', leftDays * pxPerDay);
+        console.log('   - includeWeekends config:', includeWeekends, '(pero usando días calendario para fechas de tareas)');
+        
+        // Debug específico para la primera tarea
+        if (task.name.includes('Aprobación')) {
+          console.log('🔍 DEBUG ESPECÍFICO TAREA 1:');
+          console.log('   - Fecha inicio tabla:', tableStartDate);
+          console.log('   - Fecha referencia proyecto:', pStart);
+          console.log('   - Diferencia en días:', Math.round((new Date(tableStartDate) - new Date(pStart)) / (1000 * 60 * 60 * 24)));
+          console.log('   - leftDays calculado:', leftDays);
+          console.log('   - leftPx calculado:', leftDays * pxPerDay);
+          console.log('   - ¿Debería ser 0?', tableStartDate === pStart ? 'SÍ' : 'NO');
+        }
 
         // Debug para comparar con lo que muestra la tabla
-        const tableDisplayStart = new Date(task.startDate).toLocaleDateString('es-ES');
-        const tableDisplayEnd = new Date(task.endDate).toLocaleDateString('es-ES');
-        console.log('   📋 TABLA DEBERÍA MOSTRAR:');
+        const tableDisplayStart = new Date(tableStartDate).toLocaleDateString('es-ES');
+        const tableDisplayEnd = new Date(tableEndDate).toLocaleDateString('es-ES');
+        console.log('   📋 FORMATO TABLA:');
         console.log('   - Inicio formateado:', tableDisplayStart);
         console.log('   - Fin formateado:', tableDisplayEnd);
+        
+        // Debug para verificar si hay diferencia entre fechas de tabla y CPM
+        if (tableStartDate !== task.earlyStart || tableEndDate !== task.earlyFinish) {
+          console.log('   ⚠️ DIFERENCIA ENTRE TABLA Y CPM:');
+          console.log('   - Tabla inicio:', tableStartDate, 'vs CPM inicio:', task.earlyStart);
+          console.log('   - Tabla fin:', tableEndDate, 'vs CPM fin:', task.earlyFinish);
+          console.log('   ✅ GANTT USARÁ FECHAS DE TABLA (correcto)');
+        }
       }
 
 
@@ -4645,8 +4727,8 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         wbsCode: task.wbsCode,
         name: task.name,
         duration: task.duration,
-        startDate: task.startDate,
-        endDate: task.endDate,
+        startDate: tableStartDate,  // CORRECCIÓN: Usar fecha de tabla
+        endDate: tableEndDate,      // CORRECCIÓN: Usar fecha de tabla
         progress: task.progress,
         predecessors: [...(task.predecessors || [])],
         cost: task.cost,
@@ -4986,7 +5068,9 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
       projectDatesStart: toISO(projectDates.start),
       projectDatesEnd: toISO(projectDates.end),
       includeWeekends: includeWeekends,
-      startReference: toISO(startReference)
+      startReference: toISO(startReference),
+      pxPerDay: pxPerDay,
+      chartWidthPx: chartWidthPx
     });
 
     if (ganttScale === 'days') {
@@ -5029,6 +5113,15 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         cur.setMonth(cur.getMonth() + 1);
       }
     }
+    
+    // Debug: verificar cuántos headers se generaron
+    console.log('🏁 TIMELINE HEADERS GENERADOS:', {
+      totalHeaders: headers.length,
+      totalWidth: headers.reduce((sum, h) => sum + h.width, 0),
+      firstHeader: headers[0],
+      lastHeader: headers[headers.length - 1]
+    });
+    
     return headers;
   };
 
@@ -5100,7 +5193,12 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                 </div>
                 <div className="text-lg font-bold text-gray-800">
                   {tasksWithCPM.length > 0 
-                    ? new Date(Math.min(...tasksWithCPM.map(t => new Date(t.startDate)))).toLocaleDateString('es')
+                    ? (() => {
+                        // CORRECCIÓN: Usar fechas originales de la tabla, no las calculadas por CPM
+                        const originalStartDates = tasksWithCPM.map(t => new Date(t.startDate));
+                        const minStartDate = new Date(Math.min(...originalStartDates));
+                        return minStartDate.toLocaleDateString('es');
+                      })()
                     : projectData?.startDate ? new Date(projectData.startDate).toLocaleDateString('es') : 'N/A'
                   }
                 </div>
@@ -5114,13 +5212,13 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                 <div className="text-lg font-bold text-gray-800">
                   {(() => {
                     if (tasksWithCPM.length > 0) {
-                      // Usar fechas UTC para evitar problemas de zona horaria
-                      const endDates = tasksWithCPM.map(t => {
+                      // CORRECCIÓN: Usar fechas originales de la tabla, no las calculadas por CPM
+                      const originalEndDates = tasksWithCPM.map(t => {
                         const [year, month, day] = t.endDate.split('-');
                         return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
                       });
                       
-                      const maxEndDate = new Date(Math.max(...endDates));
+                      const maxEndDate = new Date(Math.max(...originalEndDates));
                       
                       // Formatear fecha de manera más precisa para evitar problemas de zona horaria
                       const year = maxEndDate.getFullYear();
@@ -5128,9 +5226,9 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                       const day = String(maxEndDate.getDate()).padStart(2, '0');
                       const formattedDate = `${day}/${month}/${year}`;
                       
-                      console.log('🔍 DEBUG - Fecha de fin del cronograma:', {
+                      console.log('🔍 DEBUG - Fecha de fin del cronograma (usando fechas de tabla):', {
                         totalTasks: tasksWithCPM.length,
-                        endDates: endDates.map(d => d.toISOString().split('T')[0]),
+                        originalEndDates: originalEndDates.map(d => d.toISOString().split('T')[0]),
                         maxEndDate: maxEndDate.toISOString().split('T')[0],
                         year, month, day,
                         formattedDate: formattedDate
@@ -5956,20 +6054,35 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                 </div>
 
                 {/* Panel derecho - Diagrama Gantt */}
-                <div 
-                  ref={rightRef}
-                  onScroll={onRightScroll}
-                  className="flex-1 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200 max-w-full"
-                  style={{ height: '600px', maxWidth: 'calc(100vw - 400px)' }}
-                >
-                  <div style={{ width: Math.max(chartWidthPx + 100, 800) }}>
-                    {/* Headers de timeline */}
-                    <div className="bg-gray-100 border-b p-2">
-                      <div className="flex">
+                <div className="flex-1 flex flex-col max-w-full" style={{ height: '600px', maxWidth: 'calc(100vw - 400px)' }}>
+                  {/* Headers de timeline - FIJOS (fuera del scroll) */}
+                  <div 
+                    className="bg-gray-100 border-b p-2 flex-shrink-0"
+                    style={{ 
+                      backgroundColor: '#f9fafb',
+                      borderBottom: '1px solid #e5e7eb'
+                    }}
+                  >
+                    <div 
+                      ref={headerRef}
+                      onScroll={onHeaderScroll}
+                      className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200"
+                      style={{ 
+                        width: '100%',
+                        maxWidth: '100%'
+                      }}
+                    >
+                      <div 
+                        className="flex"
+                        style={{ 
+                          width: Math.max(chartWidthPx + 100, 800),
+                          minWidth: Math.max(chartWidthPx + 100, 800)
+                        }}
+                      >
                         {generateTimelineHeaders().map((header, index) => (
                           <div
                             key={index}
-                            className="text-xs text-gray-600 text-center border-r border-gray-200"
+                            className="text-xs text-gray-600 text-center border-r border-gray-200 flex-shrink-0"
                             style={{ width: header.width, minWidth: header.width }}
                           >
                             <div className="font-medium">{header.label}</div>
@@ -5978,6 +6091,15 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                         ))}
                       </div>
                     </div>
+                  </div>
+                  
+                  {/* Contenido scrolleable del Gantt */}
+                  <div 
+                    ref={rightRef}
+                    onScroll={onRightScroll}
+                    className="flex-1 overflow-x-auto overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200"
+                  >
+                    <div style={{ width: Math.max(chartWidthPx + 100, 800) }}>
 
                     {/* Barras del Gantt */}
                     <div className="relative">
@@ -6001,7 +6123,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                           key={task.id}
                           className="absolute"
                           style={{
-                            left: task.leftPx + 320,
+                            left: task.leftPx, // CORRECCIÓN: Eliminar offset fijo de 320px
                             top: index * (ROW_H + 8) + PADDING_TOP + 5, // +8 por el mb-2 (0.5rem = 8px)
                             width: task.widthPx,
                             height: ROW_H - 10
@@ -6064,9 +6186,9 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                                 const predBar = generateGanttBars().find(t => t.id === predId);
                                 if (!predBar) return null;
                                 
-                                const startX = predBar.leftPx + predBar.widthPx + 320;
+                                const startX = predBar.leftPx + predBar.widthPx; // CORRECCIÓN: Eliminar offset fijo
                                 const startY = tasksWithCPM.findIndex(t => t.id === predId) * (ROW_H + 8) + PADDING_TOP + 5 + (ROW_H - 10) / 2;
-                                const endX = task.leftPx + 320;
+                                const endX = task.leftPx; // CORRECCIÓN: Eliminar offset fijo
                                 const endY = index * (ROW_H + 8) + PADDING_TOP + 5 + (ROW_H - 10) / 2;
                                 
                                 return (
@@ -6113,6 +6235,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                           )}
                         </div>
                       ))}
+                    </div>
                     </div>
                   </div>
                 </div>
