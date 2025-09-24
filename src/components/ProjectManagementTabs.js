@@ -9,6 +9,118 @@ import ChangeManagement from './ChangeManagement';
 import CashFlowProjection from './CashFlowProjection';
 import usePermissions from '../hooks/usePermissions';
 
+// Componente para manejar tareas huérfanas
+const OrphanedTasksManager = ({ orphanedTasks, availableMilestones, onReassign, updateMinutaTaskHito }) => {
+  const [reassigning, setReassigning] = useState({});
+  
+  const handleReassign = async (taskId, newHitoId) => {
+    if (!newHitoId) return;
+    
+    setReassigning(prev => ({ ...prev, [taskId]: true }));
+    
+    try {
+      const success = await updateMinutaTaskHito(taskId, newHitoId);
+      
+      if (success) {
+        // Notificar al componente padre
+        onReassign(taskId, newHitoId);
+        
+        // Mostrar confirmación
+        alert('✅ Tarea reasignada exitosamente');
+      } else {
+        alert('❌ Error al reasignar tarea');
+      }
+    } catch (error) {
+      console.error('Error en reasignación:', error);
+      alert('❌ Error al reasignar tarea');
+    } finally {
+      setReassigning(prev => ({ ...prev, [taskId]: false }));
+    }
+  };
+  
+  if (orphanedTasks.length === 0) return null;
+  
+  return (
+    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-yellow-800 font-semibold flex items-center">
+          <span className="mr-2">⚠️</span>
+          Tareas de Minuta sin Hito Asignado
+        </h3>
+        <span className="text-sm bg-yellow-200 text-yellow-800 px-2 py-1 rounded-full">
+          {orphanedTasks.length} tareas
+        </span>
+      </div>
+      
+      <p className="text-yellow-700 text-sm mb-3">
+        Estas tareas perdieron su hito asignado. Reasígnalas para mantener la organización.
+      </p>
+      
+      <div className="space-y-2">
+        {orphanedTasks.map(task => {
+          const daysUntilDeadline = Math.ceil((new Date(task.fecha) - new Date()) / (1000 * 60 * 60 * 24));
+          const urgencyColor = daysUntilDeadline <= 3 ? 'text-red-600 bg-red-100' : 
+                             daysUntilDeadline <= 7 ? 'text-orange-600 bg-orange-100' : 
+                             'text-yellow-600 bg-yellow-100';
+          
+          return (
+            <div key={task.id} className="bg-white p-3 rounded border border-yellow-200">
+              <div className="flex items-center space-x-3">
+                <div className="flex-1">
+                  <div className="flex items-center space-x-2 mb-1">
+                    <span className="text-sm font-medium text-gray-800">{task.tarea}</span>
+                    <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center">
+                      <span className="mr-1">📝</span>
+                      Minuta
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-4 text-xs text-gray-500">
+                    <span>👤 {task.responsable}</span>
+                    <span>📅 {new Date(task.fecha).toLocaleDateString('es-ES')}</span>
+                    <span className={`px-2 py-1 rounded-full text-xs ${
+                      task.estatus === 'Completado' ? 'bg-green-100 text-green-800' :
+                      task.estatus === 'En Proceso' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {task.estatus}
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${urgencyColor}`}>
+                    {daysUntilDeadline === 0 ? 'Hoy' : 
+                     daysUntilDeadline === 1 ? 'Mañana' : 
+                     `${daysUntilDeadline} días`}
+                  </span>
+                  
+                  <select 
+                    value={task.hitoId || ''} 
+                    onChange={(e) => handleReassign(task.id, e.target.value)}
+                    disabled={reassigning[task.id]}
+                    className="text-xs border border-gray-300 rounded px-2 py-1 min-w-[200px]"
+                  >
+                    <option value="">Seleccionar hito...</option>
+                    {availableMilestones.map(milestone => (
+                      <option key={milestone.id} value={milestone.id}>
+                        {milestone.name}
+                      </option>
+                    ))}
+                  </select>
+                  
+                  {reassigning[task.id] && (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-600"></div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 const ProjectManagementTabs = ({
   projects,
   currentProjectId,
@@ -326,6 +438,58 @@ const ProjectManagementTabs = ({
     });
     
     return Object.values(tasksByMilestone);
+  };
+
+  // Función para detectar tareas de minuta huérfanas
+  const getOrphanedMinutaTasks = (minutaTasks, allTasks) => {
+    if (!minutaTasks || !allTasks) return [];
+    
+    return minutaTasks.filter(minutaTask => {
+      // Buscar el hito al que está asignada la tarea
+      const milestone = allTasks.find(task => 
+        task.id === minutaTask.hitoId && task.isMilestone
+      );
+      
+      // Si no se encuentra el hito, la tarea está huérfana
+      return !milestone;
+    });
+  };
+
+  // Función para actualizar el hito de una tarea de minuta
+  const updateMinutaTaskHito = async (taskId, newHitoId) => {
+    try {
+      if (useSupabase) {
+        // Actualizar en Supabase
+        const { default: supabaseService } = await import('../services/SupabaseService');
+        const { success } = await supabaseService.updateMinutaTask(taskId, { hitoId: newHitoId });
+        if (!success) throw new Error('Error actualizando en Supabase');
+      } else {
+        // Actualizar en localStorage
+        const portfolioData = JSON.parse(localStorage.getItem('portfolioData') || '{}');
+        const projectMinutas = portfolioData.minutasByProject?.[currentProjectId] || [];
+        
+        const updatedMinutas = projectMinutas.map(task => 
+          task.id === taskId ? { ...task, hitoId: newHitoId } : task
+        );
+        
+        portfolioData.minutasByProject = {
+          ...portfolioData.minutasByProject,
+          [currentProjectId]: updatedMinutas
+        };
+        
+        localStorage.setItem('portfolioData', JSON.stringify(portfolioData));
+      }
+      
+      // Actualizar estado local
+      setMinutaTasks(prev => prev.map(task => 
+        task.id === taskId ? { ...task, hitoId: newHitoId } : task
+      ));
+      
+      return true;
+    } catch (error) {
+      console.error('Error actualizando tarea de minuta:', error);
+      return false;
+    }
   };
 
   // Función unificada para obtener todas las tareas próximas a vencer
@@ -922,13 +1086,38 @@ const ProjectManagementTabs = ({
                     <span className="text-sm text-gray-500 ml-2">(Cronograma + Minutas)</span>
                   </div>
                   <span className="text-sm bg-orange-100 text-orange-800 px-3 py-1 rounded-full">
-                    {getUnifiedTasksNearDeadline(projectTasks, minutaTasks).reduce((total, group) => total + group.tasks.length, 0)} tareas
+                    {(() => {
+                      const orphanedTasks = getOrphanedMinutaTasks(minutaTasks, projectTasks);
+                      const unifiedTasks = getUnifiedTasksNearDeadline(projectTasks, minutaTasks);
+                      const totalTasks = unifiedTasks.reduce((total, group) => total + group.tasks.length, 0) + orphanedTasks.length;
+                      return `${totalTasks} tareas`;
+                    })()}
                   </span>
                 </h2>
                 
-                {getUnifiedTasksNearDeadline(projectTasks, minutaTasks).length > 0 ? (
-                  <div className="space-y-6">
-                    {getUnifiedTasksNearDeadline(projectTasks, minutaTasks).map((group, groupIndex) => (
+                {(() => {
+                  const orphanedTasks = getOrphanedMinutaTasks(minutaTasks, projectTasks);
+                  const unifiedTasks = getUnifiedTasksNearDeadline(projectTasks, minutaTasks);
+                  
+                  return unifiedTasks.length > 0 || orphanedTasks.length > 0 ? (
+                    <div className="space-y-6">
+                      {/* Mostrar tareas huérfanas primero si las hay */}
+                      {orphanedTasks.length > 0 && (
+                        <OrphanedTasksManager 
+                          orphanedTasks={orphanedTasks}
+                          availableMilestones={projectTasks.filter(t => t.isMilestone)}
+                          onReassign={(taskId, newHitoId) => {
+                            // Actualizar estado local
+                            setMinutaTasks(prev => prev.map(task => 
+                              task.id === taskId ? { ...task, hitoId: newHitoId } : task
+                            ));
+                          }}
+                          updateMinutaTaskHito={updateMinutaTaskHito}
+                        />
+                      )}
+                      
+                      {/* Mostrar grupos normales */}
+                      {unifiedTasks.map((group, groupIndex) => (
                       <div key={group.milestone.id} className="bg-gradient-to-r from-orange-50 to-red-50 p-4 rounded-lg border border-orange-200">
                         <div className="flex items-center mb-3">
                           <div className="w-3 h-3 rounded-full bg-orange-500 mr-3"></div>
@@ -1001,14 +1190,15 @@ const ProjectManagementTabs = ({
                         </div>
                       </div>
                     ))}
-                  </div>
-                ) : (
-                  <div className="text-center text-gray-500 py-8">
-                    <span className="text-4xl mb-4 block">✅</span>
-                    <p>¡Excelente! No hay tareas próximas a vencer</p>
-                    <p className="text-sm mt-2">Todas las tareas del cronograma y minutas están al día o completadas</p>
-                  </div>
-                )}
+                    </div>
+                  ) : (
+                    <div className="text-center text-gray-500 py-8">
+                      <span className="text-4xl mb-4 block">✅</span>
+                      <p>¡Excelente! No hay tareas próximas a vencer</p>
+                      <p className="text-sm mt-2">Todas las tareas del cronograma y minutas están al día o completadas</p>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           )}
