@@ -4580,27 +4580,29 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
     }
   };
 
-  // Línea "Hoy"
-  const todayLeftPx = useMemo(() => {
-    // Usar exactamente el mismo punto de referencia que headers y barras
-    const pStartISO = includeWeekends ?
+  // Función centralizada para obtener la fecha de referencia del timeline
+  const getTimelineReferenceDate = useMemo(() => {
+    return includeWeekends ?
       toISO(projectDates.start) :
       findFirstWorkingDay(projectDates.start);
+  }, [projectDates.start, includeWeekends]);
+
+  // Línea "Hoy"
+  const todayLeftPx = useMemo(() => {
+    // Usar la función centralizada para obtener la fecha de referencia
     const todayISO = toISO(new Date());
     // Para la línea "HOY" usar la misma configuración que las barras
     // NUEVO ALGORITMO: Usar índice de columnas
-    const days = findColumnIndex(todayISO, pStartISO, includeWeekends);
+    const days = findColumnIndex(todayISO, getTimelineReferenceDate, includeWeekends);
     
     
     return Math.min(Math.max(0, days * pxPerDay), chartWidthPx);
-  }, [projectDates, pxPerDay, chartWidthPx, includeWeekends]);
+  }, [getTimelineReferenceDate, pxPerDay, chartWidthPx, includeWeekends]);
 
   // Barras Gantt
   const generateGanttBars = () => {
-    // Usar exactamente la misma fecha de referencia que generateTimelineHeaders
-    const pStart = includeWeekends ?
-      toISO(projectDates.start) :
-      findFirstWorkingDay(projectDates.start);
+    // Usar la función centralizada para obtener la fecha de referencia
+    const pStart = getTimelineReferenceDate;
 
     // Debug temporal para verificar la referencia de barras
     console.log('🎯 GANTT BARS REFERENCIA:', {
@@ -4971,10 +4973,8 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
   // Encabezados de timeline
   const generateTimelineHeaders = () => {
     const headers = [];
-    // Usar el mismo punto de referencia que las barras Gantt
-    const startReference = includeWeekends ?
-      toISO(projectDates.start) :
-      findFirstWorkingDay(projectDates.start);
+    // Usar la función centralizada para obtener la fecha de referencia
+    const startReference = getTimelineReferenceDate;
     const start = new Date(startReference);
     const end = new Date(toISO(projectDates.end));
 
