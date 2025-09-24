@@ -7,7 +7,8 @@ Sistema integral de gestión de proyectos desarrollado en React con integración
 ### 📊 Dashboard Ejecutivo
 - Resumen ejecutivo con métricas clave del proyecto
 - Indicadores de progreso y salud financiera
-- Alertas y notificaciones importantes
+- **Alertas unificadas de tareas por vencer** (cronograma + minutas)
+- **Detección automática de tareas huérfanas** con interfaz de reasignación
 - Visualización de tendencias y KPIs
 
 ### 🎯 Gestión de Proyectos
@@ -23,10 +24,12 @@ Sistema integral de gestión de proyectos desarrollado en React con integración
 - Categorización por severidad
 
 ### 📅 Cronograma y Tareas
-- Gestión de cronograma de proyecto
-- Creación y seguimiento de tareas
-- Hitos y dependencias
+- Gestión de cronograma de proyecto con vista Gantt mejorada
+- Creación y seguimiento de tareas con fechas precisas
+- Hitos y dependencias con cálculo automático de ruta crítica
 - **Minutas de reunión** con tareas asignadas y seguimiento
+- **Dashboard unificado** que combina tareas del cronograma y minutas
+- **Manejo inteligente de tareas huérfanas** cuando se modifican hitos
 
 ### 💰 Gestión Financiera
 - Control de presupuesto del proyecto
@@ -167,6 +170,38 @@ El sistema registra automáticamente:
 - Filtros avanzados por categoría, fecha y búsqueda
 - Reportes de cumplimiento regulatorio
 
+## 📅 Mejoras del Cronograma y Dashboard
+
+### Vista Gantt Mejorada
+- **Fechas precisas**: Las barras del Gantt se alinean exactamente con las fechas de la tabla
+- **Headers fijos**: Los encabezados de fechas permanecen visibles durante el scroll vertical
+- **Scroll sincronizado**: Navegación horizontal sincronizada entre headers y contenido
+- **Cálculo de ruta crítica**: Identificación automática de tareas críticas del proyecto
+
+### Dashboard Unificado de Tareas
+- **Vista consolidada**: Combina tareas del cronograma y minutas en una sola sección
+- **Badges diferenciadores**: 
+  - 📋 **Cronograma** (azul) para tareas del cronograma
+  - 📝 **Minuta** (verde) para tareas de minutas
+- **Agrupación por hitos**: Mantiene la organización por hitos del proyecto
+- **Filtrado inteligente**: Muestra solo tareas próximas a vencer (15 días)
+
+### Manejo de Tareas Huérfanas
+- **Detección automática**: Identifica tareas de minuta que perdieron su hito asignado
+- **Interfaz de reasignación**: Dropdown para seleccionar nuevo hito
+- **Persistencia robusta**: Actualiza tanto en Supabase como en localStorage
+- **Casos cubiertos**:
+  - Modificación de hitos existentes
+  - Carga de cronogramas diferentes
+  - Cambio de IDs de hitos
+  - Eliminación de hitos
+
+### Funcionalidades Técnicas
+- **Compatibilidad dual**: Funciona con Supabase y localStorage
+- **Estados de carga**: Indicadores visuales durante operaciones
+- **Manejo de errores**: Captura y maneja errores de actualización
+- **Feedback visual**: Confirmaciones y alertas de estado
+
 ## 🔧 Desarrollo
 
 ### Agregar Nuevos Eventos de Auditoría
@@ -212,6 +247,38 @@ La aplicación está configurada para desplegarse fácilmente en:
 - ✅ UI responsive y accesible
 - ✅ Filtros y búsqueda avanzada
 - ✅ Exportación de reportes
+- ✅ **Vista Gantt mejorada con fechas precisas**
+- ✅ **Dashboard unificado de tareas (cronograma + minutas)**
+- ✅ **Manejo inteligente de tareas huérfanas**
+- ✅ **Headers fijos y scroll sincronizado en Gantt**
+
+## 📝 Changelog
+
+### v2.2.0 (Enero 2025)
+#### 🎯 Mejoras del Cronograma
+- **Vista Gantt mejorada**: Fechas precisas alineadas con la tabla
+- **Headers fijos**: Encabezados de fechas permanecen visibles durante scroll
+- **Scroll sincronizado**: Navegación horizontal sincronizada
+- **Eliminación de botones redundantes**: Navegación, Guardar Proyecto, Corregir Hitos
+- **Deshabilitación de vista Red**: Diagrama de red deshabilitado
+
+#### 📊 Dashboard Unificado
+- **Vista consolidada**: Combina tareas del cronograma y minutas
+- **Badges diferenciadores**: 📋 Cronograma (azul) y 📝 Minuta (verde)
+- **Agrupación inteligente**: Mantiene organización por hitos
+- **Filtrado automático**: Solo tareas próximas a vencer (15 días)
+
+#### 🔧 Manejo de Tareas Huérfanas
+- **Detección automática**: Identifica tareas sin hito asignado
+- **Interfaz de reasignación**: Dropdown para seleccionar nuevo hito
+- **Persistencia robusta**: Compatible con Supabase y localStorage
+- **Casos edge cubiertos**: Modificación de hitos, cronogramas diferentes
+
+### v2.1.0 (Septiembre 2025)
+- Sistema de auditoría completo
+- Integración con Supabase
+- Persistencia de datos confiable
+- UI responsive y accesible
 
 ## 🤝 Contribución
 
@@ -227,6 +294,6 @@ Este proyecto es privado y propietario. Todos los derechos reservados.
 
 ---
 
-**Última actualización**: Septiembre 2025
-**Versión**: 2.1.0
+**Última actualización**: Enero 2025
+**Versión**: 2.2.0
 **Estado**: Producción
