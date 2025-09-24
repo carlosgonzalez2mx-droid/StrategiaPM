@@ -313,12 +313,10 @@ const calculateCPM = (tasks, includeWeekends = false) => {
       // Para hitos: fecha de fin = fecha de inicio (exactamente igual)
       if (task.isMilestone) {
         task.earlyFinish = task.earlyStart;  // MISMO día
-        task.startDate = task.earlyStart;
-        task.endDate = task.earlyStart;     // MISMO día
+        // NO sobrescribir startDate y endDate - mantener fechas originales de la tabla
       } else {
         task.earlyFinish = addDays(task.earlyStart, task.duration, includeWeekends);
-        task.startDate = task.earlyStart;
-        task.endDate = addDays(task.earlyStart, task.duration, includeWeekends);
+        // NO sobrescribir startDate y endDate - mantener fechas originales de la tabla
       }
 
       calculating.delete(taskId);
@@ -5501,9 +5499,9 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                         ) : (
                           <div
                             className="cursor-pointer hover:bg-gray-100 px-2 py-1 rounded min-h-[24px] flex items-center text-sm"
-                            onClick={() => startEditing(task.id, 'startDate', task.earlyStart || task.startDate)}
+                            onClick={() => startEditing(task.id, 'startDate', task.startDate)}
                           >
-                            {(task.earlyStart || task.startDate) ? (task.earlyStart || task.startDate).split('-').reverse().join('/') : ''}
+                            {task.startDate ? task.startDate.split('-').reverse().join('/') : ''}
                 </div>
                         )}
                       </td>
@@ -5513,8 +5511,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                         {task.isMilestone ? (
                           <div className="px-2 py-1 rounded bg-purple-100 text-purple-800 text-center font-medium text-sm">
                             {(() => {
-                              const startDate = task.earlyStart || task.startDate;
-                              const [year, month, day] = startDate.split('-');
+                              const [year, month, day] = task.startDate.split('-');
                               return new Date(year, month - 1, day).toLocaleDateString('es');
                             })()}
                     </div>
@@ -5531,11 +5528,11 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                         ) : (
                           <div
                             className="cursor-pointer hover:bg-gray-100 px-2 py-1 rounded min-h-[24px] flex items-center text-sm"
-                            onClick={() => startEditing(task.id, 'endDate', task.earlyFinish || task.endDate)}
+                            onClick={() => startEditing(task.id, 'endDate', task.endDate)}
                           >
                             {task.isMilestone 
-                              ? ((task.earlyStart || task.startDate) ? (task.earlyStart || task.startDate).split('-').reverse().join('/') : '')
-                              : ((task.earlyFinish || task.endDate) ? (task.earlyFinish || task.endDate).split('-').reverse().join('/') : '')
+                              ? (task.startDate ? task.startDate.split('-').reverse().join('/') : '')
+                              : (task.endDate ? task.endDate.split('-').reverse().join('/') : '')
                             }
                     </div>
                         )}
