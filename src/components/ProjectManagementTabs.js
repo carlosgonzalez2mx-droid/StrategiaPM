@@ -41,6 +41,10 @@ const ProjectManagementTabs = ({
   const [activeTab, setActiveTab] = useState('summary');
   const [scheduleData, setScheduleData] = useState(null); // Nuevo estado para datos del cronograma
   const [archivedProjects, setArchivedProjects] = useState([]); // Estado para proyectos archivados
+  
+  // Estado para las tareas de minuta del proyecto actual
+  const [minutaTasks, setMinutaTasks] = useState([]);
+  const [loadingMinutas, setLoadingMinutas] = useState(false);
 
   // Definir pestañas con permisos ANTES de los useEffect
   const allProjectTabs = [
@@ -88,6 +92,45 @@ const ProjectManagementTabs = ({
       }
     }
   }, [projectTabs, activeTab]);
+
+  // Cargar tareas de minuta del proyecto actual
+  useEffect(() => {
+    const loadMinutas = async () => {
+      if (!currentProjectId) return;
+
+      setLoadingMinutas(true);
+      try {
+        if (useSupabase) {
+          // Cargar desde Supabase si está habilitado
+          console.log('🔍 DEBUG: Cargando minutas para proyecto:', currentProjectId);
+          // Importar el servicio de Supabase dinámicamente
+          const { default: supabaseService } = await import('../services/SupabaseService');
+          const { success, minutas } = await supabaseService.loadMinutasByProject(currentProjectId);
+          if (success) {
+            console.log(`🔍 DEBUG: Minutas recibidas de Supabase:`, minutas);
+            setMinutaTasks(minutas);
+            console.log(`✅ Minutas cargadas desde Supabase: ${minutas.length}`);
+          } else {
+            console.warn('⚠️ Error cargando minutas desde Supabase');
+            setMinutaTasks([]);
+          }
+        } else {
+          // Cargar desde portfolioData si está en modo local
+          const portfolioData = JSON.parse(localStorage.getItem('portfolioData') || '{}');
+          const minutasFromStorage = portfolioData.minutasByProject?.[currentProjectId] || [];
+          setMinutaTasks(minutasFromStorage);
+          console.log(`✅ Minutas cargadas desde localStorage: ${minutasFromStorage.length}`);
+        }
+      } catch (error) {
+        console.error('❌ Error cargando minutas:', error);
+        setMinutaTasks([]);
+      } finally {
+        setLoadingMinutas(false);
+      }
+    };
+
+    loadMinutas();
+  }, [currentProjectId, useSupabase]);
 
   // Función para calcular el progreso de tareas entre hitos
   const calculateMilestoneProgress = (milestone, allTasks) => {
@@ -163,7 +206,7 @@ const ProjectManagementTabs = ({
     return averageProgress;
   };
 
-  // Función para obtener tareas próximas a vencer (menos de 15 días)
+  // Función para obtener tareas próximas a vencer (menos de 15 días) - SOLO CRONOGRAMA
   const getTasksNearDeadline = (allTasks) => {
     if (!allTasks) return [];
     
@@ -233,6 +276,96 @@ const ProjectManagementTabs = ({
     });
     
     return Object.values(tasksByMilestone);
+  };
+
+  // Función para obtener tareas de minuta próximas a vencer
+  const getMinutaTasksNearDeadline = (allTasks, minutaTasks) => {
+    if (!minutaTasks || minutaTasks.length === 0) return [];
+    
+    const today = new Date();
+    const fifteenDaysFromNow = new Date();
+    fifteenDaysFromNow.setDate(today.getDate() + 15);
+    
+    // Filtrar tareas de minuta que vencen en menos de 15 días y no están completadas
+    const minutaTasksNearDeadline = minutaTasks.filter(minutaTask => {
+      if (minutaTask.estatus === 'Completado') return false; // Excluir tareas completadas
+      
+      const endDate = new Date(minutaTask.fecha);
+      return endDate >= today && endDate <= fifteenDaysFromNow;
+    });
+    
+    // Agrupar tareas por hito
+    const tasksByMilestone = {};
+    
+    minutaTasksNearDeadline.forEach(minutaTask => {
+      // Encontrar el hito al que pertenece esta tarea de minuta
+      const milestone = allTasks.find(task => task.id === minutaTask.hitoId && task.isMilestone);
+      
+      if (milestone) {
+        if (!tasksByMilestone[milestone.id]) {
+          tasksByMilestone[milestone.id] = {
+            milestone: milestone,
+            tasks: []
+          };
+        }
+        
+        // Convertir tarea de minuta al formato esperado
+        const convertedTask = {
+          id: minutaTask.id,
+          name: minutaTask.tarea,
+          endDate: minutaTask.fecha,
+          progress: minutaTask.estatus === 'Completado' ? 100 : 
+                   minutaTask.estatus === 'En Proceso' ? 50 : 0,
+          responsable: minutaTask.responsable,
+          estatus: minutaTask.estatus,
+          source: 'minuta' // Identificador de origen
+        };
+        
+        tasksByMilestone[milestone.id].tasks.push(convertedTask);
+      }
+    });
+    
+    return Object.values(tasksByMilestone);
+  };
+
+  // Función unificada para obtener todas las tareas próximas a vencer
+  const getUnifiedTasksNearDeadline = (allTasks, minutaTasks) => {
+    const cronogramaTasks = getTasksNearDeadline(allTasks);
+    const minutaTasksNearDeadline = getMinutaTasksNearDeadline(allTasks, minutaTasks);
+    
+    // Agregar identificador de origen a las tareas del cronograma
+    const cronogramaWithSource = cronogramaTasks.map(group => ({
+      ...group,
+      source: 'cronograma',
+      tasks: group.tasks.map(task => ({ ...task, source: 'cronograma' }))
+    }));
+    
+    const minutaWithSource = minutaTasksNearDeadline.map(group => ({
+      ...group,
+      source: 'minuta',
+      tasks: group.tasks.map(task => ({ ...task, source: 'minuta' }))
+    }));
+    
+    // Combinar y agrupar por hito
+    const combinedGroups = [...cronogramaWithSource, ...minutaWithSource];
+    
+    // Agrupar por hito (combinar grupos del mismo hito)
+    const unifiedGroups = {};
+    
+    combinedGroups.forEach(group => {
+      const milestoneId = group.milestone.id;
+      
+      if (!unifiedGroups[milestoneId]) {
+        unifiedGroups[milestoneId] = {
+          milestone: group.milestone,
+          tasks: []
+        };
+      }
+      
+      unifiedGroups[milestoneId].tasks.push(...group.tasks);
+    });
+    
+    return Object.values(unifiedGroups);
   };
 
   // Obtener proyecto actual
@@ -786,15 +919,16 @@ const ProjectManagementTabs = ({
                   <div className="flex items-center">
                     <span className="text-3xl mr-3">⚠️</span>
                     Alerta Tareas por Vencer
+                    <span className="text-sm text-gray-500 ml-2">(Cronograma + Minutas)</span>
                   </div>
                   <span className="text-sm bg-orange-100 text-orange-800 px-3 py-1 rounded-full">
-                    {getTasksNearDeadline(projectTasks).reduce((total, group) => total + group.tasks.length, 0)} tareas
+                    {getUnifiedTasksNearDeadline(projectTasks, minutaTasks).reduce((total, group) => total + group.tasks.length, 0)} tareas
                   </span>
                 </h2>
                 
-                {getTasksNearDeadline(projectTasks).length > 0 ? (
+                {getUnifiedTasksNearDeadline(projectTasks, minutaTasks).length > 0 ? (
                   <div className="space-y-6">
-                    {getTasksNearDeadline(projectTasks).map((group, groupIndex) => (
+                    {getUnifiedTasksNearDeadline(projectTasks, minutaTasks).map((group, groupIndex) => (
                       <div key={group.milestone.id} className="bg-gradient-to-r from-orange-50 to-red-50 p-4 rounded-lg border border-orange-200">
                         <div className="flex items-center mb-3">
                           <div className="w-3 h-3 rounded-full bg-orange-500 mr-3"></div>
@@ -817,11 +951,34 @@ const ProjectManagementTabs = ({
                               <div key={task.id} className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
                                 <div className="flex items-center justify-between">
                                   <div className="flex-1">
-                                    <h4 className="font-medium text-gray-800">{task.name}</h4>
+                                    <div className="flex items-center space-x-2 mb-1">
+                                      <h4 className="font-medium text-gray-800">{task.name}</h4>
+                                      {/* Badge diferenciador de origen */}
+                                      {task.source === 'cronograma' ? (
+                                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full flex items-center">
+                                          <span className="mr-1">📋</span>
+                                          Cronograma
+                                        </span>
+                                      ) : (
+                                        <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center">
+                                          <span className="mr-1">📝</span>
+                                          Minuta
+                                        </span>
+                                      )}
+                                    </div>
                                     <div className="flex items-center space-x-4 mt-1 text-sm text-gray-600">
                                       <span>📅 {new Date(task.endDate).toLocaleDateString('es-ES')}</span>
-                                      <span>👤 {task.assignedTo || 'Sin asignar'}</span>
+                                      <span>👤 {task.assignedTo || task.responsable || 'Sin asignar'}</span>
                                       <span>📊 {task.progress || 0}% completado</span>
+                                      {task.estatus && (
+                                        <span className={`px-2 py-1 rounded-full text-xs ${
+                                          task.estatus === 'Completado' ? 'bg-green-100 text-green-800' :
+                                          task.estatus === 'En Proceso' ? 'bg-yellow-100 text-yellow-800' :
+                                          'bg-gray-100 text-gray-800'
+                                        }`}>
+                                          {task.estatus}
+                                        </span>
+                                      )}
                                     </div>
                                   </div>
                                   <div className="flex items-center space-x-2">
@@ -849,7 +1006,7 @@ const ProjectManagementTabs = ({
                   <div className="text-center text-gray-500 py-8">
                     <span className="text-4xl mb-4 block">✅</span>
                     <p>¡Excelente! No hay tareas próximas a vencer</p>
-                    <p className="text-sm mt-2">Todas las tareas están al día o completadas</p>
+                    <p className="text-sm mt-2">Todas las tareas del cronograma y minutas están al día o completadas</p>
                   </div>
                 )}
               </div>
