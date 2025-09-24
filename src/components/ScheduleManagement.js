@@ -3097,26 +3097,27 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
     reader.readAsText(file);
   }, []);
 
-  // Fechas del proyecto
+  // Fechas del proyecto - USAR FECHAS ORIGINALES DE LA TABLA
   const projectDates = useMemo(() => {
-    if (tasksWithCPM.length === 0) return { start: new Date(), end: new Date() };
-    const dates = tasksWithCPM.flatMap((t) => [new Date(t.startDate), new Date(t.endDate)]);
+    if (tasks.length === 0) return { start: new Date(), end: new Date() };
+    // USAR tasks (fechas originales) en lugar de tasksWithCPM (fechas procesadas por CPM)
+    const dates = tasks.flatMap((t) => [new Date(t.startDate), new Date(t.endDate)]);
     const result = {
       start: new Date(Math.min(...dates.map((d) => d.getTime()))),
       end: new Date(Math.max(...dates.map((d) => d.getTime()))),
     };
 
     // Debug temporal para verificar el rango del proyecto
-    console.log('📅 PROJECT DATES CALCULADO:', {
+    console.log('📅 PROJECT DATES CALCULADO (FECHAS ORIGINALES):', {
       start: toISO(result.start),
       end: toISO(result.end),
-      totalTasks: tasksWithCPM.length,
-      firstTaskDate: tasksWithCPM[0]?.startDate,
-      lastTaskDate: tasksWithCPM[tasksWithCPM.length - 1]?.endDate
+      totalTasks: tasks.length,
+      firstTaskDate: tasks[0]?.startDate,
+      lastTaskDate: tasks[tasks.length - 1]?.endDate
     });
 
     return result;
-  }, [tasksWithCPM]);
+  }, [tasks]); // Cambiar dependencia de tasksWithCPM a tasks
 
   const totalDays = useMemo(() => {
     const pStart = toISO(projectDates.start);
