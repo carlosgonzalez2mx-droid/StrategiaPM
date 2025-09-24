@@ -902,6 +902,22 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
     useSupabase
   );
 
+  // Estados del diagrama de red (preservados para evitar errores)
+  const [networkLayout, setNetworkLayout] = useState('hierarchical');
+  const [networkOrientation, setNetworkOrientation] = useState('TB');
+  const [showNetworkDependencies, setShowNetworkDependencies] = useState(false);
+  const [showNetworkCriticalPath, setShowNetworkCriticalPath] = useState(true);
+  const [showOnlyCriticalPath, setShowOnlyCriticalPath] = useState(false);
+  const [showSimplifiedView, setShowSimplifiedView] = useState(false);
+  const [autoFitNetwork, setAutoFitNetwork] = useState(true);
+  
+  // Funciones de zoom y pan para el diagrama de red
+  const [networkZoom, setNetworkZoom] = useState(1);
+  const [networkPan, setNetworkPan] = useState({ x: 0, y: 0 });
+  
+  // Funciones de arrastrar y soltar para nodos
+  const [draggedNode, setDraggedNode] = useState(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   
   // Estados para arrastrar el diagrama (pan)
   const [isPanning, setIsPanning] = useState(false);
