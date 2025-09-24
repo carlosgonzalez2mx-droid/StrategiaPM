@@ -5908,43 +5908,6 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                     </button>
                   </div>
                   
-                  {/* Controles de navegación horizontal */}
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm text-gray-600">Navegación:</span>
-                    <button 
-                      onClick={() => {
-                        if (rightRef.current) {
-                          rightRef.current.scrollBy({ left: -200, behavior: 'smooth' });
-                        }
-                      }}
-                      className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                      title="Scroll izquierda"
-                    >
-                      ←
-                    </button>
-                    <button 
-                      onClick={() => {
-                        if (rightRef.current) {
-                          rightRef.current.scrollBy({ left: 200, behavior: 'smooth' });
-                        }
-                      }}
-                      className="px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                      title="Scroll derecha"
-                    >
-                      →
-                    </button>
-                    <button 
-                      onClick={() => {
-                        if (rightRef.current) {
-                          rightRef.current.scrollTo({ left: 0, behavior: 'smooth' });
-                        }
-                      }}
-                      className="px-3 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
-                      title="Ir al inicio"
-                    >
-                      🏠
-                    </button>
-                  </div>
                   
                   <div className="flex space-x-2">
                     <button 
