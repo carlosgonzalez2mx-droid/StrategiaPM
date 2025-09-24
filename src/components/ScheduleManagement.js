@@ -3758,56 +3758,6 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
     }
   };
 
-  // Función para corregir hitos existentes con fechas incorrectas
-  const fixExistingMilestones = () => {
-    console.log('🔧 EJECUTANDO CORRECCIÓN MANUAL DE HITOS');
-    console.log('🔧 TAREAS ACTUALES:', tasks.length);
-    
-    // Primero identificar hitos con fechas incorrectas
-    const milestonesWithWrongDates = tasks.filter(task => 
-      task.isMilestone && task.startDate !== task.endDate
-    );
-    
-    console.log('🔧 HITOS CON FECHAS INCORRECTAS ENCONTRADOS:', milestonesWithWrongDates.length);
-    milestonesWithWrongDates.forEach(task => {
-      console.log('🔧 HITO PROBLEMÁTICO:', {
-        taskId: task.id,
-        taskName: task.name,
-        startDate: task.startDate,
-        endDate: task.endDate,
-        isMilestone: task.isMilestone
-      });
-    });
-    
-    setTasks(prev => {
-      console.log('🔧 INICIANDO CORRECCIÓN EN setTasks');
-      const correctedTasks = prev.map(task => {
-        if (!task.isMilestone) return task;
-        
-        // Verificar si la fecha de fin es diferente a la de inicio
-        if (task.startDate !== task.endDate) {
-          console.log('🔧 CORRIGIENDO HITO:', {
-            taskId: task.id,
-            taskName: task.name,
-            startDateOriginal: task.startDate,
-            endDateOriginal: task.endDate,
-            endDateCorregida: task.startDate
-          });
-          
-          return {
-            ...task,
-            endDate: task.startDate, // Corregir: fin = inicio
-            updatedAt: new Date().toISOString()
-          };
-        }
-        
-        return task;
-      });
-      
-      console.log('🔧 CORRECCIÓN COMPLETADA - TAREAS CORREGIDAS:', correctedTasks.length);
-      return correctedTasks;
-    });
-  };
 
   // Funciones para el manejo de minutas
   const handleOpenMinutaModal = () => {
@@ -5137,17 +5087,6 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                   <span>Comprimir</span>
                 </button>
                 
-                <button
-                  onClick={() => {
-                    console.log('🔧 BOTÓN CORREGIR HITOS PRESIONADO');
-                    fixExistingMilestones();
-                  }}
-                  className="bg-purple-500 text-white px-4 py-2 rounded-xl hover:bg-purple-600 flex items-center space-x-2 transition-all duration-300 text-sm shadow-sm"
-                  title="Corregir fechas de hitos existentes"
-                >
-                  <span>🔧</span>
-                  <span>Corregir Hitos</span>
-                </button>
 
                 </div>
                 </div>
