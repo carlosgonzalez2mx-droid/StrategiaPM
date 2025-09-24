@@ -4602,6 +4602,14 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
       toISO(projectDates.start) :
       findFirstWorkingDay(projectDates.start);
 
+    // Debug temporal para verificar la referencia de barras
+    console.log('🎯 GANTT BARS REFERENCIA:', {
+      pStart: pStart,
+      projectDatesStart: toISO(projectDates.start),
+      includeWeekends: includeWeekends,
+      pxPerDay: pxPerDay
+    });
+
     return tasksWithCPM.map((task) => {
       // NUEVO ALGORITMO: Contar índices de columnas en lugar de días
       const leftDays = findColumnIndex(task.startDate, pStart, includeWeekends);
@@ -4974,7 +4982,11 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
     console.log('🏁 TIMELINE HEADERS RANGO:', {
       startDate: toISO(start),
       endDate: toISO(end),
-      ganttScale: ganttScale
+      ganttScale: ganttScale,
+      projectDatesStart: toISO(projectDates.start),
+      projectDatesEnd: toISO(projectDates.end),
+      includeWeekends: includeWeekends,
+      startReference: toISO(startReference)
     });
 
     if (ganttScale === 'days') {
