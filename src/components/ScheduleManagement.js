@@ -902,22 +902,6 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
     useSupabase
   );
 
-  // Estados del diagrama de red
-  const [networkLayout, setNetworkLayout] = useState('hierarchical');
-  const [networkOrientation, setNetworkOrientation] = useState('TB');
-  const [showNetworkDependencies, setShowNetworkDependencies] = useState(false);
-  const [showNetworkCriticalPath, setShowNetworkCriticalPath] = useState(true);
-  const [showOnlyCriticalPath, setShowOnlyCriticalPath] = useState(false);
-  const [showSimplifiedView, setShowSimplifiedView] = useState(false);
-  const [autoFitNetwork, setAutoFitNetwork] = useState(true);
-  
-  // Funciones de zoom y pan para el diagrama de red
-  const [networkZoom, setNetworkZoom] = useState(1);
-  const [networkPan, setNetworkPan] = useState({ x: 0, y: 0 });
-  
-  // Funciones de arrastrar y soltar para nodos
-  const [draggedNode, setDraggedNode] = useState(null);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   
   // Estados para arrastrar el diagrama (pan)
   const [isPanning, setIsPanning] = useState(false);
@@ -1303,17 +1287,6 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
   //   if (fresh && fresh !== selectedTask) setSelectedTask(fresh);
   // }, [tasksWithCPM, selectedTask]);
 
-  // Recalcular layout del diagrama de red cuando cambien las opciones
-  useEffect(() => {
-    if (viewMode === 'network' && networkSvgRef.current) {
-      // Forzar re-render del diagrama
-      const svg = networkSvgRef.current;
-      svg.style.display = 'none';
-      setTimeout(() => {
-        svg.style.display = 'block';
-      }, 10);
-    }
-  }, [networkLayout, networkOrientation, viewMode]);
 
   // Generar nodos del diagrama de red
   const generateNetworkNodes = useMemo(() => {
@@ -5218,17 +5191,6 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                     <span>Tabla</span>
               </button>
               
-              <button
-                    onClick={() => setViewMode('network')}
-                    className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-300 flex items-center space-x-2 ${
-                      viewMode === 'network'
-                        ? 'bg-indigo-600 text-white shadow-md hover:shadow-lg'
-                        : 'bg-white text-gray-600 hover:bg-indigo-50 hover:text-indigo-700 border border-gray-300 hover:border-indigo-300'
-                    }`}
-                  >
-                    <span>🔗</span>
-                    <span>Red</span>
-              </button>
 
               <button
                     onClick={() => setViewMode('minutas')}
@@ -6112,8 +6074,8 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
           </div>
         )}
 
-        {/* Vista de Red */}
-        {viewMode === 'network' && (
+        {/* Vista de Red - DESHABILITADA */}
+        {false && viewMode === 'network' && (
           <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
             <h2 className="text-2xl font-bold mb-4">Diagrama de Red</h2>
             
