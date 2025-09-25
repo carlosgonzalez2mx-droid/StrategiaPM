@@ -244,78 +244,23 @@ const ProjectManagementTabs = ({
     loadMinutas();
   }, [currentProjectId, useSupabase]);
 
-  // Función para calcular el progreso de tareas entre hitos
+  // Función para calcular el progreso de hitos
   const calculateMilestoneProgress = (milestone, allTasks) => {
     if (!milestone || !allTasks) return 0;
     
-    // Obtener todos los hitos ordenados por fecha de inicio
-    const milestones = allTasks
-      .filter(task => task.isMilestone)
-      .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+    // CORRECCIÓN: Un hito debe mostrar su propio progreso, no el de las tareas relacionadas
+    // El progreso del hito viene directamente del campo 'progress' de la tarea hito
+    const milestoneProgress = milestone.progress || 0;
     
-    // Encontrar el índice del hito actual
-    const currentMilestoneIndex = milestones.findIndex(m => m.id === milestone.id);
-    if (currentMilestoneIndex === -1) return 0;
-    
-    // Determinar el rango de tareas para este hito
-    let startDate, endDate;
-    
-    if (currentMilestoneIndex === 0) {
-      // Primer hito: desde el inicio del proyecto hasta este hito
-      // Usar la fecha de inicio de la primera tarea como referencia
-      const firstTask = allTasks
-        .filter(task => !task.isMilestone)
-        .sort((a, b) => new Date(a.startDate) - new Date(b.startDate))[0];
-      
-      startDate = firstTask ? new Date(firstTask.startDate) : new Date(milestone.startDate);
-      endDate = new Date(milestone.endDate);
-    } else {
-      // Hitos intermedios: desde el hito anterior hasta este hito
-      const previousMilestone = milestones[currentMilestoneIndex - 1];
-      startDate = new Date(previousMilestone.endDate);
-      endDate = new Date(milestone.endDate);
-    }
-    
-    // Filtrar tareas que están en el rango de este hito (excluyendo hitos)
-    const tasksInRange = allTasks.filter(task => {
-      if (task.isMilestone) return false; // Excluir hitos
-      
-      const taskStartDate = new Date(task.startDate);
-      const taskEndDate = new Date(task.endDate);
-      
-      // La tarea está en el rango si:
-      // - Su fecha de inicio está entre startDate y endDate, O
-      // - Su fecha de fin está entre startDate y endDate, O
-      // - Envuelve completamente el rango
-      return (taskStartDate >= startDate && taskStartDate <= endDate) ||
-             (taskEndDate >= startDate && taskEndDate <= endDate) ||
-             (taskStartDate <= startDate && taskEndDate >= endDate);
-    });
-    
-    // Calcular progreso promedio de las tareas en el rango
-    if (tasksInRange.length === 0) return 0;
-    
-    const totalProgress = tasksInRange.reduce((sum, task) => sum + (task.progress || 0), 0);
-    const averageProgress = Math.round(totalProgress / tasksInRange.length);
-    
-    console.log('🎯 CÁLCULO PROGRESO HITO:', {
+    console.log('🎯 CÁLCULO PROGRESO HITO CORREGIDO:', {
       milestoneName: milestone.name,
       milestoneId: milestone.id,
-      currentMilestoneIndex,
-      startDate: startDate.toISOString().split('T')[0],
-      endDate: endDate.toISOString().split('T')[0],
-      tasksInRange: tasksInRange.length,
-      totalProgress,
-      averageProgress,
-      tasksDetails: tasksInRange.map(t => ({ 
-        name: t.name, 
-        progress: t.progress, 
-        startDate: t.startDate, 
-        endDate: t.endDate 
-      }))
+      milestoneProgress: milestoneProgress,
+      milestoneStatus: milestone.status,
+      milestoneProgressField: milestone.progress
     });
     
-    return averageProgress;
+    return milestoneProgress;
   };
 
   // Función para obtener tareas próximas a vencer (menos de 15 días) - SOLO CRONOGRAMA
