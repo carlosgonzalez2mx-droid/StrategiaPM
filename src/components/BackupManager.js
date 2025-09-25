@@ -9,14 +9,7 @@ const BackupManager = ({ projects, workPackagesByProject, risksByProject, tasksB
     loadBackups();
   }, []);
 
-  // Crear backup automático cada 30 minutos
-  useEffect(() => {
-    const interval = setInterval(() => {
-      createAutomaticBackup();
-    }, 30 * 60 * 1000); // 30 minutos
-
-    return () => clearInterval(interval);
-  }, [projects, workPackagesByProject, risksByProject, tasksByProject]);
+  // ELIMINADO: Backup automático - ahora solo se usan backups manuales y auto-save
 
   const loadBackups = () => {
     const savedBackups = localStorage.getItem('mi-dashboard-backups');

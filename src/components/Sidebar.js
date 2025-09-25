@@ -1,6 +1,5 @@
 import React from 'react';
 import supabaseService from '../services/SupabaseService';
-import AutoBackupIndicator from './AutoBackupIndicator';
 import usePermissions from '../hooks/usePermissions';
 
 const Sidebar = ({ 
@@ -435,10 +434,6 @@ const Sidebar = ({
                   </div>
                 )}
 
-                {/* Indicador de backup automático */}
-                <div className="mt-2 pt-2 border-t border-gray-100">
-                  <AutoBackupIndicator className="justify-center" />
-                </div>
               </div>
             ) : (
               /* Botones colapsados */
