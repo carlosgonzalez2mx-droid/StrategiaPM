@@ -990,11 +990,23 @@ class SupabaseService {
             console.error(`🚨 Total duplicados: ${duplicateIds.length} de ${tasksToUpsert.length} tareas`);
           }
           
-          // UPSERT SEGURO: Actualizar o insertar tareas sin eliminar existentes
-          console.log(`📝 Actualizando/insertando ${tasksToUpsert.length} tareas para proyecto ${projectId}...`);
+          // REEMPLAZO COMPLETO: Eliminar tareas existentes y insertar nuevas
+          console.log(`🗑️ Eliminando tareas existentes del proyecto ${projectId}...`);
+          const { error: deleteError } = await this.supabase
+            .from('tasks')
+            .delete()
+            .eq('project_id', projectId)
+            .eq('owner_id', this.currentUser.id);
+
+          if (deleteError) {
+            console.error(`❌ Error eliminando tareas existentes para proyecto ${projectId}:`, deleteError);
+            throw deleteError;
+          }
+
+          console.log(`📝 Insertando ${tasksToUpsert.length} tareas nuevas para proyecto ${projectId}...`);
           const { error: tasksError } = await this.supabase
             .from('tasks')
-            .upsert(tasksToUpsert, { onConflict: 'id' });
+            .insert(tasksToUpsert);
 
           if (tasksError) {
             console.error(`❌ Error guardando tareas para proyecto ${projectId}:`, tasksError);
@@ -1005,7 +1017,7 @@ class SupabaseService {
               hint: tasksError.hint
             });
           } else {
-            console.log(`✅ Tareas guardadas para proyecto ${projectId}: ${tasksToUpsert.length} (originales: ${tasks.length})`);
+            console.log(`✅ TAREAS REEMPLAZADAS COMPLETAMENTE para proyecto ${projectId}: ${tasksToUpsert.length} tareas nuevas (cronograma anterior eliminado)`);
             
             // VERIFICAR SI SUPABASE DUPLICÓ LAS TAREAS
             try {
