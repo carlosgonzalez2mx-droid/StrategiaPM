@@ -3632,20 +3632,34 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
       
       console.log('✅ Validación de predecesoras completada exitosamente');
       
-      // REEMPLAZAR TODAS LAS TAREAS EXISTENTES
-      console.log('📊 IMPORTACIÓN - Llamando a importTasks con:', newTasks.length, 'tareas');
-      console.log('📊 IMPORTACIÓN - Primeras 3 tareas:', newTasks.slice(0, 3));
+      // REEMPLAZAR COMPLETAMENTE TODAS LAS TAREAS EXISTENTES
+      console.log('📊 IMPORTACIÓN - REEMPLAZANDO CRONOGRAMA COMPLETO');
+      console.log('📊 IMPORTACIÓN - Tareas anteriores:', tasks?.length || 0);
+      console.log('📊 IMPORTACIÓN - Nuevas tareas:', newTasks.length);
+      console.log('📊 IMPORTACIÓN - Primeras 3 tareas nuevas:', newTasks.slice(0, 3));
       console.log('📊 IMPORTACIÓN - importTasks es función?', typeof importTasks);
-      console.log('📊 IMPORTACIÓN - importTasks:', importTasks);
+      
+      // CONFIRMACIÓN: ¿Reemplazar cronograma completo?
+      const confirmMessage = `⚠️ IMPORTACIÓN DE CRONOGRAMA COMPLETO\n\n` +
+        `Tareas actuales: ${tasks?.length || 0}\n` +
+        `Nuevas tareas: ${newTasks.length}\n\n` +
+        `Esto REEMPLAZARÁ COMPLETAMENTE el cronograma actual.\n` +
+        `Las tareas de minuta existentes podrían quedar sin hito asignado.\n\n` +
+        `¿Continuar con la importación?`;
+      
+      if (!window.confirm(confirmMessage)) {
+        console.log('📊 IMPORTACIÓN - Cancelada por el usuario');
+        return;
+      }
       
       if (typeof importTasks === 'function') {
         importTasks(newTasks);
-        console.log('📊 IMPORTACIÓN - importTasks llamado exitosamente');
+        console.log('📊 IMPORTACIÓN - importTasks llamado exitosamente - CRONOGRAMA REEMPLAZADO');
       } else {
         console.error('❌ IMPORTACIÓN - importTasks no está disponible, usando setTasks como fallback');
         if (typeof setTasks === 'function') {
           setTasks(newTasks);
-          console.log('📊 IMPORTACIÓN - setTasks llamado como fallback');
+          console.log('📊 IMPORTACIÓN - setTasks llamado como fallback - CRONOGRAMA REEMPLAZADO');
         } else {
           console.error('❌ IMPORTACIÓN - Ni importTasks ni setTasks están disponibles');
           alert('Error: No se puede completar la importación. Las funciones de actualización no están disponibles.');
@@ -3677,7 +3691,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         });
       }
       
-      alert(`✅ Cronograma importado exitosamente!\n\n📊 ${newTasks.length} tareas cargadas\n📅 Proyecto: ${projectStart.toLocaleDateString('es')} - ${projectEnd.toLocaleDateString('es')}`);
+      alert(`✅ CRONOGRAMA REEMPLAZADO EXITOSAMENTE!\n\n📊 ${newTasks.length} tareas cargadas (cronograma anterior eliminado)\n📅 Proyecto: ${projectStart.toLocaleDateString('es')} - ${projectEnd.toLocaleDateString('es')}\n\n⚠️ Las tareas de minuta existentes podrían necesitar reasignación de hitos.`);
       
     } catch (error) {
       console.error('❌ Error al procesar workbook:', error);

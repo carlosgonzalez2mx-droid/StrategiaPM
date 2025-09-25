@@ -449,13 +449,20 @@ function MainApp() {
 
   // Función especial para importación que bypassa la protección
   const importTasksToCurrentProject = (newTasks) => {
-    console.log('📊 importTasksToCurrentProject - IMPORTACIÓN DIRECTA:', {
+    console.log('📊 importTasksToCurrentProject - REEMPLAZO COMPLETO DE CRONOGRAMA:', {
       currentProjectId,
+      currentTasksCount: getCurrentProjectTasks()?.length || 0,
       newTasksLength: newTasks?.length
     });
     
+    // IMPORTANTE: Esta función REEMPLAZA COMPLETAMENTE el cronograma anterior
+    // No mezcla tareas, las reemplaza por completo
+    console.log('🔄 REEMPLAZANDO CRONOGRAMA COMPLETO - Tareas anteriores serán eliminadas');
+    
     // Forzar bypass de protección para importación
     updateCurrentProjectTasks(newTasks, true);
+    
+    console.log('✅ CRONOGRAMA REEMPLAZADO EXITOSAMENTE');
   };
 
   // Función para limpiar duplicados en Supabase
