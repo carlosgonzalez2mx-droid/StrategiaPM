@@ -280,60 +280,56 @@ const ProjectManagementTabs = ({
       return endDate >= today && endDate <= fifteenDaysFromNow;
     });
     
-    // Agrupar tareas por hito
+    // CORRECCIÓN: Agrupar tareas por hito - las tareas pertenecen al hito que las ANTECEDE
     const tasksByMilestone = {};
     
-    tasksNearDeadline.forEach(task => {
-      // Encontrar a qué hito pertenece esta tarea
-      const milestones = allTasks
-        .filter(t => t.isMilestone)
-        .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+    // Obtener todos los hitos ordenados por fecha de inicio
+    const milestones = allTasks
+      .filter(t => t.isMilestone)
+      .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+    
+    // Para cada hito, encontrar todas las tareas que están ANTES de él
+    milestones.forEach(milestone => {
+      const milestoneDate = new Date(milestone.startDate);
       
-      let assignedMilestone = null;
-      
-      for (let i = 0; i < milestones.length; i++) {
-        const milestone = milestones[i];
-        let startDate, endDate;
-        
-        if (i === 0) {
-          // Primer hito: desde el inicio del proyecto hasta este hito
-          const firstTask = allTasks
-            .filter(t => !t.isMilestone)
-            .sort((a, b) => new Date(a.startDate) - new Date(b.startDate))[0];
-          startDate = firstTask ? new Date(firstTask.startDate) : new Date(milestone.startDate);
-          endDate = new Date(milestone.endDate);
-        } else {
-          // Hitos intermedios: desde el hito anterior hasta este hito
-          const previousMilestone = milestones[i - 1];
-          startDate = new Date(previousMilestone.endDate);
-          endDate = new Date(milestone.endDate);
-        }
-        
-        const taskStartDate = new Date(task.startDate);
+      // Encontrar tareas que están antes de este hito (fecha de fin <= fecha del hito)
+      const tasksBeforeMilestone = tasksNearDeadline.filter(task => {
         const taskEndDate = new Date(task.endDate);
-        
-        // Verificar si la tarea está en el rango de este hito
-        if ((taskStartDate >= startDate && taskStartDate <= endDate) ||
-            (taskEndDate >= startDate && taskEndDate <= endDate) ||
-            (taskStartDate <= startDate && taskEndDate >= endDate)) {
-          assignedMilestone = milestone;
-          break;
-        }
-      }
+        return taskEndDate <= milestoneDate;
+      });
       
-      if (assignedMilestone) {
-        if (!tasksByMilestone[assignedMilestone.id]) {
-          tasksByMilestone[assignedMilestone.id] = {
-            milestone: assignedMilestone,
-            tasks: []
-          };
-        }
-        tasksByMilestone[assignedMilestone.id].tasks.push(task);
+      // Excluir tareas que ya fueron asignadas a hitos anteriores
+      const alreadyAssignedTaskIds = new Set();
+      Object.values(tasksByMilestone).forEach(group => {
+        group.tasks.forEach(t => alreadyAssignedTaskIds.add(t.id));
+      });
+      
+      const unassignedTasks = tasksBeforeMilestone.filter(task => 
+        !alreadyAssignedTaskIds.has(task.id)
+      );
+      
+      if (unassignedTasks.length > 0) {
+        tasksByMilestone[milestone.id] = {
+          milestone: milestone,
+          tasks: unassignedTasks
+        };
       }
+    });
+    
+    console.log('🎯 TAREAS AGRUPADAS POR HITO (CORREGIDO):', {
+      tasksNearDeadline: tasksNearDeadline.length,
+      tasksByMilestone: Object.keys(tasksByMilestone).length,
+      details: Object.values(tasksByMilestone).map(group => ({
+        milestoneName: group.milestone.name,
+        milestoneId: group.milestone.id,
+        tasksCount: group.tasks.length,
+        tasksNames: group.tasks.map(t => t.name)
+      }))
     });
     
     return Object.values(tasksByMilestone);
   };
+
 
   // Función para obtener tareas de minuta próximas a vencer
   const getMinutaTasksNearDeadline = (allTasks, minutaTasks) => {
