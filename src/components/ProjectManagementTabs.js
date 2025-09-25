@@ -623,7 +623,7 @@ const ProjectManagementTabs = ({
               <div>
                 <h1 className="text-4xl font-bold mb-2 text-gray-800">{currentProject.name}</h1>
                 <p className="text-gray-600 text-lg">
-                  Gestión integral del proyecto - PMBOK v7
+                  {currentProject.description || 'Gestión integral del proyecto - PMBOK v7'}
                 </p>
                 <div className="flex items-center space-x-4 mt-2 text-sm text-gray-700">
                   <span className="flex items-center space-x-1">
