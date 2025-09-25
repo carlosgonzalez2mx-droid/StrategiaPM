@@ -459,9 +459,9 @@ const ProjectManagementTabs = ({
   const updateMinutaTaskHito = async (taskId, newHitoId) => {
     try {
       if (useSupabase) {
-        // Actualizar en Supabase
+        // Actualizar en Supabase usando el método correcto
         const { default: supabaseService } = await import('../services/SupabaseService');
-        const { success } = await supabaseService.updateMinutaTask(taskId, { hitoId: newHitoId });
+        const { success } = await supabaseService.updateMinuta(taskId, { milestone_id: newHitoId });
         if (!success) throw new Error('Error actualizando en Supabase');
       } else {
         // Actualizar en localStorage
