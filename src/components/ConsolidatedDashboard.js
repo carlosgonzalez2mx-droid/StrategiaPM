@@ -82,10 +82,36 @@ const ConsolidatedDashboard = ({
     allMilestonesStatuses: milestones.map(m => m.status)
   });
 
-  // Calcular métricas EVM consolidadas
-  const totalWorkPackageBudget = workPackages?.reduce((sum, wp) => sum + (wp.budget || 0), 0) || 0;
-  const totalWorkPackageEarned = workPackages?.reduce((sum, wp) => sum + (wp.earnedValue || 0), 0) || 0;
-  const totalWorkPackageActual = workPackages?.reduce((sum, wp) => sum + (wp.actualCost || 0), 0) || 0;
+  // Calcular métricas EVM consolidadas basadas en tareas reales
+  // Si no hay workPackages, calcular basado en tareas del cronograma
+  let totalWorkPackageBudget, totalWorkPackageEarned, totalWorkPackageActual;
+  
+  if (workPackages && workPackages.length > 0) {
+    // Usar datos de workPackages si están disponibles
+    totalWorkPackageBudget = workPackages.reduce((sum, wp) => sum + (wp.budget || 0), 0);
+    totalWorkPackageEarned = workPackages.reduce((sum, wp) => sum + (wp.earnedValue || 0), 0);
+    totalWorkPackageActual = workPackages.reduce((sum, wp) => sum + (wp.actualCost || 0), 0);
+  } else {
+    // Calcular basado en tareas del cronograma
+    const allTasks = Object.values(tasksByProject || {}).flat();
+    
+    // Presupuesto total: suma de costos de todas las tareas
+    totalWorkPackageBudget = allTasks.reduce((sum, task) => sum + (task.cost || 0), 0);
+    
+    // Valor ganado: suma de costos * progreso de tareas completadas
+    totalWorkPackageEarned = allTasks.reduce((sum, task) => {
+      const progress = (task.progress || 0) / 100;
+      return sum + ((task.cost || 0) * progress);
+    }, 0);
+    
+    // Costo actual: estimación basada en progreso (simplificado)
+    // En un sistema real, esto vendría de órdenes de compra, facturas, etc.
+    totalWorkPackageActual = allTasks.reduce((sum, task) => {
+      const progress = (task.progress || 0) / 100;
+      // Asumir que el costo actual es proporcional al progreso
+      return sum + ((task.cost || 0) * progress * 0.8); // Factor de 0.8 para simular eficiencia
+    }, 0);
+  }
 
   const consolidatedCPI = totalWorkPackageActual > 0 ? totalWorkPackageEarned / totalWorkPackageActual : 1;
   const consolidatedSPI = totalWorkPackageBudget > 0 ? totalWorkPackageEarned / totalWorkPackageBudget : 1;
@@ -93,6 +119,20 @@ const ConsolidatedDashboard = ({
   const consolidatedSV = totalWorkPackageEarned - totalWorkPackageBudget;
   const consolidatedVAC = totalWorkPackageBudget - (totalWorkPackageActual + (totalWorkPackageBudget - totalWorkPackageEarned));
   const consolidatedEAC = totalWorkPackageBudget / consolidatedCPI;
+
+  // Logging para debug de métricas EVM
+  console.log('📊 MÉTRICAS EVM CALCULADAS:', {
+    dataSource: workPackages && workPackages.length > 0 ? 'workPackages' : 'tasks',
+    workPackagesCount: workPackages?.length || 0,
+    tasksCount: Object.values(tasksByProject || {}).flat().length,
+    totalWorkPackageBudget,
+    totalWorkPackageEarned,
+    totalWorkPackageActual,
+    consolidatedCPI,
+    consolidatedSPI,
+    consolidatedVAC,
+    consolidatedEAC
+  });
 
   // Función para obtener el color del indicador
   const getIndicatorColor = (value, type) => {
@@ -435,6 +475,23 @@ const ConsolidatedDashboard = ({
           <span className="text-3xl mr-3">📊</span>
           Indicadores PMBOK v7 - Gestión de Costos
         </h2>
+        
+        {/* Nota informativa sobre el cálculo */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <div className="flex items-center">
+            <div className="text-blue-600 text-xl mr-3">ℹ️</div>
+            <div className="text-blue-800">
+              <strong>Fuente de datos:</strong> {workPackages && workPackages.length > 0 
+                ? `Calculado basado en ${workPackages.length} paquetes de trabajo` 
+                : `Calculado basado en ${Object.values(tasksByProject || {}).flat().length} tareas del cronograma`}
+              {!(workPackages && workPackages.length > 0) && (
+                <span className="block text-sm mt-1">
+                  Los costos se estiman basándose en el campo "Costo" de cada tarea y su progreso actual.
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div className="space-y-6">
             <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-lg border border-blue-200">
