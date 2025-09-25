@@ -470,7 +470,23 @@ const ProjectManagementTabs = ({
       unifiedGroups[milestoneId].tasks.push(...group.tasks);
     });
     
-    return Object.values(unifiedGroups);
+    // CORRECCIÓN: Ordenar hitos por fecha de inicio para mantener consistencia con el cronograma
+    const sortedGroups = Object.values(unifiedGroups).sort((a, b) => {
+      const dateA = new Date(a.milestone.startDate);
+      const dateB = new Date(b.milestone.startDate);
+      return dateA - dateB; // Orden ascendente (más antiguo primero)
+    });
+    
+    console.log('🎯 HITOS ORDENADOS POR FECHA:', {
+      totalGroups: sortedGroups.length,
+      order: sortedGroups.map(group => ({
+        milestoneName: group.milestone.name,
+        milestoneDate: group.milestone.startDate,
+        tasksCount: group.tasks.length
+      }))
+    });
+    
+    return sortedGroups;
   };
 
   // Obtener proyecto actual
