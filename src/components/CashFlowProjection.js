@@ -371,6 +371,7 @@ const CashFlowProjection = ({
 
       // Calcular gasto planificado del mes
       const monthPlannedExpense = calculateMonthPlannedExpense(currentDate);
+      console.log(`🔍 CASHFLOW PROJECTION - RESULTADO calculateMonthPlannedExpense para ${monthKey}: $${monthPlannedExpense}`);
       
       // Calcular gasto comprometido del mes (OCs)
       console.log(`🔍 CASHFLOW PROJECTION - LLAMANDO calculateMonthCommittedExpense para mes ${monthKey}`);
@@ -387,7 +388,7 @@ const CashFlowProjection = ({
       const previousBalance = i > 0 ? projection[i - 1].cumulativeBalance : 0;
       const cumulativeBalance = previousBalance + monthPlannedExpense;
 
-      projection.push({
+      const monthProjection = {
         month: i + 1,
         monthKey,
         monthLabel,
@@ -399,7 +400,19 @@ const CashFlowProjection = ({
         cumulativeBalance,
         cashIn: monthPlannedExpense,
         cashOut: monthRealExpense
-      });
+      };
+      
+      // DEBUG: Logging específico para julio y agosto 2026
+      if (monthKey === '2026-07' || monthKey === '2026-08') {
+        console.log(`🔍 CASHFLOW PROJECTION - ASIGNANDO VALORES para ${monthKey}:`, {
+          monthPlannedExpense: monthPlannedExpense,
+          revenue: monthProjection.revenue,
+          monthLabel: monthProjection.monthLabel,
+          monthKey: monthProjection.monthKey
+        });
+      }
+      
+      projection.push(monthProjection);
     }
 
     return projection;
