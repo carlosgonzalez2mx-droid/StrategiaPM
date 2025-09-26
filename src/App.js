@@ -30,12 +30,6 @@ import UserManagement from './components/UserManagement';
 import SplashScreen from './components/SplashScreen';
 import filePersistenceService from './services/FilePersistenceService';
 import supabaseService from './services/SupabaseService';
-// Importar script de diagnóstico solo en desarrollo
-if (process.env.NODE_ENV === 'development') {
-  import('./debug-file-storage').catch(err => {
-    console.warn('No se pudo cargar el script de diagnóstico:', err);
-  });
-}
 
 // Contextos
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -44,6 +38,15 @@ import { ProjectProvider } from './contexts/ProjectContext';
 // Componente principal de la aplicación (requiere autenticación)
 function MainApp() {
   const { user, showSplash, completeSplash } = useAuth();
+  
+  // Cargar script de diagnóstico solo en desarrollo
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      import('./debug-file-storage').catch(err => {
+        console.warn('No se pudo cargar el script de diagnóstico:', err);
+      });
+    }
+  }, []);
   
   // ===== ESTADO MULTI-PROYECTO =====
   const [projects, setProjects] = useState([
