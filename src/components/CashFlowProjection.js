@@ -181,8 +181,8 @@ const CashFlowProjection = ({
           // Para hitos: verificar que la fecha esté dentro del mes
           isInMonth = taskStart >= monthStart && taskStart <= monthEnd;
           
-          // DEBUG: Logging específico para hitos
-          if (task.cost && task.cost > 300000) {
+          // DEBUG: Logging detallado para todas las tareas con costos
+          if (task.cost > 0) {
             console.log('🎯 DEBUG HITO - Verificación de mes:', {
               taskName: task.name || task.title,
               taskStartDate: task.startDate,
@@ -190,7 +190,14 @@ const CashFlowProjection = ({
               monthStart: monthStart.toISOString().split('T')[0],
               monthEnd: monthEnd.toISOString().split('T')[0],
               isInMonth: isInMonth,
-              monthName: monthDate.toLocaleDateString('es-ES', { year: 'numeric', month: 'long' })
+              monthName: monthDate.toLocaleDateString('es-ES', { year: 'numeric', month: 'long' }),
+              comparison: {
+                taskStartGreaterEqualMonthStart: taskStart >= monthStart,
+                taskStartLessEqualMonthEnd: taskStart <= monthEnd,
+                taskStartTime: taskStart.getTime(),
+                monthStartTime: monthStart.getTime(),
+                monthEndTime: monthEnd.getTime()
+              }
             });
           }
         } else {
