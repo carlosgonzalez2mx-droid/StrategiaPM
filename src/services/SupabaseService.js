@@ -1734,63 +1734,136 @@ class SupabaseService {
         return { success: false, error: 'No autenticado', files: [] };
       }
 
-      // CORRECCIÓN: Buscar archivos reales en todas las carpetas del bucket
+      // CORRECCIÓN: Buscar archivos siguiendo la estructura correcta del bucket
+      // Estructura: {organizationId}/{projectId}/{category}/archivo
       let allFiles = [];
       let error = null;
 
-      console.log(`📋 Buscando archivos reales en todo el bucket`);
+      console.log(`📋 Buscando archivos siguiendo estructura del bucket`);
       console.log(`🔍 DEBUG - Parámetros de búsqueda:`, {
         organizationId: this.organizationId,
         projectId: projectId,
         category: category
       });
 
-      // 1. Listar carpetas en la raíz del bucket
-      const { data: rootFolders, error: rootError } = await this.supabase.storage
+      // 1. Buscar en la ruta específica del proyecto
+      const searchPath = category 
+        ? `${this.organizationId}/${projectId}/${category}`
+        : `${this.organizationId}/${projectId}`;
+
+      console.log(`📁 Buscando archivos en ruta: ${searchPath}`);
+      
+      const { data: projectFiles, error: projectError } = await this.supabase.storage
         .from('project-files')
-        .list('', {
+        .list(searchPath, {
           limit: 100,
           offset: 0
         });
 
-      if (rootError) {
-        console.error('❌ Error listando carpetas en raíz:', rootError);
-        error = rootError;
+      if (projectError) {
+        console.error(`❌ Error listando archivos en ruta ${searchPath}:`, projectError);
+        error = projectError;
       } else {
-        console.log('🔍 DEBUG - Carpetas encontradas en raíz:', rootFolders);
+        console.log(`🔍 DEBUG - Archivos encontrados en ruta ${searchPath}:`, projectFiles);
         
-        // 2. Buscar archivos en cada carpeta
-        for (const folder of rootFolders || []) {
-          if (folder.id === null) { // Es una carpeta, no un archivo
-            console.log(`📁 Buscando archivos en carpeta: ${folder.name}`);
-            
-            const { data: folderFiles, error: folderError } = await this.supabase.storage
-              .from('project-files')
-              .list(folder.name, {
-                limit: 100,
-                offset: 0
-              });
+        // Filtrar solo archivos reales (con id no null)
+        const realFiles = (projectFiles || []).filter(file => file.id !== null);
+        console.log(`✅ Archivos reales encontrados: ${realFiles.length}`);
+        
+        // Agregar la ruta de búsqueda a cada archivo
+        realFiles.forEach(file => {
+          file.folderPath = searchPath;
+        });
+        
+        allFiles = realFiles;
+      }
 
-            if (folderError) {
-              console.error(`❌ Error listando archivos en carpeta ${folder.name}:`, folderError);
-            } else {
-              console.log(`🔍 DEBUG - Archivos en carpeta ${folder.name}:`, folderFiles);
+      // 2. Si no se encontraron archivos en la ruta específica, buscar en todas las carpetas
+      if (allFiles.length === 0) {
+        console.log(`📁 No se encontraron archivos en ruta específica, buscando en todo el bucket...`);
+        
+        // Listar carpetas de organización
+        const { data: orgFolders, error: orgError } = await this.supabase.storage
+          .from('project-files')
+          .list('', {
+            limit: 100,
+            offset: 0
+          });
+
+        if (orgError) {
+          console.error('❌ Error listando carpetas de organización:', orgError);
+        } else {
+          console.log('🔍 DEBUG - Carpetas de organización encontradas:', orgFolders);
+          
+          for (const orgFolder of orgFolders || []) {
+            if (orgFolder.id === null && orgFolder.name === this.organizationId) {
+              console.log(`📁 Buscando proyectos en organización: ${orgFolder.name}`);
               
-              // Filtrar solo archivos reales (con id no null)
-              const realFiles = (folderFiles || []).filter(file => file.id !== null);
-              console.log(`✅ Archivos reales en carpeta ${folder.name}:`, realFiles.length);
-              
-              // Agregar la ruta de la carpeta a cada archivo
-              realFiles.forEach(file => {
-                file.folderPath = folder.name;
-              });
-              
-              allFiles = allFiles.concat(realFiles);
+              // Listar proyectos en la organización
+              const { data: projectFolders, error: projectFoldersError } = await this.supabase.storage
+                .from('project-files')
+                .list(orgFolder.name, {
+                  limit: 100,
+                  offset: 0
+                });
+
+              if (projectFoldersError) {
+                console.error(`❌ Error listando proyectos en organización ${orgFolder.name}:`, projectFoldersError);
+              } else {
+                console.log(`🔍 DEBUG - Proyectos encontrados en organización ${orgFolder.name}:`, projectFolders);
+                
+                for (const projectFolder of projectFolders || []) {
+                  if (projectFolder.id === null) {
+                    console.log(`📁 Buscando categorías en proyecto: ${projectFolder.name}`);
+                    
+                    // Listar categorías en el proyecto
+                    const { data: categoryFolders, error: categoryFoldersError } = await this.supabase.storage
+                      .from('project-files')
+                      .list(`${orgFolder.name}/${projectFolder.name}`, {
+                        limit: 100,
+                        offset: 0
+                      });
+
+                    if (categoryFoldersError) {
+                      console.error(`❌ Error listando categorías en proyecto ${projectFolder.name}:`, categoryFoldersError);
+                    } else {
+                      console.log(`🔍 DEBUG - Categorías encontradas en proyecto ${projectFolder.name}:`, categoryFolders);
+                      
+                      for (const categoryFolder of categoryFolders || []) {
+                        if (categoryFolder.id === null) {
+                          console.log(`📁 Buscando archivos en categoría: ${categoryFolder.name}`);
+                          
+                          // Listar archivos en la categoría
+                          const { data: filesInCategory, error: filesError } = await this.supabase.storage
+                            .from('project-files')
+                            .list(`${orgFolder.name}/${projectFolder.name}/${categoryFolder.name}`, {
+                              limit: 100,
+                              offset: 0
+                            });
+
+                          if (filesError) {
+                            console.error(`❌ Error listando archivos en categoría ${categoryFolder.name}:`, filesError);
+                          } else {
+                            console.log(`🔍 DEBUG - Archivos en categoría ${categoryFolder.name}:`, filesInCategory);
+                            
+                            // Filtrar solo archivos reales (con id no null)
+                            const realFilesInCategory = (filesInCategory || []).filter(file => file.id !== null);
+                            console.log(`✅ Archivos reales en categoría ${categoryFolder.name}:`, realFilesInCategory.length);
+                            
+                            // Agregar la ruta completa a cada archivo
+                            realFilesInCategory.forEach(file => {
+                              file.folderPath = `${orgFolder.name}/${projectFolder.name}/${categoryFolder.name}`;
+                            });
+                            
+                            allFiles = allFiles.concat(realFilesInCategory);
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
             }
-          } else {
-            // Es un archivo en la raíz
-            console.log(`📄 Archivo encontrado en raíz: ${folder.name}`);
-            allFiles.push(folder);
           }
         }
       }
@@ -1808,7 +1881,7 @@ class SupabaseService {
       
       // DEBUG: Verificar si realmente hay archivos en el bucket
       console.log('🔍 DEBUG - Verificando bucket completo...');
-      const { data: allFiles, error: allError } = await this.supabase.storage
+      const { data: bucketContents, error: allError } = await this.supabase.storage
         .from('project-files')
         .list('', {
           limit: 1000,
@@ -1818,7 +1891,7 @@ class SupabaseService {
       if (allError) {
         console.error('❌ Error listando bucket completo:', allError);
       } else {
-        console.log('🔍 DEBUG - Todos los archivos en el bucket:', allFiles);
+        console.log('🔍 DEBUG - Todos los archivos en el bucket:', bucketContents);
       }
 
       // Convertir archivos de Storage a formato esperado
