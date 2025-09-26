@@ -1739,6 +1739,12 @@ class SupabaseService {
         : `${this.organizationId}/${projectId}`;
 
       console.log(`📋 Listando archivos en Storage: ${searchPath}`);
+      console.log(`🔍 DEBUG - Parámetros de búsqueda:`, {
+        organizationId: this.organizationId,
+        projectId: projectId,
+        category: category,
+        searchPath: searchPath
+      });
 
       const { data, error } = await this.supabase.storage
         .from('project-files')
@@ -1754,6 +1760,21 @@ class SupabaseService {
 
       // DEBUG: Mostrar datos raw de Supabase
       console.log('🔍 DEBUG - Datos raw de Supabase:', data);
+      
+      // DEBUG: Verificar si realmente hay archivos en el bucket
+      console.log('🔍 DEBUG - Verificando bucket completo...');
+      const { data: allFiles, error: allError } = await this.supabase.storage
+        .from('project-files')
+        .list('', {
+          limit: 1000,
+          offset: 0
+        });
+      
+      if (allError) {
+        console.error('❌ Error listando bucket completo:', allError);
+      } else {
+        console.log('🔍 DEBUG - Todos los archivos en el bucket:', allFiles);
+      }
 
       // Convertir archivos de Storage a formato esperado
       const files = (data || []).map(file => {
