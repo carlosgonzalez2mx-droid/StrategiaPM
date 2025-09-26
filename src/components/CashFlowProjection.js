@@ -338,7 +338,9 @@ const CashFlowProjection = ({
       projectionStartDate,
       purchaseOrders: purchaseOrders?.length || 0,
       advances: advances?.length || 0,
-      invoices: invoices?.length || 0
+      invoices: invoices?.length || 0,
+      tasks: tasks?.length || 0,
+      timestamp: new Date().toISOString()
     });
 
     const startDate = new Date(projectionStartDate);
@@ -414,6 +416,14 @@ const CashFlowProjection = ({
       
       projection.push(monthProjection);
     }
+
+    // DEBUG: Logging final de la proyección completa
+    console.log('🔍 CASHFLOW PROJECTION - PROYECCIÓN FINAL COMPLETA:', {
+      totalMonths: projection.length,
+      julio2026: projection.find(m => m.monthKey === '2026-07'),
+      agosto2026: projection.find(m => m.monthKey === '2026-08'),
+      timestamp: new Date().toISOString()
+    });
 
     return projection;
   }, [currentProject, projectionPeriod, projectionStartDate, projectionSettings, purchaseOrders, advances, invoices, contracts, tasks]);
@@ -708,7 +718,18 @@ const CashFlowProjection = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {cashFlowProjection.map((month) => (
+                  {cashFlowProjection.map((month) => {
+                    // DEBUG: Logging específico para julio y agosto 2026 en el renderizado
+                    if (month.monthKey === '2026-07' || month.monthKey === '2026-08') {
+                      console.log(`🔍 CASHFLOW RENDER - RENDERIZANDO ${month.monthKey}:`, {
+                        monthLabel: month.monthLabel,
+                        revenue: month.revenue,
+                        formattedRevenue: formatCurrency(month.revenue),
+                        monthObject: month
+                      });
+                    }
+                    
+                    return (
                     <tr key={month.month} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4">
                         <div className="font-medium text-gray-900">{month.monthLabel}</div>
@@ -740,7 +761,8 @@ const CashFlowProjection = ({
                         </span>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
