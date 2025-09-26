@@ -200,7 +200,18 @@ function MainApp() {
         name: t.name,
         projectId: t.projectId,
         startDate: t.startDate,
-        cost: t.cost
+        endDate: t.endDate,
+        cost: t.cost,
+        isMilestone: t.isMilestone
+      })),
+      tasksWithCosts: tasks.filter(t => t.cost > 0).length,
+      tasksWithCostsDetails: tasks.filter(t => t.cost > 0).map(t => ({
+        id: t.id,
+        name: t.name,
+        startDate: t.startDate,
+        endDate: t.endDate,
+        cost: t.cost,
+        isMilestone: t.isMilestone
       }))
     });
     
