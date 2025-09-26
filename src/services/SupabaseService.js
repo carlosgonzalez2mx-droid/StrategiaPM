@@ -1621,13 +1621,21 @@ class SupabaseService {
 
       console.log(`📤 Subiendo archivo a Storage: ${filePath}`);
 
-      // Subir archivo
+      // Subir archivo con metadatos que incluyan el nombre original
       const { data, error } = await this.supabase.storage
         .from('project-files')
         .upload(filePath, file, {
           cacheControl: '3600',
           upsert: false,
-          contentType: file.type
+          contentType: file.type,
+          metadata: {
+            originalName: file.name,
+            uploadedBy: this.currentUser.email,
+            projectId: projectId,
+            category: category,
+            organizationId: this.organizationId,
+            ...metadata
+          }
         });
 
       if (error) {
@@ -1899,10 +1907,15 @@ class SupabaseService {
           'uploadDate final': uploadDate
         });
 
+        // CORRECCIÓN: Usar el nombre original del archivo si está disponible en metadata
+        const originalFileName = file.metadata?.originalName || 
+                                file.metadata?.name || 
+                                file.name;
+
         return {
           id: `file-${file.name.split('.')[0]}`,
           projectId,
-          fileName: file.name,
+          fileName: originalFileName, // Usar nombre original en lugar del nombre técnico
           fileSize: fileSize,
           uploadDate: uploadDate,
           storagePath: filePath,
@@ -1911,6 +1924,7 @@ class SupabaseService {
             storageProvider: 'supabase',
             bucket: 'project-files',
             originalFile: file, // Incluir objeto original para debugging
+            technicalName: file.name, // Guardar el nombre técnico para referencia
             ...file.metadata
           }
         };
