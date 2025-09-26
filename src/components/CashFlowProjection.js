@@ -155,10 +155,10 @@ const CashFlowProjection = ({
         const taskStart = new Date(task.startDate);
         const taskEnd = new Date(task.endDate);
         
-        // DEBUG: Logging específico para agosto 2026
+        // DEBUG: Logging específico para julio y agosto 2026
         const monthName = monthDate.toLocaleDateString('es-ES', { year: 'numeric', month: 'long' });
-        if (monthName === 'agosto de 2026' && task.cost > 0) {
-          console.log(`🔍 CASHFLOW [${componentId}] - TAREA CON COSTO EN AGOSTO 2026:`, {
+        if ((monthName === 'julio de 2026' || monthName === 'agosto de 2026') && task.cost > 0) {
+          console.log(`🔍 CASHFLOW [${componentId}] - TAREA CON COSTO EN ${monthName.toUpperCase()}:`, {
             taskIndex: index,
             taskId: task.id,
             taskName: task.name,
