@@ -30,6 +30,7 @@ import UserManagement from './components/UserManagement';
 import SplashScreen from './components/SplashScreen';
 import filePersistenceService from './services/FilePersistenceService';
 import supabaseService from './services/SupabaseService';
+import './debug-file-storage'; // Script de diagnóstico para archivos
 
 // Contextos
 import { AuthProvider, useAuth } from './contexts/AuthContext';
