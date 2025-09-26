@@ -40,25 +40,40 @@ const ProjectAnalysisStep = ({ wizardData, onUpdate, availableTemplates }) => {
   // Efecto para actualizar datos cuando cambia el template seleccionado
   useEffect(() => {
     if (selectedTemplate) {
-      onUpdate({
+      // Solo actualizar si los valores han cambiado realmente
+      const newData = {
         projectType: selectedTemplate.project_type,
         industry: selectedTemplate.industry,
         methodology: selectedTemplate.methodology,
         templateId: selectedTemplate.id,
         templateName: selectedTemplate.name
-      });
+      };
+      
+      // Verificar si realmente hay cambios antes de actualizar
+      const hasChanges = Object.keys(newData).some(key => 
+        wizardData[key] !== newData[key]
+      );
+      
+      if (hasChanges) {
+        onUpdate(newData);
+      }
     }
-  }, [selectedTemplate, onUpdate]);
+  }, [selectedTemplate]); // Remover onUpdate de las dependencias
 
   // Efecto para manejar tipo de proyecto personalizado
   useEffect(() => {
     if (wizardData.projectType === 'custom' && customProjectType) {
-      onUpdate({
-        projectType: customProjectType.toLowerCase().replace(/\s+/g, '_'),
-        customProjectType: customProjectType
-      });
+      const newProjectType = customProjectType.toLowerCase().replace(/\s+/g, '_');
+      
+      // Solo actualizar si el valor ha cambiado
+      if (wizardData.customProjectType !== customProjectType) {
+        onUpdate({
+          projectType: newProjectType,
+          customProjectType: customProjectType
+        });
+      }
     }
-  }, [customProjectType, wizardData.projectType, onUpdate]);
+  }, [customProjectType, wizardData.projectType]); // Remover onUpdate de las dependencias
 
   const handleProjectTypeChange = (projectType) => {
     onUpdate({ projectType });

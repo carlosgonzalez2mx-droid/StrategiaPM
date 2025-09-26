@@ -3985,7 +3985,19 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
       }
 
       // Aplicar CPM a las nuevas tareas
-      const tasksWithCPM = calculateCPM(allAITasks, includeWeekends);
+      const cpmResult = calculateCPM(allAITasks, includeWeekends);
+
+      // CORRECCIÓN: calculateCPM devuelve un objeto con {tasks, criticalPath, criticalPathLength}
+      // Necesitamos extraer solo el array de tareas
+      const tasksWithCPM = cpmResult.tasks || cpmResult;
+
+      console.log('🔍 DEBUG - Resultado CPM:', {
+        cpmResultType: typeof cpmResult,
+        cpmResultKeys: Object.keys(cpmResult),
+        tasksType: typeof tasksWithCPM,
+        tasksIsArray: Array.isArray(tasksWithCPM),
+        tasksLength: Array.isArray(tasksWithCPM) ? tasksWithCPM.length : 'N/A'
+      });
 
       // Actualizar el estado de tareas
       setTasks(tasksWithCPM);
