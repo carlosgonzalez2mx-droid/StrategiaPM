@@ -30,6 +30,8 @@ Sistema integral de gestión de proyectos desarrollado en React con integración
 - **Minutas de reunión** con tareas asignadas y seguimiento
 - **Dashboard unificado** que combina tareas del cronograma y minutas
 - **Manejo inteligente de tareas huérfanas** cuando se modifican hitos
+- **Eliminación inteligente de tareas** con manejo automático de dependencias
+- **Importación de cronogramas** con reemplazo completo (no mezcla)
 
 ### 💰 Gestión Financiera
 - Control de presupuesto del proyecto
@@ -59,6 +61,14 @@ Sistema integral de gestión de proyectos desarrollado en React con integración
 - Exportación de reportes de auditoría
 - Filtros por categoría, fecha y búsqueda
 - Trazabilidad completa de acciones
+
+### 📁 Gestión de Archivos
+- **Almacenamiento en Supabase Storage** con bucket `project-files`
+- **Filtrado por proyecto**: Cada proyecto muestra solo sus propios archivos
+- **Nombres originales**: Muestra el nombre asignado al archivo, no el técnico
+- **Metadatos completos**: Tamaño, fecha de subida y tipo de archivo
+- **Descarga directa**: Acceso inmediato a archivos desde la interfaz
+- **Eliminación segura**: Borrado tanto de la interfaz como de Supabase Storage
 
 ## 🛠️ Tecnologías Utilizadas
 
@@ -202,6 +212,12 @@ El sistema registra automáticamente:
 - **Manejo de errores**: Captura y maneja errores de actualización
 - **Feedback visual**: Confirmaciones y alertas de estado
 
+### Gestión Inteligente de Tareas
+- **Eliminación con dependencias**: Advertencia detallada antes de eliminar tareas con dependencias
+- **Limpieza automática**: Remoción automática de referencias a tareas eliminadas
+- **Recálculo automático**: Actualización automática del cronograma después de eliminaciones
+- **Confirmación informada**: Mensajes detallados sobre el impacto de la eliminación
+
 ## 🔧 Desarrollo
 
 ### Agregar Nuevos Eventos de Auditoría
@@ -251,8 +267,33 @@ La aplicación está configurada para desplegarse fácilmente en:
 - ✅ **Dashboard unificado de tareas (cronograma + minutas)**
 - ✅ **Manejo inteligente de tareas huérfanas**
 - ✅ **Headers fijos y scroll sincronizado en Gantt**
+- ✅ **Gestión de archivos con Supabase Storage**
+- ✅ **Eliminación inteligente de tareas con manejo de dependencias**
+- ✅ **Importación de cronogramas con reemplazo completo**
 
 ## 📝 Changelog
+
+### v2.3.0 (Enero 2025)
+#### 🗑️ Gestión Inteligente de Tareas
+- **Eliminación con dependencias**: Advertencia detallada antes de eliminar tareas con dependencias
+- **Limpieza automática**: Remoción automática de referencias a tareas eliminadas
+- **Recálculo automático**: Actualización automática del cronograma después de eliminaciones
+- **Confirmación informada**: Mensajes detallados sobre el impacto de la eliminación
+- **Botón de eliminar**: Reemplazo del botón de editar redundante por funcionalidad de eliminar
+
+#### 📁 Gestión de Archivos
+- **Almacenamiento en Supabase Storage**: Integración completa con bucket `project-files`
+- **Filtrado por proyecto**: Cada proyecto muestra solo sus propios archivos
+- **Nombres originales**: Muestra el nombre asignado al archivo, no el técnico
+- **Metadatos completos**: Tamaño, fecha de subida y tipo de archivo correctos
+- **Descarga directa**: Acceso inmediato a archivos desde la interfaz
+- **Eliminación segura**: Borrado tanto de la interfaz como de Supabase Storage
+
+#### 📊 Importación de Cronogramas
+- **Reemplazo completo**: Los nuevos cronogramas reemplazan completamente los anteriores
+- **Confirmación de usuario**: Advertencia antes de reemplazar cronograma existente
+- **Prevención de mezcla**: Evita mezclar tareas de cronogramas diferentes
+- **Manejo de tareas huérfanas**: Advertencia sobre posibles tareas de minuta sin hito
 
 ### v2.2.0 (Enero 2025)
 #### 🎯 Mejoras del Cronograma
@@ -295,5 +336,5 @@ Este proyecto es privado y propietario. Todos los derechos reservados.
 ---
 
 **Última actualización**: Enero 2025
-**Versión**: 2.2.0
+**Versión**: 2.3.0
 **Estado**: Producción
