@@ -89,8 +89,25 @@ const CashFlowProjection = ({
         startDate: task.startDate,
         endDate: task.endDate,
         hasCost: !!task.cost,
-        hasDates: !!(task.startDate && task.endDate)
+        hasDates: !!(task.startDate && task.endDate),
+        isMilestone: task.isMilestone,
+        duration: task.duration
       });
+      
+      // DEBUG ESPECÍFICO: Para la tarea 45 (hito problemático)
+      if (index === 44) { // Tarea 45 (índice 44)
+        console.log('🚨 DEBUG TAREA 45 ESPECÍFICA:', {
+          taskName: task.name || task.title,
+          taskCost: task.cost,
+          taskStartDate: task.startDate,
+          taskEndDate: task.endDate,
+          isMilestone: task.isMilestone,
+          duration: task.duration,
+          monthStart: monthStart.toISOString().split('T')[0],
+          monthEnd: monthEnd.toISOString().split('T')[0],
+          monthName: monthDate.toLocaleDateString('es-ES', { year: 'numeric', month: 'long' })
+        });
+      }
       
       if (task.cost && task.startDate && task.endDate) {
         tasksWithCosts++;
