@@ -181,25 +181,25 @@ const CashFlowProjection = ({
           // Para hitos: verificar que la fecha esté dentro del mes
           isInMonth = taskStart >= monthStart && taskStart <= monthEnd;
           
-          // DEBUG: Logging detallado para todas las tareas con costos
-          if (task.cost > 0) {
-            console.log('🎯 DEBUG HITO - Verificación de mes:', {
-              taskName: task.name || task.title,
-              taskStartDate: task.startDate,
-              taskStart: taskStart.toISOString().split('T')[0],
-              monthStart: monthStart.toISOString().split('T')[0],
-              monthEnd: monthEnd.toISOString().split('T')[0],
-              isInMonth: isInMonth,
-              monthName: monthDate.toLocaleDateString('es-ES', { year: 'numeric', month: 'long' }),
-              comparison: {
-                taskStartGreaterEqualMonthStart: taskStart >= monthStart,
-                taskStartLessEqualMonthEnd: taskStart <= monthEnd,
-                taskStartTime: taskStart.getTime(),
-                monthStartTime: monthStart.getTime(),
-                monthEndTime: monthEnd.getTime()
-              }
-            });
-          }
+  // DEBUG: Logging detallado solo para tareas con costos altos y meses específicos
+  if (task.cost > 0 && (monthName === 'julio de 2026' || monthName === 'agosto de 2026')) {
+    console.log(`🎯 DEBUG HITO [${componentId}] - Verificación de mes:`, {
+      taskName: task.name || task.title,
+      taskStartDate: task.startDate,
+      taskStart: taskStart.toISOString().split('T')[0],
+      monthStart: monthStart.toISOString().split('T')[0],
+      monthEnd: monthEnd.toISOString().split('T')[0],
+      isInMonth: isInMonth,
+      monthName: monthName,
+      comparison: {
+        taskStartGreaterEqualMonthStart: taskStart >= monthStart,
+        taskStartLessEqualMonthEnd: taskStart <= monthEnd,
+        taskStartTime: taskStart.getTime(),
+        monthStartTime: monthStart.getTime(),
+        monthEndTime: monthEnd.getTime()
+      }
+    });
+  }
         } else {
           // Para tareas normales: verificar intersección de fechas
           isInMonth = taskStart <= monthEnd && taskEnd >= monthStart;
