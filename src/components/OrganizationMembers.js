@@ -286,7 +286,57 @@ ${registrationUrl}`);
           console.warn('⚠️ Error actualizando riesgos:', risksError);
         }
 
-        // PASO 4: Registrar evento de auditoría
+        // PASO 4: Limpiar caché local del usuario eliminado
+        console.log('🗑️ Limpiando caché local del usuario eliminado...');
+        try {
+          // Limpiar localStorage del usuario eliminado
+          const localStorageKeys = [
+            'mi-dashboard-portfolio',
+            'lastSelectedProjectId',
+            'portfolioData',
+            'audit-log-' + memberEmail,
+            'user-preferences-' + memberEmail
+          ];
+          
+          localStorageKeys.forEach(key => {
+            const data = localStorage.getItem(key);
+            if (data) {
+              try {
+                const parsedData = JSON.parse(data);
+                // Si los datos contienen referencias al usuario eliminado, limpiarlos
+                if (JSON.stringify(parsedData).includes(memberEmail)) {
+                  console.log(`🗑️ Limpiando localStorage key: ${key}`);
+                  localStorage.removeItem(key);
+                }
+              } catch (e) {
+                // Si no se puede parsear, eliminar directamente
+                console.log(`🗑️ Limpiando localStorage key (raw): ${key}`);
+                localStorage.removeItem(key);
+              }
+            }
+          });
+          
+          // Limpiar sessionStorage también
+          const sessionStorageKeys = [
+            'currentUser',
+            'userSession',
+            'organizationData'
+          ];
+          
+          sessionStorageKeys.forEach(key => {
+            const data = sessionStorage.getItem(key);
+            if (data && data.includes(memberEmail)) {
+              console.log(`🗑️ Limpiando sessionStorage key: ${key}`);
+              sessionStorage.removeItem(key);
+            }
+          });
+          
+          console.log('✅ Caché local limpiado para usuario eliminado');
+        } catch (cacheError) {
+          console.warn('⚠️ Error limpiando caché local:', cacheError);
+        }
+
+        // PASO 5: Registrar evento de auditoría
         if (addAuditEvent) {
           addAuditEvent({
             category: 'organization',
@@ -295,15 +345,34 @@ ${registrationUrl}`);
             details: {
               userEmail: memberEmail,
               organizationId: organizationId,
-              tablesCleaned: ['organization_members', 'user_organization_roles', 'tasks', 'risks']
+              tablesCleaned: ['organization_members', 'user_organization_roles', 'tasks', 'risks'],
+              localCacheCleaned: true
             },
             severity: 'high',
             user: supabaseService.getCurrentUser()?.email || 'Sistema'
           });
         }
 
-        console.log('✅ Usuario eliminado completamente de todas las tablas');
-        alert(`✅ Usuario ${memberEmail} eliminado COMPLETAMENTE de la organización\n\nSe eliminó de:\n• organization_members\n• user_organization_roles\n• Referencias en tareas y riesgos\n\nEl usuario ya no tiene acceso a la organización.`);
+        console.log('✅ Usuario eliminado completamente de todas las tablas y caché local');
+        
+        // Mostrar mensaje detallado con instrucciones
+        const detailedMessage = `✅ Usuario ${memberEmail} eliminado COMPLETAMENTE de la organización
+
+Se eliminó de:
+• organization_members (membresía principal)
+• user_organization_roles (roles y permisos)
+• Referencias en tareas y riesgos
+• Caché local del navegador
+
+⚠️ IMPORTANTE: El usuario eliminado debe:
+1. Cerrar sesión completamente
+2. Cerrar el navegador
+3. Volver a abrir el navegador
+4. Iniciar sesión nuevamente
+
+Solo así verá que ya no tiene acceso a la organización.`;
+        
+        alert(detailedMessage);
         
         // Recargar miembros
         await loadOrganizationMembers();

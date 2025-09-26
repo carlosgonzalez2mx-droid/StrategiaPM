@@ -114,6 +114,56 @@ class SupabaseService {
     }
   }
 
+  // NUEVA: Forzar recarga de organización y limpiar caché
+  async forceReloadOrganization() {
+    console.log('🔄 Forzando recarga de organización...');
+    
+    try {
+      // Limpiar caché de organización
+      this.organizationId = null;
+      
+      // Limpiar localStorage relacionado con organización
+      const keysToClean = [
+        'mi-dashboard-portfolio',
+        'lastSelectedProjectId',
+        'portfolioData',
+        'organizationData',
+        'userSession'
+      ];
+      
+      keysToClean.forEach(key => {
+        if (localStorage.getItem(key)) {
+          console.log(`🗑️ Limpiando localStorage: ${key}`);
+          localStorage.removeItem(key);
+        }
+      });
+      
+      // Limpiar sessionStorage
+      const sessionKeysToClean = [
+        'currentUser',
+        'userSession',
+        'organizationData'
+      ];
+      
+      sessionKeysToClean.forEach(key => {
+        if (sessionStorage.getItem(key)) {
+          console.log(`🗑️ Limpiando sessionStorage: ${key}`);
+          sessionStorage.removeItem(key);
+        }
+      });
+      
+      // Forzar nueva detección de organización
+      const newOrgId = await this.detectUserOrganization();
+      
+      console.log('✅ Recarga de organización completada:', newOrgId);
+      return newOrgId;
+      
+    } catch (error) {
+      console.error('❌ Error en forceReloadOrganization:', error);
+      return null;
+    }
+  }
+
   // Cargar organización del usuario
   async loadOrganization() {
     if (!this.currentUser) return null;
