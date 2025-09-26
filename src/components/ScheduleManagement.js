@@ -2,7 +2,9 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import * as XLSX from 'xlsx';
 import MinutaModal from './MinutaModal';
 import EditMinutaModal from './EditMinutaModal';
+import ScheduleWizard from './ai-scheduler/ScheduleWizard';
 import supabaseService from '../services/SupabaseService';
+import aiSchedulerService from '../services/AISchedulerService';
 import useAuditLog from '../hooks/useAuditLog';
 
 // ===== Utilidades de tiempo =====
@@ -895,9 +897,12 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
   // Estados para edición de minutas
   const [editingMinuta, setEditingMinuta] = useState(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  
+  // Estados para el Asistente Inteligente de Cronogramas
+  const [showAIWizard, setShowAIWizard] = useState(false);
 
   // Hook de auditoría para minutas
-  const { logMinutaTaskCreated, logMinutaTaskUpdated } = useAuditLog(
+  const { logMinutaTaskCreated, logMinutaTaskUpdated, addAuditEvent } = useAuditLog(
     projectData?.id,
     useSupabase
   );
@@ -3875,6 +3880,142 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
     }
   };
 
+  // ===== FUNCIONES PARA ASISTENTE INTELIGENTE DE CRONOGRAMAS =====
+  
+  // Inicializar el servicio de IA
+  useEffect(() => {
+    const initializeAIService = async () => {
+      if (useSupabase && projectData?.id) {
+        try {
+          await aiSchedulerService.initialize(
+            supabaseService.supabase,
+            projectData.organizationId,
+            supabaseService.currentUser
+          );
+          console.log('🤖 Servicio de IA inicializado para proyecto:', projectData.id);
+        } catch (error) {
+          console.error('❌ Error inicializando servicio de IA:', error);
+        }
+      }
+    };
+
+    initializeAIService();
+  }, [useSupabase, projectData?.id, projectData?.organizationId]);
+
+  // Manejar cronograma generado por IA
+  const handleAIScheduleGenerated = async (generatedSchedule) => {
+    try {
+      console.log('🤖 Aplicando cronograma generado por IA:', generatedSchedule);
+      
+      // Convertir actividades generadas por IA al formato de tareas
+      const aiTasks = generatedSchedule.activities.map(activity => ({
+        id: activity.id,
+        name: activity.name,
+        description: activity.description || '',
+        duration: activity.duration || 1,
+        startDate: null, // Se calculará con CPM
+        endDate: null,   // Se calculará con CPM
+        progress: 0,
+        status: 'pending',
+        priority: activity.priority || 'medium',
+        assignedTo: activity.assignedTo || 'Pendiente',
+        dependencies: activity.dependencies || [],
+        predecessors: activity.dependencies || [],
+        successors: [],
+        isMilestone: activity.isMilestone || false,
+        estimatedCost: activity.estimatedCost || 0,
+        category: activity.category || 'execution',
+        phase: activity.phase || 'General',
+        generatedBy: 'ai',
+        confidence: activity.confidence || 0.8
+      }));
+
+      // Agregar hitos generados por IA
+      const aiMilestones = generatedSchedule.milestones.map(milestone => ({
+        id: milestone.id,
+        name: milestone.name,
+        description: milestone.description || '',
+        duration: 0, // Los hitos no tienen duración
+        startDate: null, // Se calculará con CPM
+        endDate: null,   // Se calculará con CPM
+        progress: 0,
+        status: 'pending',
+        priority: milestone.priority || 'high',
+        assignedTo: milestone.assignedTo || 'Pendiente',
+        dependencies: milestone.dependencies || [],
+        predecessors: milestone.dependencies || [],
+        successors: [],
+        isMilestone: true,
+        estimatedCost: 0,
+        category: 'milestone',
+        phase: milestone.phase || 'General',
+        generatedBy: 'ai',
+        confidence: milestone.confidence || 0.9,
+        criteria: milestone.criteria || ''
+      }));
+
+      // Combinar tareas y hitos
+      const allAITasks = [...aiTasks, ...aiMilestones];
+
+      // Confirmar reemplazo del cronograma actual
+      const confirmMessage = `🤖 CRONOGRAMA GENERADO POR IA\n\n` +
+        `Actividades: ${aiTasks.length}\n` +
+        `Hitos: ${aiMilestones.length}\n` +
+        `Duración estimada: ${Math.round(generatedSchedule.metadata?.estimatedDuration || 0)} días\n\n` +
+        `Esto REEMPLAZARÁ COMPLETAMENTE el cronograma actual.\n` +
+        `¿Continuar con la aplicación del cronograma generado por IA?`;
+
+      if (!window.confirm(confirmMessage)) {
+        console.log('🤖 Aplicación de cronograma IA cancelada por el usuario');
+        return;
+      }
+
+      // Aplicar CPM a las nuevas tareas
+      const tasksWithCPM = calculateCPM(allAITasks, includeWeekends);
+
+      // Actualizar el estado de tareas
+      setTasks(tasksWithCPM);
+
+      // Registrar evento de auditoría
+      addAuditEvent({
+        category: 'ai-scheduler',
+        action: 'schedule-applied',
+        description: 'Cronograma generado por IA aplicado al proyecto',
+        details: {
+          activitiesCount: aiTasks.length,
+          milestonesCount: aiMilestones.length,
+          templateUsed: generatedSchedule.metadata?.templateUsed,
+          estimatedDuration: generatedSchedule.metadata?.estimatedDuration,
+          complexity: generatedSchedule.metadata?.complexity
+        }
+      });
+
+      // Mostrar recomendaciones si las hay
+      if (generatedSchedule.recommendations && generatedSchedule.recommendations.length > 0) {
+        const recommendationsText = generatedSchedule.recommendations
+          .map(rec => `• ${rec.title}: ${rec.description}`)
+          .join('\n');
+        
+        alert(`✅ CRONOGRAMA DE IA APLICADO EXITOSAMENTE!\n\n` +
+          `📊 ${allAITasks.length} elementos generados\n` +
+          `🎯 ${aiMilestones.length} hitos creados\n` +
+          `⏱️ Duración estimada: ${Math.round(generatedSchedule.metadata?.estimatedDuration || 0)} días\n\n` +
+          `💡 RECOMENDACIONES:\n${recommendationsText}`);
+      } else {
+        alert(`✅ CRONOGRAMA DE IA APLICADO EXITOSAMENTE!\n\n` +
+          `📊 ${allAITasks.length} elementos generados\n` +
+          `🎯 ${aiMilestones.length} hitos creados\n` +
+          `⏱️ Duración estimada: ${Math.round(generatedSchedule.metadata?.estimatedDuration || 0)} días`);
+      }
+
+      console.log('✅ Cronograma de IA aplicado exitosamente');
+
+    } catch (error) {
+      console.error('❌ Error aplicando cronograma de IA:', error);
+      alert(`❌ Error aplicando cronograma de IA: ${error.message}`);
+    }
+  };
+
   // Función para alternar hito
   const toggleMilestone = (taskId) => {
     setTasks(prev => prev.map(task => {
@@ -5392,6 +5533,14 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
               >
                   <span>📊</span>
                   <span>Importar Cronograma</span>
+              </button>
+              <button
+                  onClick={() => setShowAIWizard(true)}
+                  className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2 rounded-lg hover:from-purple-700 hover:to-pink-700 flex items-center space-x-2 transition-all transform hover:scale-105"
+                  title="Generar cronograma automáticamente con Asistente de IA"
+              >
+                  <span>🤖</span>
+                  <span>Asistente de IA</span>
               </button>
               
               {/* Input de archivo oculto */}
@@ -9575,6 +9724,15 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         minuta={editingMinuta}
         hitos={tasks.filter(task => task.isMilestone)}
         onUpdate={handleUpdateMinuta}
+      />
+
+      {/* Asistente Inteligente de Cronogramas */}
+      <ScheduleWizard
+        isOpen={showAIWizard}
+        onClose={() => setShowAIWizard(false)}
+        onComplete={handleAIScheduleGenerated}
+        projectId={projectData?.id}
+        currentProject={projectData}
       />
     </div>
   );
