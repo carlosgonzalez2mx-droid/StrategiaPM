@@ -1734,24 +1734,58 @@ class SupabaseService {
         return { success: false, error: 'No autenticado', files: [] };
       }
 
-      const searchPath = category 
-        ? `${this.organizationId}/${projectId}/${category}`
-        : `${this.organizationId}/${projectId}`;
+      // CORRECCIÓN: Buscar primero en la raíz del bucket, luego en subcarpetas
+      let searchPath = '';
+      let data = [];
+      let error = null;
 
-      console.log(`📋 Listando archivos en Storage: ${searchPath}`);
+      // Primero intentar buscar en la raíz del bucket
+      console.log(`📋 Listando archivos en Storage: raíz del bucket`);
       console.log(`🔍 DEBUG - Parámetros de búsqueda:`, {
         organizationId: this.organizationId,
         projectId: projectId,
         category: category,
-        searchPath: searchPath
+        searchPath: 'raíz del bucket'
       });
 
-      const { data, error } = await this.supabase.storage
+      const { data: rootData, error: rootError } = await this.supabase.storage
         .from('project-files')
-        .list(searchPath, {
+        .list('', {
           limit: 100,
           offset: 0
         });
+
+      if (rootError) {
+        console.error('❌ Error listando archivos en raíz:', rootError);
+        error = rootError;
+      } else {
+        console.log('🔍 DEBUG - Archivos encontrados en raíz:', rootData);
+        data = rootData || [];
+      }
+
+      // Si no hay archivos en la raíz, intentar en la ruta específica
+      if (data.length === 0) {
+        searchPath = category 
+          ? `${this.organizationId}/${projectId}/${category}`
+          : `${this.organizationId}/${projectId}`;
+
+        console.log(`📋 No hay archivos en raíz, buscando en: ${searchPath}`);
+        
+        const { data: specificData, error: specificError } = await this.supabase.storage
+          .from('project-files')
+          .list(searchPath, {
+            limit: 100,
+            offset: 0
+          });
+
+        if (specificError) {
+          console.error('❌ Error listando archivos en ruta específica:', specificError);
+          error = specificError;
+        } else {
+          console.log('🔍 DEBUG - Archivos encontrados en ruta específica:', specificData);
+          data = specificData || [];
+        }
+      }
 
       if (error) {
         console.error('❌ Error listando archivos:', error);
