@@ -569,9 +569,10 @@ const CashFlowProjection = ({
     if (value === null || value === undefined || isNaN(value)) return '$0,00';
     
     // Formatear con separadores de miles (punto) y decimales (coma)
+    // CORRECCIÓN: Permitir hasta 3 decimales para preservar precisión de costos
     const formatted = new Intl.NumberFormat('es-MX', {
       minimumFractionDigits: 2,
-      maximumFractionDigits: 2
+      maximumFractionDigits: 3
     }).format(value);
     
     return `$${formatted}`;
