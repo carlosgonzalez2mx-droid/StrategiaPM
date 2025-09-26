@@ -54,7 +54,38 @@ const usePermissions = () => {
         
         if (!currentOrganizationId) {
           console.log('⏳ Esperando detección de organización...');
-          // En lugar de aplicar permisos restrictivos, esperar un poco más
+          
+          // VERIFICAR SI EL USUARIO EXISTE EN LA ORGANIZACIÓN
+          // Si no se puede detectar organización, verificar si el usuario fue eliminado
+          try {
+            const { data: userMemberships, error: membershipError } = await supabaseService.supabase
+              .from('organization_members')
+              .select('id, organization_id, status')
+              .eq('user_email', currentUser.email)
+              .eq('status', 'active');
+
+            if (membershipError) {
+              console.error('❌ Error verificando membresía:', membershipError);
+            } else if (!userMemberships || userMemberships.length === 0) {
+              console.log('🚨 USUARIO ELIMINADO DETECTADO - No tiene membresías activas');
+              console.log('🚨 Forzando cierre de sesión para:', currentUser.email);
+              
+              // FORZAR CIERRE DE SESIÓN
+              await supabaseService.supabase.auth.signOut();
+              
+              // Limpiar caché local
+              localStorage.clear();
+              sessionStorage.clear();
+              
+              // Recargar página para limpiar estado
+              window.location.reload();
+              return;
+            }
+          } catch (verifyError) {
+            console.error('❌ Error verificando membresía del usuario:', verifyError);
+          }
+          
+          // Si el usuario existe pero no se detecta organización, esperar un poco más
           setTimeout(() => {
             if (!isLoadingRef.current) {
               loadUserRole();
