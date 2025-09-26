@@ -1762,17 +1762,29 @@ class SupabaseService {
           .from('project-files')
           .getPublicUrl(filePath);
 
-        // Obtener tamaño del archivo desde diferentes fuentes posibles
+        // CORRECCIÓN: Obtener tamaño del archivo desde metadata.size (que es donde Supabase lo guarda)
         const fileSize = file.metadata?.size || 
-                        file.size || 
                         file.metadata?.file_size || 
+                        file.size || 
                         0;
 
-        // Formatear fecha correctamente
+        // CORRECCIÓN: Usar created_at directamente (que es la fecha real de Supabase)
         const uploadDate = file.created_at || 
                           file.updated_at || 
                           file.metadata?.created_at || 
                           new Date().toISOString();
+
+        // DEBUG: Mostrar qué valores estamos obteniendo
+        console.log(`🔍 DEBUG - Procesando archivo ${file.name}:`, {
+          'file.metadata?.size': file.metadata?.size,
+          'file.metadata?.file_size': file.metadata?.file_size,
+          'file.size': file.size,
+          'fileSize final': fileSize,
+          'file.created_at': file.created_at,
+          'file.updated_at': file.updated_at,
+          'file.metadata?.created_at': file.metadata?.created_at,
+          'uploadDate final': uploadDate
+        });
 
         return {
           id: `file-${file.name.split('.')[0]}`,
