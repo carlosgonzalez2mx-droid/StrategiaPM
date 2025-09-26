@@ -190,6 +190,20 @@ function MainApp() {
     // La limpieza se hace solo una vez al cargar datos iniciales
     const tasks = tasksByProject[currentProjectId] || [];
     
+    // DEBUG: Logging detallado para identificar mezcla de proyectos
+    console.log(`🔍 getCurrentProjectTasks - Proyecto ${currentProjectId}:`, {
+      currentProjectId,
+      tasksCount: tasks.length,
+      tasksWithDifferentProjects: tasks.filter(t => t.projectId && t.projectId !== currentProjectId).length,
+      sampleTasks: tasks.slice(0, 3).map(t => ({
+        id: t.id,
+        name: t.name,
+        projectId: t.projectId,
+        startDate: t.startDate,
+        cost: t.cost
+      }))
+    });
+    
     // Solo loggear si hay un problema potencial
     if (!Array.isArray(tasks)) {
       console.warn('⚠️ Datos corruptos detectados en getCurrentProjectTasks:', {
