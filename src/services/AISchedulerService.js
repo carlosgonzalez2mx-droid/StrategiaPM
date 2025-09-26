@@ -85,10 +85,11 @@ class AISchedulerService {
       const { projectType, industry, methodology } = wizardData;
 
       // Buscar templates que coincidan con los criterios
+      // CORRECCIÓN: Buscar templates de la organización O templates globales (sin organization_id)
       let query = this.supabase
         .from('schedule_templates')
         .select('*')
-        .eq('organization_id', this.organizationId);
+        .or(`organization_id.eq.${this.organizationId},organization_id.is.null`);
 
       // Filtrar por tipo de proyecto si está disponible
       if (projectType) {
@@ -107,9 +108,28 @@ class AISchedulerService {
 
       const { data: templates, error } = await query;
 
+      console.log('🔍 DEBUG - Consulta de templates:', {
+        organizationId: this.organizationId,
+        projectType,
+        industry,
+        methodology,
+        query: query.toString()
+      });
+
       if (error) {
         console.error('Error obteniendo templates:', error);
         throw error;
+      }
+
+      console.log('📋 Templates encontrados:', templates?.length || 0);
+      if (templates && templates.length > 0) {
+        console.log('📋 Primeros templates:', templates.slice(0, 3).map(t => ({
+          id: t.id,
+          name: t.name,
+          project_type: t.project_type,
+          industry: t.industry,
+          organization_id: t.organization_id
+        })));
       }
 
       if (!templates || templates.length === 0) {
@@ -118,7 +138,7 @@ class AISchedulerService {
         const { data: genericTemplates } = await this.supabase
           .from('schedule_templates')
           .select('*')
-          .eq('organization_id', this.organizationId)
+          .or(`organization_id.eq.${this.organizationId},organization_id.is.null`)
           .limit(1);
         
         if (genericTemplates?.[0]) {
@@ -652,7 +672,7 @@ class AISchedulerService {
       const { data: templates, error } = await this.supabase
         .from('schedule_templates')
         .select('*')
-        .eq('organization_id', this.organizationId)
+        .or(`organization_id.eq.${this.organizationId},organization_id.is.null`)
         .order('name');
 
       if (error) {
