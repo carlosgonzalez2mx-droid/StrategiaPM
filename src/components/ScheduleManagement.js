@@ -3964,11 +3964,37 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
 
   // Función para eliminar una tarea
   const deleteTask = (taskId) => {
-    if (!window.confirm('¿Estás seguro de que quieres eliminar esta tarea? Esta acción no se puede deshacer.')) {
+    const taskToDelete = tasks.find(t => t.id === taskId);
+    if (!taskToDelete) return;
+
+    // Verificar dependencias antes de eliminar
+    const dependentTasks = tasks.filter(task => 
+      task.predecessors?.includes(taskId) || task.successors?.includes(taskId)
+    );
+
+    let confirmMessage = `¿Estás seguro de que quieres eliminar la tarea "${taskToDelete.name}"?`;
+    
+    if (dependentTasks.length > 0) {
+      confirmMessage += `\n\n⚠️ ADVERTENCIA: Esta tarea tiene dependencias:\n`;
+      dependentTasks.forEach(task => {
+        if (task.predecessors?.includes(taskId)) {
+          confirmMessage += `• "${task.name}" depende de esta tarea\n`;
+        }
+        if (task.successors?.includes(taskId)) {
+          confirmMessage += `• Esta tarea depende de "${task.name}"\n`;
+        }
+      });
+      confirmMessage += `\nLas dependencias se limpiarán automáticamente, pero esto podría afectar el cronograma.`;
+    }
+    
+    confirmMessage += `\n\nEsta acción no se puede deshacer.`;
+
+    if (!window.confirm(confirmMessage)) {
       return;
     }
 
-    console.log('🗑️ Eliminando tarea:', taskId);
+    console.log('🗑️ Eliminando tarea:', taskToDelete.name, 'ID:', taskId);
+    console.log('🔗 Tareas dependientes encontradas:', dependentTasks.length);
     
     setTasks(prev => {
       const updatedTasks = prev.filter(task => task.id !== taskId);
@@ -3980,8 +4006,17 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         successors: task.successors?.filter(succId => succId !== taskId) || []
       }));
       
+      // Recalcular CPM para las tareas afectadas
+      const affectedTaskIds = dependentTasks.map(t => t.id);
+      console.log('🔄 Recalculando CPM para tareas afectadas:', affectedTaskIds);
+      
+      // Aplicar CPM a todas las tareas para actualizar fechas
+      const tasksWithCPM = calculateCPM(cleanedTasks, includeWeekends);
+      
       console.log('✅ Tarea eliminada exitosamente');
-      return cleanedTasks;
+      console.log('📊 Cronograma recalculado automáticamente');
+      
+      return tasksWithCPM;
     });
   };
 
