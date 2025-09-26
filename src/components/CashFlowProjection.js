@@ -85,19 +85,68 @@ const CashFlowProjection = ({
     
     // DEBUG: Mostrar todas las tareas con costos para julio 2026
     if (monthDate.getMonth() === 6 && monthDate.getFullYear() === 2026) {
-      console.log('🔍 DEBUG JULIO 2026 - Todas las tareas con costos:');
+      console.log('🔍 DEBUG JULIO 2026 - ANÁLISIS COMPLETO DE TAREAS:');
+      console.log('🔍 Rango del mes julio 2026:', {
+        monthStart: monthStart.toISOString().split('T')[0],
+        monthEnd: monthEnd.toISOString().split('T')[0]
+      });
+
+      let totalCostoEsperado = 0;
+      let tareasEnJulio = 0;
+      let tareasExcluidasJulio = [];
+
       tasks.forEach((task, index) => {
         if (task.cost && task.cost > 0) {
-          console.log(`  Tarea ${index + 1}:`, {
-            name: task.name || task.title,
-            cost: task.cost,
-            startDate: task.startDate,
-            endDate: task.endDate,
-            isMilestone: task.isMilestone,
-            duration: task.duration
-          });
+          totalCostoEsperado += task.cost;
+
+          // Verificar si la tarea está en julio 2026
+          const taskStart = new Date(task.startDate);
+          const taskEnd = new Date(task.endDate);
+
+          let isInMonth = false;
+          if (task.isMilestone || task.duration === 0) {
+            isInMonth = taskStart >= monthStart && taskStart <= monthEnd;
+          } else {
+            isInMonth = taskStart <= monthEnd && taskEnd >= monthStart;
+          }
+
+          if (isInMonth) {
+            tareasEnJulio++;
+            console.log(`  ✅ INCLUIDA - Tarea ${index + 1}:`, {
+              name: task.name || task.title,
+              cost: task.cost,
+              startDate: task.startDate,
+              endDate: task.endDate,
+              isMilestone: task.isMilestone,
+              duration: task.duration,
+              taskStart: taskStart.toISOString().split('T')[0],
+              taskEnd: taskEnd.toISOString().split('T')[0]
+            });
+          } else {
+            tareasExcluidasJulio.push({
+              index: index + 1,
+              name: task.name || task.title,
+              cost: task.cost,
+              startDate: task.startDate,
+              taskStart: taskStart.toISOString().split('T')[0],
+              isMilestone: task.isMilestone,
+              razon: task.isMilestone ?
+                `Hito fuera del rango: ${taskStart.toISOString().split('T')[0]} no está entre ${monthStart.toISOString().split('T')[0]} y ${monthEnd.toISOString().split('T')[0]}` :
+                `Tarea normal sin intersección: ${taskStart.toISOString().split('T')[0]} - ${taskEnd.toISOString().split('T')[0]} no intersecta con ${monthStart.toISOString().split('T')[0]} - ${monthEnd.toISOString().split('T')[0]}`
+            });
+          }
         }
       });
+
+      console.log('🔍 JULIO 2026 - Resumen:', {
+        totalTareas: tasks.length,
+        tareasConCosto: tasks.filter(t => t.cost > 0).length,
+        tareasEnJulio: tareasEnJulio,
+        costoTotalEsperado: totalCostoEsperado,
+        costoPromedioPorTarea: totalCostoEsperado / tasks.filter(t => t.cost > 0).length
+      });
+
+      console.log('🔍 JULIO 2026 - Tareas EXCLUIDAS (posibles causas del error):', tareasExcluidasJulio);
     }
     
     let plannedExpense = 0;
@@ -268,7 +317,18 @@ const CashFlowProjection = ({
       tasksInMonth,
       plannedExpense: plannedExpense.toFixed(2)
     });
-    
+
+    // DEBUG ESPECÍFICO PARA JULIO 2026
+    if (monthDate.getMonth() === 6 && monthDate.getFullYear() === 2026) {
+      console.log('🎯 JULIO 2026 - VALOR FINAL CALCULADO:', {
+        plannedExpense: plannedExpense,
+        plannedExpenseFixed: plannedExpense.toFixed(3),
+        valorEsperadoPorUsuario: 385953.528,
+        diferencia: plannedExpense - 385953.528,
+        porcentajeDelEsperado: ((plannedExpense / 385953.528) * 100).toFixed(2) + '%'
+      });
+    }
+
     return plannedExpense;
   };
 
@@ -395,10 +455,13 @@ const CashFlowProjection = ({
   };
 
   // Calcular proyección de flujo de caja
+  // FORZAR RECÁLCULO: Agregar timestamp para invalidar cache
+  const forceRecalculation = useMemo(() => Date.now(), [currentProject, tasks, projectionPeriod, projectionStartDate]);
+
   const cashFlowProjection = useMemo(() => {
     if (!currentProject) return null;
 
-    console.log(`🔍 CASHFLOW PROJECTION [${componentId}] - Iniciando cálculo de proyección:`, {
+    console.log(`🔄 CASHFLOW PROJECTION [${componentId}] - FORZANDO RECÁLCULO COMPLETO:`, {
       currentProject: currentProject?.name,
       projectionPeriod,
       projectionStartDate,
@@ -406,6 +469,7 @@ const CashFlowProjection = ({
       advances: advances?.length || 0,
       invoices: invoices?.length || 0,
       tasks: tasks?.length || 0,
+      forceRecalculation,
       timestamp: new Date().toISOString()
     });
 
@@ -424,18 +488,32 @@ const CashFlowProjection = ({
 
     const daysToPayment = paymentTerms[projectionSettings.paymentTerms];
 
+    // DEBUG: Mostrar configuración de proyección
+    console.log('🔍 CASHFLOW PROJECTION - CONFIGURACIÓN COMPLETA:', {
+      startDate: startDate.toISOString().split('T')[0],
+      months: months,
+      projectionStartDate: projectionStartDate,
+      projectionPeriod: projectionPeriod,
+      currentProject: currentProject?.name
+    });
+
     // Calcular flujo de caja mes a mes
     for (let i = 0; i < months; i++) {
       // CORREGIDO: Cálculo robusto de fechas para evitar repetición de meses
       const currentDate = new Date(startDate.getFullYear(), startDate.getMonth() + i, 1);
-      
+
       const monthKey = currentDate.toISOString().slice(0, 7); // YYYY-MM
-      const monthLabel = currentDate.toLocaleDateString('es-ES', { 
-        year: 'numeric', 
-        month: 'long' 
+      const monthLabel = currentDate.toLocaleDateString('es-ES', {
+        year: 'numeric',
+        month: 'long'
       });
 
       console.log(`🔍 CASHFLOW PROJECTION - Procesando mes ${i + 1}: ${monthKey} (${monthLabel})`);
+
+      // DEBUG ESPECÍFICO: Alertar cuando procesamos julio 2026
+      if (monthKey === '2026-07') {
+        console.log('🎯 JULIO 2026 DETECTADO - Iniciando cálculo detallado...');
+      }
 
       // Calcular gasto planificado del mes
       const monthPlannedExpense = calculateMonthPlannedExpense(currentDate);
@@ -492,7 +570,7 @@ const CashFlowProjection = ({
     });
 
     return projection;
-  }, [currentProject, projectionPeriod, projectionStartDate, projectionSettings, purchaseOrders, advances, invoices, contracts, tasks]);
+  }, [currentProject, projectionPeriod, projectionStartDate, projectionSettings, purchaseOrders, advances, invoices, contracts, tasks, forceRecalculation]);
 
   // Calcular métricas de flujo de caja
   const cashFlowMetrics = useMemo(() => {

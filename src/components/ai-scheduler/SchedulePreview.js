@@ -205,10 +205,17 @@ const SchedulePreview = ({ wizardData, generatedSchedule, isGenerating, onGenera
                   <div>
                     <h5 className="font-semibold text-gray-800 mb-3">Template Utilizado</h5>
                     <div className="bg-blue-50 rounded-lg p-4">
-                      <p className="font-semibold text-blue-800">{generatedSchedule.metadata?.templateUsed}</p>
+                      <p className="font-semibold text-blue-800">
+                        {generatedSchedule.metadata?.templateUsed || 'Template Genérico de Proyecto'}
+                      </p>
                       <p className="text-sm text-blue-600 mt-1">
                         Generado el {formatDate(generatedSchedule.metadata?.generatedAt)}
                       </p>
+                      {!generatedSchedule.metadata?.templateUsed && (
+                        <p className="text-xs text-blue-500 mt-2">
+                          ℹ️ Se utilizó un template genérico basado en mejores prácticas
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>

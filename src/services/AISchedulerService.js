@@ -121,7 +121,21 @@ class AISchedulerService {
           .eq('organization_id', this.organizationId)
           .limit(1);
         
-        return genericTemplates?.[0] || null;
+        if (genericTemplates?.[0]) {
+          return genericTemplates[0];
+        }
+        
+        // Si no hay templates en la base de datos, crear uno genérico
+        console.log('📋 Creando template genérico para el proyecto');
+        return {
+          id: 'generic-template',
+          name: 'Template Genérico de Proyecto',
+          description: 'Template genérico basado en mejores prácticas de gestión de proyectos',
+          project_type: wizardData.projectType || 'general',
+          industry: wizardData.industry || 'general',
+          methodology: wizardData.methodology || 'waterfall',
+          template_data: this.getGenericTemplateData(wizardData)
+        };
       }
 
       // Seleccionar el template más apropiado
@@ -551,6 +565,83 @@ class AISchedulerService {
       
       return scoreB - scoreA; // Orden descendente
     });
+  }
+
+  /**
+   * Obtener template genérico cuando no hay templates específicos
+   */
+  getGenericTemplateData(wizardData) {
+    const { projectType = 'general', teamSize = 5 } = wizardData;
+    
+    // Template genérico basado en el tipo de proyecto
+    const genericPhases = {
+      'manufacturing': [
+        {
+          name: 'Planificación',
+          activities: [
+            { name: 'Definición de requerimientos', duration: 5, category: 'planning' },
+            { name: 'Diseño conceptual', duration: 10, category: 'design' },
+            { name: 'Planificación de recursos', duration: 3, category: 'planning' }
+          ]
+        },
+        {
+          name: 'Diseño y Desarrollo',
+          activities: [
+            { name: 'Diseño detallado', duration: 15, category: 'design' },
+            { name: 'Especificaciones técnicas', duration: 8, category: 'design' },
+            { name: 'Prototipo', duration: 20, category: 'development' }
+          ]
+        },
+        {
+          name: 'Implementación',
+          activities: [
+            { name: 'Compra e instalación de maquinas y equipos', duration: 30, category: 'procurement', isMilestone: true },
+            { name: 'Instalación y configuración', duration: 15, category: 'implementation' },
+            { name: 'Pruebas de funcionamiento', duration: 10, category: 'testing' }
+          ]
+        },
+        {
+          name: 'Cierre',
+          activities: [
+            { name: 'Capacitación del personal', duration: 5, category: 'training' },
+            { name: 'Documentación final', duration: 3, category: 'documentation' },
+            { name: 'Entrega del proyecto', duration: 2, category: 'delivery', isMilestone: true }
+          ]
+        }
+      ],
+      'general': [
+        {
+          name: 'Inicio',
+          activities: [
+            { name: 'Kick-off del proyecto', duration: 1, category: 'planning', isMilestone: true },
+            { name: 'Definición de alcance', duration: 5, category: 'planning' },
+            { name: 'Planificación inicial', duration: 7, category: 'planning' }
+          ]
+        },
+        {
+          name: 'Ejecución',
+          activities: [
+            { name: 'Desarrollo de actividades principales', duration: 20, category: 'execution' },
+            { name: 'Seguimiento y control', duration: 15, category: 'monitoring' },
+            { name: 'Gestión de cambios', duration: 8, category: 'management' }
+          ]
+        },
+        {
+          name: 'Cierre',
+          activities: [
+            { name: 'Pruebas finales', duration: 5, category: 'testing' },
+            { name: 'Entrega del proyecto', duration: 3, category: 'delivery', isMilestone: true }
+          ]
+        }
+      ]
+    };
+
+    return {
+      phases: genericPhases[projectType] || genericPhases.general,
+      estimatedDuration: 60,
+      complexity: 'medium',
+      riskLevel: 'medium'
+    };
   }
 
   /**
