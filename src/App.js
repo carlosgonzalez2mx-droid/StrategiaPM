@@ -30,7 +30,12 @@ import UserManagement from './components/UserManagement';
 import SplashScreen from './components/SplashScreen';
 import filePersistenceService from './services/FilePersistenceService';
 import supabaseService from './services/SupabaseService';
-import './debug-file-storage'; // Script de diagnóstico para archivos
+// Importar script de diagnóstico solo en desarrollo
+if (process.env.NODE_ENV === 'development') {
+  import('./debug-file-storage').catch(err => {
+    console.warn('No se pudo cargar el script de diagnóstico:', err);
+  });
+}
 
 // Contextos
 import { AuthProvider, useAuth } from './contexts/AuthContext';
