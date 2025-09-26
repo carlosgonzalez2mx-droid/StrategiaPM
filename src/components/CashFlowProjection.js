@@ -60,6 +60,23 @@ const CashFlowProjection = ({
       totalTasks: tasks.length
     });
     
+    // DEBUG: Mostrar todas las tareas con costos para julio 2026
+    if (monthDate.getMonth() === 6 && monthDate.getFullYear() === 2026) {
+      console.log('🔍 DEBUG JULIO 2026 - Todas las tareas con costos:');
+      tasks.forEach((task, index) => {
+        if (task.cost && task.cost > 0) {
+          console.log(`  Tarea ${index + 1}:`, {
+            name: task.name || task.title,
+            cost: task.cost,
+            startDate: task.startDate,
+            endDate: task.endDate,
+            isMilestone: task.isMilestone,
+            duration: task.duration
+          });
+        }
+      });
+    }
+    
     let plannedExpense = 0;
     let tasksWithCosts = 0;
     let tasksInMonth = 0;
@@ -97,6 +114,21 @@ const CashFlowProjection = ({
               endDate: task.endDate,
               costInMonth: taskCostInMonth.toFixed(2)
             });
+            
+            // DEBUG ESPECÍFICO: Para el hito problemático
+            if (task.cost && task.cost > 300000) {
+              console.log('🚨 DEBUG HITO PROBLEMÁTICO:', {
+                taskName: task.name || task.title,
+                taskCost: task.cost,
+                taskStartDate: task.startDate,
+                taskEndDate: task.endDate,
+                monthStart: monthStart.toISOString().split('T')[0],
+                monthEnd: monthEnd.toISOString().split('T')[0],
+                isInMonth: taskStart <= monthEnd && taskEnd >= monthStart,
+                plannedExpenseBefore: plannedExpense - taskCostInMonth,
+                plannedExpenseAfter: plannedExpense
+              });
+            }
           } else {
             // Para tareas normales: calcular porcentaje basado en duración
             const monthDuration = monthEnd - monthStart + 1; // Duración del mes en ms
