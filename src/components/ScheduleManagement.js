@@ -3962,6 +3962,29 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
     window.dispatchEvent(dataChangeEvent);
   };
 
+  // Función para eliminar una tarea
+  const deleteTask = (taskId) => {
+    if (!window.confirm('¿Estás seguro de que quieres eliminar esta tarea? Esta acción no se puede deshacer.')) {
+      return;
+    }
+
+    console.log('🗑️ Eliminando tarea:', taskId);
+    
+    setTasks(prev => {
+      const updatedTasks = prev.filter(task => task.id !== taskId);
+      
+      // Actualizar dependencias: remover referencias a la tarea eliminada
+      const cleanedTasks = updatedTasks.map(task => ({
+        ...task,
+        predecessors: task.predecessors?.filter(predId => predId !== taskId) || [],
+        successors: task.successors?.filter(succId => succId !== taskId) || []
+      }));
+      
+      console.log('✅ Tarea eliminada exitosamente');
+      return cleanedTasks;
+    });
+  };
+
   const saveEdit = () => {
     if (!editingCell) return;
     
@@ -5423,12 +5446,12 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              setSelectedTask(task);
+                              deleteTask(task.id);
                             }}
-                            className="text-blue-600 hover:text-blue-800 text-xs px-1 py-1 rounded"
-                            title="Editar tarea"
+                            className="text-red-600 hover:text-red-800 text-xs px-1 py-1 rounded"
+                            title="Eliminar tarea"
                           >
-                            ✏️
+                            🗑️
                           </button>
             </div>
                       </td>
