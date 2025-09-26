@@ -1752,6 +1752,9 @@ class SupabaseService {
         return { success: false, error, files: [] };
       }
 
+      // DEBUG: Mostrar datos raw de Supabase
+      console.log('🔍 DEBUG - Datos raw de Supabase:', data);
+
       // Convertir archivos de Storage a formato esperado
       const files = (data || []).map(file => {
         const filePath = `${searchPath}/${file.name}`;
@@ -1789,6 +1792,17 @@ class SupabaseService {
       });
 
       console.log(`✅ ${files.length} archivos encontrados en Storage`);
+      
+      // DEBUG: Mostrar detalles de los archivos para diagnosticar
+      console.log('🔍 DEBUG - Archivos encontrados:', files.map(f => ({
+        fileName: f.fileName,
+        fileSize: f.fileSize,
+        uploadDate: f.uploadDate,
+        storagePath: f.storagePath,
+        publicUrl: f.publicUrl,
+        originalFile: f.metadata?.originalFile
+      })));
+      
       return { success: true, files };
 
     } catch (error) {
