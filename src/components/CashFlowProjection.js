@@ -106,23 +106,6 @@ const CashFlowProjection = ({
     
     // Calcular gasto planificado basado en tareas del cronograma que se ejecutan en este mes
     tasks.forEach((task, index) => {
-      // DEBUG: Logging específico para agosto 2026
-      if (monthName === 'agosto de 2026' && task.cost > 0) {
-        console.log(`🔍 CASHFLOW [${componentId}] - TAREA CON COSTO EN AGOSTO 2026:`, {
-          taskIndex: index,
-          taskId: task.id,
-          taskName: task.name,
-          taskCost: task.cost,
-          taskStartDate: task.startDate,
-          taskEndDate: task.endDate,
-          isMilestone: task.isMilestone,
-          duration: task.duration,
-          monthName: monthName,
-          monthStart: monthStart.toISOString().split('T')[0],
-          monthEnd: monthEnd.toISOString().split('T')[0]
-        });
-      }
-      
       console.log(`🔍 CashFlow: Tarea ${index + 1}:`, {
         name: task.name || task.title,
         cost: task.cost,
@@ -136,6 +119,7 @@ const CashFlowProjection = ({
       
       // DEBUG ESPECÍFICO: Para la tarea 45 (hito problemático)
       if (index === 44) { // Tarea 45 (índice 44)
+        const monthName = monthDate.toLocaleDateString('es-ES', { year: 'numeric', month: 'long' });
         console.log('🚨 DEBUG TAREA 45 ESPECÍFICA:', {
           taskName: task.name || task.title,
           taskCost: task.cost,
@@ -145,14 +129,49 @@ const CashFlowProjection = ({
           duration: task.duration,
           monthStart: monthStart.toISOString().split('T')[0],
           monthEnd: monthEnd.toISOString().split('T')[0],
-          monthName: monthDate.toLocaleDateString('es-ES', { year: 'numeric', month: 'long' })
+          monthName: monthName
         });
+        
+        // DEBUG: Logging específico para agosto 2026
+        if (monthName === 'agosto de 2026' && task.cost > 0) {
+          console.log(`🔍 CASHFLOW [${componentId}] - TAREA CON COSTO EN AGOSTO 2026:`, {
+            taskIndex: index,
+            taskId: task.id,
+            taskName: task.name,
+            taskCost: task.cost,
+            taskStartDate: task.startDate,
+            taskEndDate: task.endDate,
+            isMilestone: task.isMilestone,
+            duration: task.duration,
+            monthName: monthName,
+            monthStart: monthStart.toISOString().split('T')[0],
+            monthEnd: monthEnd.toISOString().split('T')[0]
+          });
+        }
       }
       
       if (task.cost && task.startDate && task.endDate) {
         tasksWithCosts++;
         const taskStart = new Date(task.startDate);
         const taskEnd = new Date(task.endDate);
+        
+        // DEBUG: Logging específico para agosto 2026
+        const monthName = monthDate.toLocaleDateString('es-ES', { year: 'numeric', month: 'long' });
+        if (monthName === 'agosto de 2026' && task.cost > 0) {
+          console.log(`🔍 CASHFLOW [${componentId}] - TAREA CON COSTO EN AGOSTO 2026:`, {
+            taskIndex: index,
+            taskId: task.id,
+            taskName: task.name,
+            taskCost: task.cost,
+            taskStartDate: task.startDate,
+            taskEndDate: task.endDate,
+            isMilestone: task.isMilestone,
+            duration: task.duration,
+            monthName: monthName,
+            monthStart: monthStart.toISOString().split('T')[0],
+            monthEnd: monthEnd.toISOString().split('T')[0]
+          });
+        }
         
         // Verificar si la tarea se ejecuta en este mes
         // CORRECCIÓN: Para hitos, verificar que la fecha esté exactamente en el mes
