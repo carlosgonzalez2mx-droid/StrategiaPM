@@ -1734,21 +1734,19 @@ class SupabaseService {
         return { success: false, error: 'No autenticado', files: [] };
       }
 
-      // CORRECCIÓN: Buscar primero en la raíz del bucket, luego en subcarpetas
-      let searchPath = '';
-      let data = [];
+      // CORRECCIÓN: Buscar archivos reales en todas las carpetas del bucket
+      let allFiles = [];
       let error = null;
 
-      // Primero intentar buscar en la raíz del bucket
-      console.log(`📋 Listando archivos en Storage: raíz del bucket`);
+      console.log(`📋 Buscando archivos reales en todo el bucket`);
       console.log(`🔍 DEBUG - Parámetros de búsqueda:`, {
         organizationId: this.organizationId,
         projectId: projectId,
-        category: category,
-        searchPath: 'raíz del bucket'
+        category: category
       });
 
-      const { data: rootData, error: rootError } = await this.supabase.storage
+      // 1. Listar carpetas en la raíz del bucket
+      const { data: rootFolders, error: rootError } = await this.supabase.storage
         .from('project-files')
         .list('', {
           limit: 100,
@@ -1756,36 +1754,49 @@ class SupabaseService {
         });
 
       if (rootError) {
-        console.error('❌ Error listando archivos en raíz:', rootError);
+        console.error('❌ Error listando carpetas en raíz:', rootError);
         error = rootError;
       } else {
-        console.log('🔍 DEBUG - Archivos encontrados en raíz:', rootData);
-        data = rootData || [];
-      }
-
-      // Si no hay archivos en la raíz, intentar en la ruta específica
-      if (data.length === 0) {
-        searchPath = category 
-          ? `${this.organizationId}/${projectId}/${category}`
-          : `${this.organizationId}/${projectId}`;
-
-        console.log(`📋 No hay archivos en raíz, buscando en: ${searchPath}`);
+        console.log('🔍 DEBUG - Carpetas encontradas en raíz:', rootFolders);
         
-        const { data: specificData, error: specificError } = await this.supabase.storage
-          .from('project-files')
-          .list(searchPath, {
-            limit: 100,
-            offset: 0
-          });
+        // 2. Buscar archivos en cada carpeta
+        for (const folder of rootFolders || []) {
+          if (folder.id === null) { // Es una carpeta, no un archivo
+            console.log(`📁 Buscando archivos en carpeta: ${folder.name}`);
+            
+            const { data: folderFiles, error: folderError } = await this.supabase.storage
+              .from('project-files')
+              .list(folder.name, {
+                limit: 100,
+                offset: 0
+              });
 
-        if (specificError) {
-          console.error('❌ Error listando archivos en ruta específica:', specificError);
-          error = specificError;
-        } else {
-          console.log('🔍 DEBUG - Archivos encontrados en ruta específica:', specificData);
-          data = specificData || [];
+            if (folderError) {
+              console.error(`❌ Error listando archivos en carpeta ${folder.name}:`, folderError);
+            } else {
+              console.log(`🔍 DEBUG - Archivos en carpeta ${folder.name}:`, folderFiles);
+              
+              // Filtrar solo archivos reales (con id no null)
+              const realFiles = (folderFiles || []).filter(file => file.id !== null);
+              console.log(`✅ Archivos reales en carpeta ${folder.name}:`, realFiles.length);
+              
+              // Agregar la ruta de la carpeta a cada archivo
+              realFiles.forEach(file => {
+                file.folderPath = folder.name;
+              });
+              
+              allFiles = allFiles.concat(realFiles);
+            }
+          } else {
+            // Es un archivo en la raíz
+            console.log(`📄 Archivo encontrado en raíz: ${folder.name}`);
+            allFiles.push(folder);
+          }
         }
       }
+
+      console.log(`✅ Total archivos reales encontrados: ${allFiles.length}`);
+      const data = allFiles;
 
       if (error) {
         console.error('❌ Error listando archivos:', error);
@@ -1812,7 +1823,11 @@ class SupabaseService {
 
       // Convertir archivos de Storage a formato esperado
       const files = (data || []).map(file => {
-        const filePath = `${searchPath}/${file.name}`;
+        // CORRECCIÓN: Usar la ruta completa del archivo (carpeta + nombre)
+        const filePath = file.folderPath 
+          ? `${file.folderPath}/${file.name}`
+          : file.name;
+          
         const { data: publicData } = this.supabase.storage
           .from('project-files')
           .getPublicUrl(filePath);
@@ -1831,6 +1846,7 @@ class SupabaseService {
 
         // DEBUG: Mostrar qué valores estamos obteniendo
         console.log(`🔍 DEBUG - Procesando archivo ${file.name}:`, {
+          'filePath': filePath,
           'file.metadata?.size': file.metadata?.size,
           'file.metadata?.file_size': file.metadata?.file_size,
           'file.size': file.size,
