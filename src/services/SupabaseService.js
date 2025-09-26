@@ -1569,12 +1569,12 @@ class SupabaseService {
 
   // ========== SUPABASE STORAGE FUNCTIONS ==========
 
-  // Inicializar buckets de Storage si no existen
+  // Verificar que el bucket project-files existe (sin intentar crearlo)
   async initializeStorage() {
     try {
-      console.log('🗂️ Inicializando Supabase Storage...');
+      console.log('🗂️ Verificando Supabase Storage...');
       
-      // Crear bucket para archivos de proyectos si no existe
+      // Solo verificar si el bucket project-files existe
       const { data: buckets, error: listError } = await this.supabase.storage.listBuckets();
       
       if (listError) {
@@ -1585,44 +1585,19 @@ class SupabaseService {
       const projectFilesBucket = buckets.find(bucket => bucket.name === 'project-files');
       
       if (!projectFilesBucket) {
-        console.log('⚠️ Bucket project-files no existe. Intentando crear...');
-        
-        try {
-          const { data, error: createError } = await this.supabase.storage.createBucket('project-files', {
-            public: true, // Cambiar a true para acceso público
-            allowedMimeTypes: [
-              'application/pdf',
-              'image/jpeg',
-              'image/png',
-              'application/msword',
-              'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-              'application/vnd.ms-excel',
-              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-            ],
-            fileSizeLimit: 52428800 // 50MB
-          });
-
-          if (createError) {
-            console.error('❌ Error creando bucket:', createError);
-            console.log('🔄 SOLUCIÓN: Crea el bucket manualmente en Supabase Dashboard → Storage → New bucket');
-            console.log('🔄 Nombre: project-files, Público: Sí, Límite: 50MB');
-            return false;
-          }
-          
-          console.log('✅ Bucket project-files creado exitosamente');
-        } catch (createError) {
-          console.error('❌ Error inesperado creando bucket:', createError);
-          console.log('🔄 SOLUCIÓN: Crea el bucket manualmente en Supabase Dashboard → Storage → New bucket');
-          console.log('🔄 Nombre: project-files, Público: Sí, Límite: 50MB');
-          return false;
-        }
+        console.log('❌ Bucket project-files no encontrado');
+        console.log('🔄 SOLUCIÓN: Crea el bucket manualmente en Supabase Dashboard → Storage → New bucket');
+        console.log('🔄 Nombre: project-files, Público: Sí, Límite: 50MB');
+        return false;
       } else {
-        console.log('✅ Bucket project-files ya existe');
+        console.log('✅ Bucket project-files encontrado y disponible');
+        console.log(`   - Público: ${projectFilesBucket.public ? 'Sí' : 'No'}`);
+        console.log(`   - Límite de archivo: ${projectFilesBucket.file_size_limit ? (projectFilesBucket.file_size_limit / 1024 / 1024).toFixed(0) + 'MB' : 'Sin límite'}`);
       }
 
       return true;
     } catch (error) {
-      console.error('❌ Error inicializando Storage:', error);
+      console.error('❌ Error verificando Storage:', error);
       return false;
     }
   }
