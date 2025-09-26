@@ -403,7 +403,7 @@ const CashFlowProjection = ({
     }
 
     return projection;
-  }, [currentProject, projectionPeriod, projectionStartDate, projectionSettings, purchaseOrders, advances, invoices, contracts]);
+  }, [currentProject, projectionPeriod, projectionStartDate, projectionSettings, purchaseOrders, advances, invoices, contracts, tasks]);
 
   // Calcular métricas de flujo de caja
   const cashFlowMetrics = useMemo(() => {
