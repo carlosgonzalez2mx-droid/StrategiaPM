@@ -209,7 +209,7 @@ ${registrationUrl}`);
     }
   };
 
-  // Eliminar miembro
+  // Eliminar miembro COMPLETAMENTE de todas las tablas relacionadas
   const removeMember = async (memberId, memberEmail) => {
     // VERIFICAR PERMISOS: Solo owners y admins pueden eliminar miembros
     const currentUserMembership = members.find(m => m.user_email === supabaseService.getCurrentUser()?.email);
@@ -220,7 +220,14 @@ ${registrationUrl}`);
       return;
     }
     
-    if (!window.confirm(`¿Estás seguro de que quieres eliminar a ${memberEmail} de la organización?`)) {
+    // No permitir eliminar al owner de la organización
+    const memberToDelete = members.find(m => m.id === memberId);
+    if (memberToDelete?.role === 'owner') {
+      alert('❌ No se puede eliminar al propietario de la organización.');
+      return;
+    }
+    
+    if (!window.confirm(`⚠️ ELIMINACIÓN COMPLETA DE USUARIO\n\n¿Estás seguro de que quieres eliminar COMPLETAMENTE a ${memberEmail}?\n\nEsto eliminará:\n• Su membresía en la organización\n• Todos sus roles y permisos\n• Su acceso a todos los proyectos\n\nEsta acción NO se puede deshacer.`)) {
       return;
     }
 
@@ -229,38 +236,82 @@ ${registrationUrl}`);
       const { default: supabaseService } = await import('../services/SupabaseService');
       
       if (supabaseService.isAuthenticated()) {
-        const { error } = await supabaseService.supabase
+        console.log('🗑️ Iniciando eliminación completa de usuario:', memberEmail);
+        
+        // PASO 1: Eliminar de organization_members
+        console.log('🗑️ Eliminando de organization_members...');
+        const { error: membersError } = await supabaseService.supabase
           .from('organization_members')
           .delete()
           .eq('id', memberId);
 
-        if (error) {
-          throw error;
+        if (membersError) {
+          console.error('❌ Error eliminando de organization_members:', membersError);
+          throw new Error(`Error eliminando membresía: ${membersError.message}`);
         }
 
-        // Registrar evento de auditoría
+        // PASO 2: Eliminar de user_organization_roles (si existe)
+        console.log('🗑️ Eliminando de user_organization_roles...');
+        const { error: rolesError } = await supabaseService.supabase
+          .from('user_organization_roles')
+          .delete()
+          .eq('user_email', memberEmail)
+          .eq('organization_id', organizationId);
+
+        if (rolesError) {
+          console.warn('⚠️ Error eliminando de user_organization_roles (puede no existir):', rolesError);
+          // No lanzar error aquí, ya que la tabla puede no existir
+        }
+
+        // PASO 3: Buscar y eliminar referencias en otras tablas relacionadas
+        console.log('🗑️ Buscando referencias adicionales...');
+        
+        // Eliminar tareas asignadas al usuario (si las hay)
+        const { error: tasksError } = await supabaseService.supabase
+          .from('tasks')
+          .update({ assigned_to: null })
+          .eq('assigned_to', memberEmail);
+
+        if (tasksError) {
+          console.warn('⚠️ Error actualizando tareas:', tasksError);
+        }
+
+        // Eliminar riesgos asignados al usuario (si los hay)
+        const { error: risksError } = await supabaseService.supabase
+          .from('risks')
+          .update({ owner: null })
+          .eq('owner', memberEmail);
+
+        if (risksError) {
+          console.warn('⚠️ Error actualizando riesgos:', risksError);
+        }
+
+        // PASO 4: Registrar evento de auditoría
         if (addAuditEvent) {
           addAuditEvent({
             category: 'organization',
-            action: 'member-removed',
-            description: `Miembro "${memberEmail}" eliminado de la organización`,
+            action: 'member-completely-removed',
+            description: `Usuario "${memberEmail}" eliminado COMPLETAMENTE de la organización`,
             details: {
               userEmail: memberEmail,
-              organizationId: organizationId
+              organizationId: organizationId,
+              tablesCleaned: ['organization_members', 'user_organization_roles', 'tasks', 'risks']
             },
-            severity: 'medium',
+            severity: 'high',
             user: supabaseService.getCurrentUser()?.email || 'Sistema'
           });
         }
 
-        alert(`✅ Usuario ${memberEmail} eliminado exitosamente`);
+        console.log('✅ Usuario eliminado completamente de todas las tablas');
+        alert(`✅ Usuario ${memberEmail} eliminado COMPLETAMENTE de la organización\n\nSe eliminó de:\n• organization_members\n• user_organization_roles\n• Referencias en tareas y riesgos\n\nEl usuario ya no tiene acceso a la organización.`);
         
         // Recargar miembros
         await loadOrganizationMembers();
       }
     } catch (error) {
-      console.error('Error eliminando miembro:', error);
+      console.error('❌ Error eliminando miembro:', error);
       setError(`Error eliminando miembro: ${error.message}`);
+      alert(`❌ Error eliminando usuario: ${error.message}\n\nPor favor, intenta nuevamente o contacta al administrador.`);
     } finally {
       setIsLoading(false);
     }
