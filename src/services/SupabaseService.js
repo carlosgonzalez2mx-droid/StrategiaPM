@@ -1759,17 +1759,30 @@ class SupabaseService {
           .from('project-files')
           .getPublicUrl(filePath);
 
+        // Obtener tamaño del archivo desde diferentes fuentes posibles
+        const fileSize = file.metadata?.size || 
+                        file.size || 
+                        file.metadata?.file_size || 
+                        0;
+
+        // Formatear fecha correctamente
+        const uploadDate = file.created_at || 
+                          file.updated_at || 
+                          file.metadata?.created_at || 
+                          new Date().toISOString();
+
         return {
           id: `file-${file.name.split('.')[0]}`,
           projectId,
           fileName: file.name,
-          fileSize: file.metadata?.size || 0,
-          uploadDate: file.created_at,
+          fileSize: fileSize,
+          uploadDate: uploadDate,
           storagePath: filePath,
           publicUrl: publicData.publicUrl,
           metadata: {
             storageProvider: 'supabase',
             bucket: 'project-files',
+            originalFile: file, // Incluir objeto original para debugging
             ...file.metadata
           }
         };
