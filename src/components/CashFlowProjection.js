@@ -21,6 +21,20 @@ const CashFlowProjection = ({
     timestamp: new Date().toISOString()
   });
   
+  // DEBUG: Logging detallado de las tareas recibidas
+  console.log(`🔍 CASHFLOW COMPONENT [${componentId}] - TAREAS RECIBIDAS:`, {
+    totalTasks: tasks?.length || 0,
+    tasksWithCosts: tasks?.filter(t => t.cost > 0).length || 0,
+    tasksWithCostsDetails: tasks?.filter(t => t.cost > 0).map(t => ({
+      id: t.id,
+      name: t.name,
+      cost: t.cost,
+      startDate: t.startDate,
+      endDate: t.endDate,
+      isMilestone: t.isMilestone
+    })) || []
+  });
+  
   const [projectionPeriod, setProjectionPeriod] = useState('12'); // meses
   const [projectionStartDate, setProjectionStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [showProjectionSettings, setShowProjectionSettings] = useState(false);
@@ -92,6 +106,23 @@ const CashFlowProjection = ({
     
     // Calcular gasto planificado basado en tareas del cronograma que se ejecutan en este mes
     tasks.forEach((task, index) => {
+      // DEBUG: Logging específico para agosto 2026
+      if (monthName === 'agosto de 2026' && task.cost > 0) {
+        console.log(`🔍 CASHFLOW [${componentId}] - TAREA CON COSTO EN AGOSTO 2026:`, {
+          taskIndex: index,
+          taskId: task.id,
+          taskName: task.name,
+          taskCost: task.cost,
+          taskStartDate: task.startDate,
+          taskEndDate: task.endDate,
+          isMilestone: task.isMilestone,
+          duration: task.duration,
+          monthName: monthName,
+          monthStart: monthStart.toISOString().split('T')[0],
+          monthEnd: monthEnd.toISOString().split('T')[0]
+        });
+      }
+      
       console.log(`🔍 CashFlow: Tarea ${index + 1}:`, {
         name: task.name || task.title,
         cost: task.cost,
