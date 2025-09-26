@@ -12,6 +12,15 @@ const CashFlowProjection = ({
   invoices,
   contracts
 }) => {
+  // Generar ID único para esta instancia del componente
+  const componentId = useMemo(() => Math.random().toString(36).substr(2, 9), []);
+  
+  console.log(`🔍 CASHFLOW COMPONENT - INSTANCIA ${componentId} INICIANDO:`, {
+    currentProject: currentProject?.name,
+    tasksCount: tasks?.length || 0,
+    timestamp: new Date().toISOString()
+  });
+  
   const [projectionPeriod, setProjectionPeriod] = useState('12'); // meses
   const [projectionStartDate, setProjectionStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [showProjectionSettings, setShowProjectionSettings] = useState(false);
@@ -332,7 +341,7 @@ const CashFlowProjection = ({
   const cashFlowProjection = useMemo(() => {
     if (!currentProject) return null;
 
-    console.log('🔍 CASHFLOW PROJECTION - Iniciando cálculo de proyección:', {
+    console.log(`🔍 CASHFLOW PROJECTION [${componentId}] - Iniciando cálculo de proyección:`, {
       currentProject: currentProject?.name,
       projectionPeriod,
       projectionStartDate,
@@ -373,7 +382,7 @@ const CashFlowProjection = ({
 
       // Calcular gasto planificado del mes
       const monthPlannedExpense = calculateMonthPlannedExpense(currentDate);
-      console.log(`🔍 CASHFLOW PROJECTION - RESULTADO calculateMonthPlannedExpense para ${monthKey}: $${monthPlannedExpense}`);
+      console.log(`🔍 CASHFLOW PROJECTION [${componentId}] - RESULTADO calculateMonthPlannedExpense para ${monthKey}: $${monthPlannedExpense}`);
       
       // Calcular gasto comprometido del mes (OCs)
       console.log(`🔍 CASHFLOW PROJECTION - LLAMANDO calculateMonthCommittedExpense para mes ${monthKey}`);
@@ -406,7 +415,7 @@ const CashFlowProjection = ({
       
       // DEBUG: Logging específico para julio y agosto 2026
       if (monthKey === '2026-07' || monthKey === '2026-08') {
-        console.log(`🔍 CASHFLOW PROJECTION - ASIGNANDO VALORES para ${monthKey}:`, {
+        console.log(`🔍 CASHFLOW PROJECTION [${componentId}] - ASIGNANDO VALORES para ${monthKey}:`, {
           monthPlannedExpense: monthPlannedExpense,
           revenue: monthProjection.revenue,
           monthLabel: monthProjection.monthLabel,
@@ -418,7 +427,7 @@ const CashFlowProjection = ({
     }
 
     // DEBUG: Logging final de la proyección completa
-    console.log('🔍 CASHFLOW PROJECTION - PROYECCIÓN FINAL COMPLETA:', {
+    console.log(`🔍 CASHFLOW PROJECTION [${componentId}] - PROYECCIÓN FINAL COMPLETA:`, {
       totalMonths: projection.length,
       julio2026: projection.find(m => m.monthKey === '2026-07'),
       agosto2026: projection.find(m => m.monthKey === '2026-08'),
@@ -721,7 +730,7 @@ const CashFlowProjection = ({
                   {cashFlowProjection.map((month) => {
                     // DEBUG: Logging específico para julio y agosto 2026 en el renderizado
                     if (month.monthKey === '2026-07' || month.monthKey === '2026-08') {
-                      console.log(`🔍 CASHFLOW RENDER - RENDERIZANDO ${month.monthKey}:`, {
+                      console.log(`🔍 CASHFLOW RENDER [${componentId}] - RENDERIZANDO ${month.monthKey}:`, {
                         monthLabel: month.monthLabel,
                         revenue: month.revenue,
                         formattedRevenue: formatCurrency(month.revenue),
