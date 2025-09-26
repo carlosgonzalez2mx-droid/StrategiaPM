@@ -43,6 +43,7 @@ const useFileStorage = (projectId) => {
         }
       } catch (error) {
         console.error('❌ Error verificando Supabase:', error);
+        console.log('🔄 Fallback a localStorage debido a error de Supabase');
         setIsSupabaseAvailable(false);
         setStorageProvider('local');
       }
