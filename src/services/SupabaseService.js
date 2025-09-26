@@ -1746,12 +1746,13 @@ class SupabaseService {
         category: category
       });
 
-      // 1. Buscar en la ruta específica del proyecto
+      // 1. Buscar SOLO en la ruta específica del proyecto actual
       const searchPath = category 
         ? `${this.organizationId}/${projectId}/${category}`
         : `${this.organizationId}/${projectId}`;
 
-      console.log(`📁 Buscando archivos en ruta: ${searchPath}`);
+      console.log(`📁 Buscando archivos SOLO del proyecto actual en ruta: ${searchPath}`);
+      console.log(`🔍 DEBUG - Proyecto actual: ${projectId}, Categoría: ${category || 'todas'}`);
       
       const { data: projectFiles, error: projectError } = await this.supabase.storage
         .from('project-files')
@@ -1768,7 +1769,7 @@ class SupabaseService {
         
         // Filtrar solo archivos reales (con id no null)
         const realFiles = (projectFiles || []).filter(file => file.id !== null);
-        console.log(`✅ Archivos reales encontrados: ${realFiles.length}`);
+        console.log(`✅ Archivos reales del proyecto ${projectId} encontrados: ${realFiles.length}`);
         
         // Agregar la ruta de búsqueda a cada archivo
         realFiles.forEach(file => {
@@ -1778,91 +1779,59 @@ class SupabaseService {
         allFiles = realFiles;
       }
 
-      // 2. Si no se encontraron archivos en la ruta específica, buscar en todas las carpetas
+      // 2. Si no se encontraron archivos en la ruta específica, buscar SOLO en el proyecto actual
       if (allFiles.length === 0) {
-        console.log(`📁 No se encontraron archivos en ruta específica, buscando en todo el bucket...`);
+        console.log(`📁 No se encontraron archivos en ruta específica, buscando SOLO en el proyecto actual...`);
         
-        // Listar carpetas de organización
-        const { data: orgFolders, error: orgError } = await this.supabase.storage
+        // Buscar en la carpeta del proyecto actual (sin categoría específica)
+        const projectPath = `${this.organizationId}/${projectId}`;
+        console.log(`📁 Buscando en carpeta del proyecto: ${projectPath}`);
+        
+        const { data: projectFolderContents, error: projectFolderError } = await this.supabase.storage
           .from('project-files')
-          .list('', {
+          .list(projectPath, {
             limit: 100,
             offset: 0
           });
 
-        if (orgError) {
-          console.error('❌ Error listando carpetas de organización:', orgError);
+        if (projectFolderError) {
+          console.error(`❌ Error listando contenido de proyecto ${projectId}:`, projectFolderError);
         } else {
-          console.log('🔍 DEBUG - Carpetas de organización encontradas:', orgFolders);
+          console.log(`🔍 DEBUG - Contenido de proyecto ${projectId}:`, projectFolderContents);
           
-          for (const orgFolder of orgFolders || []) {
-            if (orgFolder.id === null && orgFolder.name === this.organizationId) {
-              console.log(`📁 Buscando proyectos en organización: ${orgFolder.name}`);
+          // Buscar en cada categoría del proyecto
+          for (const item of projectFolderContents || []) {
+            if (item.id === null) { // Es una carpeta (categoría)
+              console.log(`📁 Buscando archivos en categoría: ${item.name}`);
               
-              // Listar proyectos en la organización
-              const { data: projectFolders, error: projectFoldersError } = await this.supabase.storage
+              const { data: filesInCategory, error: filesError } = await this.supabase.storage
                 .from('project-files')
-                .list(orgFolder.name, {
+                .list(`${projectPath}/${item.name}`, {
                   limit: 100,
                   offset: 0
                 });
 
-              if (projectFoldersError) {
-                console.error(`❌ Error listando proyectos en organización ${orgFolder.name}:`, projectFoldersError);
+              if (filesError) {
+                console.error(`❌ Error listando archivos en categoría ${item.name}:`, filesError);
               } else {
-                console.log(`🔍 DEBUG - Proyectos encontrados en organización ${orgFolder.name}:`, projectFolders);
+                console.log(`🔍 DEBUG - Archivos en categoría ${item.name}:`, filesInCategory);
                 
-                for (const projectFolder of projectFolders || []) {
-                  if (projectFolder.id === null) {
-                    console.log(`📁 Buscando categorías en proyecto: ${projectFolder.name}`);
-                    
-                    // Listar categorías en el proyecto
-                    const { data: categoryFolders, error: categoryFoldersError } = await this.supabase.storage
-                      .from('project-files')
-                      .list(`${orgFolder.name}/${projectFolder.name}`, {
-                        limit: 100,
-                        offset: 0
-                      });
-
-                    if (categoryFoldersError) {
-                      console.error(`❌ Error listando categorías en proyecto ${projectFolder.name}:`, categoryFoldersError);
-                    } else {
-                      console.log(`🔍 DEBUG - Categorías encontradas en proyecto ${projectFolder.name}:`, categoryFolders);
-                      
-                      for (const categoryFolder of categoryFolders || []) {
-                        if (categoryFolder.id === null) {
-                          console.log(`📁 Buscando archivos en categoría: ${categoryFolder.name}`);
-                          
-                          // Listar archivos en la categoría
-                          const { data: filesInCategory, error: filesError } = await this.supabase.storage
-                            .from('project-files')
-                            .list(`${orgFolder.name}/${projectFolder.name}/${categoryFolder.name}`, {
-                              limit: 100,
-                              offset: 0
-                            });
-
-                          if (filesError) {
-                            console.error(`❌ Error listando archivos en categoría ${categoryFolder.name}:`, filesError);
-                          } else {
-                            console.log(`🔍 DEBUG - Archivos en categoría ${categoryFolder.name}:`, filesInCategory);
-                            
-                            // Filtrar solo archivos reales (con id no null)
-                            const realFilesInCategory = (filesInCategory || []).filter(file => file.id !== null);
-                            console.log(`✅ Archivos reales en categoría ${categoryFolder.name}:`, realFilesInCategory.length);
-                            
-                            // Agregar la ruta completa a cada archivo
-                            realFilesInCategory.forEach(file => {
-                              file.folderPath = `${orgFolder.name}/${projectFolder.name}/${categoryFolder.name}`;
-                            });
-                            
-                            allFiles = allFiles.concat(realFilesInCategory);
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
+                // Filtrar solo archivos reales (con id no null)
+                const realFilesInCategory = (filesInCategory || []).filter(file => file.id !== null);
+                console.log(`✅ Archivos reales en categoría ${item.name}:`, realFilesInCategory.length);
+                
+                // Agregar la ruta completa a cada archivo
+                realFilesInCategory.forEach(file => {
+                  file.folderPath = `${projectPath}/${item.name}`;
+                });
+                
+                allFiles = allFiles.concat(realFilesInCategory);
               }
+            } else {
+              // Es un archivo directamente en la carpeta del proyecto
+              console.log(`📄 Archivo encontrado directamente en proyecto: ${item.name}`);
+              item.folderPath = projectPath;
+              allFiles.push(item);
             }
           }
         }
