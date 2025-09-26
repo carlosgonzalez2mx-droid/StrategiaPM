@@ -83,25 +83,41 @@ const CashFlowProjection = ({
         // Verificar si la tarea se ejecuta en este mes
         if (taskStart <= monthEnd && taskEnd >= monthStart) {
           tasksInMonth++;
-          // Calcular qué porcentaje de la tarea se ejecuta en este mes
-          const monthDuration = monthEnd - monthStart + 1; // Duración del mes en ms
-          const taskDuration = taskEnd - taskStart + 1; // Duración de la tarea en ms
           
-          // Calcular intersección de fechas
-          const intersectionStart = new Date(Math.max(taskStart.getTime(), monthStart.getTime()));
-          const intersectionEnd = new Date(Math.min(taskEnd.getTime(), monthEnd.getTime()));
-          const intersectionDuration = intersectionEnd - intersectionStart + 1;
-          
-          if (intersectionDuration > 0) {
-            const percentageInMonth = intersectionDuration / taskDuration;
-            const taskCostInMonth = (task.cost || 0) * percentageInMonth;
+          // CORRECCIÓN: Manejo especial para hitos (duración 0)
+          if (task.isMilestone || task.duration === 0) {
+            // Para hitos: el costo completo se asigna al mes donde ocurre
+            const taskCostInMonth = task.cost || 0;
             plannedExpense += taskCostInMonth;
             
-            console.log(`💰 CashFlow: Tarea "${task.name || task.title}" en mes:`, {
+            console.log(`💰 CashFlow: HITO "${task.name || task.title}" en mes:`, {
               taskCost: task.cost,
-              percentageInMonth: (percentageInMonth * 100).toFixed(1) + '%',
+              isMilestone: true,
+              startDate: task.startDate,
+              endDate: task.endDate,
               costInMonth: taskCostInMonth.toFixed(2)
             });
+          } else {
+            // Para tareas normales: calcular porcentaje basado en duración
+            const monthDuration = monthEnd - monthStart + 1; // Duración del mes en ms
+            const taskDuration = taskEnd - taskStart + 1; // Duración de la tarea en ms
+            
+            // Calcular intersección de fechas
+            const intersectionStart = new Date(Math.max(taskStart.getTime(), monthStart.getTime()));
+            const intersectionEnd = new Date(Math.min(taskEnd.getTime(), monthEnd.getTime()));
+            const intersectionDuration = intersectionEnd - intersectionStart + 1;
+            
+            if (intersectionDuration > 0) {
+              const percentageInMonth = intersectionDuration / taskDuration;
+              const taskCostInMonth = (task.cost || 0) * percentageInMonth;
+              plannedExpense += taskCostInMonth;
+              
+              console.log(`💰 CashFlow: Tarea "${task.name || task.title}" en mes:`, {
+                taskCost: task.cost,
+                percentageInMonth: (percentageInMonth * 100).toFixed(1) + '%',
+                costInMonth: taskCostInMonth.toFixed(2)
+              });
+            }
           }
         }
       }
