@@ -88,8 +88,15 @@ class AISchedulerService {
       // CORRECCIÓN: Buscar templates de la organización O templates globales (sin organization_id)
       let query = this.supabase
         .from('schedule_templates')
-        .select('*')
-        .or(`organization_id.eq.${this.organizationId},organization_id.is.null`);
+        .select('*');
+      
+      // Solo filtrar por organization_id si está definido
+      if (this.organizationId) {
+        query = query.or(`organization_id.eq.${this.organizationId},organization_id.is.null`);
+      } else {
+        // Si no hay organization_id, buscar solo templates globales
+        query = query.is('organization_id', null);
+      }
 
       // Filtrar por tipo de proyecto si está disponible
       if (projectType) {
@@ -110,10 +117,11 @@ class AISchedulerService {
 
       console.log('🔍 DEBUG - Consulta de templates:', {
         organizationId: this.organizationId,
+        organizationIdType: typeof this.organizationId,
         projectType,
         industry,
         methodology,
-        query: query.toString()
+        hasOrganizationId: !!this.organizationId
       });
 
       if (error) {
@@ -135,11 +143,17 @@ class AISchedulerService {
       if (!templates || templates.length === 0) {
         console.warn('No se encontraron templates específicos, usando template genérico');
         // Buscar template genérico o el más usado
-        const { data: genericTemplates } = await this.supabase
+        let genericQuery = this.supabase
           .from('schedule_templates')
-          .select('*')
-          .or(`organization_id.eq.${this.organizationId},organization_id.is.null`)
-          .limit(1);
+          .select('*');
+        
+        if (this.organizationId) {
+          genericQuery = genericQuery.or(`organization_id.eq.${this.organizationId},organization_id.is.null`);
+        } else {
+          genericQuery = genericQuery.is('organization_id', null);
+        }
+        
+        const { data: genericTemplates } = await genericQuery.limit(1);
         
         if (genericTemplates?.[0]) {
           return genericTemplates[0];
@@ -669,11 +683,17 @@ class AISchedulerService {
    */
   async getAvailableTemplates() {
     try {
-      const { data: templates, error } = await this.supabase
+      let query = this.supabase
         .from('schedule_templates')
-        .select('*')
-        .or(`organization_id.eq.${this.organizationId},organization_id.is.null`)
-        .order('name');
+        .select('*');
+      
+      if (this.organizationId) {
+        query = query.or(`organization_id.eq.${this.organizationId},organization_id.is.null`);
+      } else {
+        query = query.is('organization_id', null);
+      }
+      
+      const { data: templates, error } = await query.order('name');
 
       if (error) {
         console.error('Error obteniendo templates:', error);

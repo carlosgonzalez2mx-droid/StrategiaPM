@@ -3887,6 +3887,14 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
     const initializeAIService = async () => {
       if (useSupabase && projectData?.id) {
         try {
+          console.log('🔍 DEBUG - Inicializando servicio de IA:', {
+            projectId: projectData.id,
+            organizationId: projectData.organizationId,
+            organizationIdType: typeof projectData.organizationId,
+            hasOrganizationId: !!projectData.organizationId,
+            currentUser: supabaseService.currentUser?.email
+          });
+          
           await aiSchedulerService.initialize(
             supabaseService.supabase,
             projectData.organizationId,
@@ -3896,6 +3904,12 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         } catch (error) {
           console.error('❌ Error inicializando servicio de IA:', error);
         }
+      } else {
+        console.log('⚠️ No se puede inicializar servicio de IA:', {
+          useSupabase,
+          hasProjectId: !!projectData?.id,
+          projectData: projectData
+        });
       }
     };
 
