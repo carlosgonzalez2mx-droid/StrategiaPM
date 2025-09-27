@@ -481,8 +481,8 @@ const calculateCPM = (tasks, includeWeekends = false) => {
       console.log('🔍 CPM DEBUG - Ruta Crítica:', {
         totalTasks: updatedTasks.length,
         criticalTasks: criticalTasks.length,
-        minStart: minStart.toISOString().split('T')[0],
-        maxEnd: maxEnd.toISOString().split('T')[0],
+        minStart: minStart && !isNaN(minStart.getTime()) ? minStart.toISOString().split('T')[0] : 'N/A',
+        maxEnd: maxEnd && !isNaN(maxEnd.getTime()) ? maxEnd.toISOString().split('T')[0] : 'N/A',
         criticalPathLength: criticalPathLength
       });
     }
@@ -497,7 +497,9 @@ const calculateCPM = (tasks, includeWeekends = false) => {
   console.log('🔍 DEBUG - Tareas y fechas de fin:', updatedTasks.map(t => ({
     name: t.name,
     endDate: t.endDate,
-    endDateObj: new Date(t.endDate).toISOString().split('T')[0]
+    endDateObj: t.endDate && t.endDate !== null && t.endDate !== undefined 
+      ? new Date(t.endDate).toISOString().split('T')[0] 
+      : 'N/A'
   })));
 
     return { 
@@ -5350,10 +5352,13 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                   {(() => {
                     if (tasksWithCPM.length > 0) {
                       // CORRECCIÓN: Usar fechas originales de la tabla, no las calculadas por CPM
-                      const originalEndDates = tasksWithCPM.map(t => {
-                        const [year, month, day] = t.endDate.split('-');
-                        return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-                      });
+                      const originalEndDates = tasksWithCPM
+                        .filter(t => t.endDate && t.endDate !== null && t.endDate !== undefined)
+                        .map(t => {
+                          const [year, month, day] = t.endDate.split('-');
+                          return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+                        })
+                        .filter(date => !isNaN(date.getTime())); // Filtrar fechas inválidas
                       
                       const maxEndDate = new Date(Math.max(...originalEndDates));
                       
@@ -5365,8 +5370,8 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                       
                       console.log('🔍 DEBUG - Fecha de fin del cronograma (usando fechas de tabla):', {
                         totalTasks: tasksWithCPM.length,
-                        originalEndDates: originalEndDates.map(d => d.toISOString().split('T')[0]),
-                        maxEndDate: maxEndDate.toISOString().split('T')[0],
+                        originalEndDates: originalEndDates.map(d => d && !isNaN(d.getTime()) ? d.toISOString().split('T')[0] : 'N/A'),
+                        maxEndDate: maxEndDate && !isNaN(maxEndDate.getTime()) ? maxEndDate.toISOString().split('T')[0] : 'N/A',
                         year, month, day,
                         formattedDate: formattedDate
                       });
@@ -5746,7 +5751,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                             className="cursor-pointer hover:bg-gray-100 px-2 py-1 rounded min-h-[24px] flex items-center text-sm"
                             onClick={() => startEditing(task.id, 'startDate', task.startDate)}
                           >
-                            {task.startDate ? task.startDate.split('-').reverse().join('/') : ''}
+                            {task.startDate && task.startDate !== null && task.startDate !== undefined ? task.startDate.split('-').reverse().join('/') : ''}
                 </div>
                         )}
                       </td>
@@ -5756,6 +5761,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                         {task.isMilestone ? (
                           <div className="px-2 py-1 rounded bg-purple-100 text-purple-800 text-center font-medium text-sm">
                             {(() => {
+                              if (!task.startDate || task.startDate === null || task.startDate === undefined) return '';
                               const [year, month, day] = task.startDate.split('-');
                               return new Date(year, month - 1, day).toLocaleDateString('es');
                             })()}
@@ -5776,8 +5782,8 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                             onClick={() => startEditing(task.id, 'endDate', task.endDate)}
                           >
                             {task.isMilestone 
-                              ? (task.startDate ? task.startDate.split('-').reverse().join('/') : '')
-                              : (task.endDate ? task.endDate.split('-').reverse().join('/') : '')
+                              ? (task.startDate && task.startDate !== null && task.startDate !== undefined ? task.startDate.split('-').reverse().join('/') : '')
+                              : (task.endDate && task.endDate !== null && task.endDate !== undefined ? task.endDate.split('-').reverse().join('/') : '')
                             }
                     </div>
                         )}
@@ -9237,6 +9243,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                       <td className="py-3 px-6 text-left">
                         {(() => {
                           // Usar formato consistente para evitar problemas de zona horaria
+                          if (!task.startDate || task.startDate === null || task.startDate === undefined) return '';
                           const [year, month, day] = task.startDate.split('-');
                           return new Date(year, month - 1, day).toLocaleDateString('es');
                         })()}
@@ -9246,11 +9253,13 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                           // Para hitos, usar la fecha de inicio como fecha de fin
                           if (task.isMilestone) {
                             // Usar formato consistente para evitar problemas de zona horaria
+                            if (!task.startDate || task.startDate === null || task.startDate === undefined) return '';
                             const [year, month, day] = task.startDate.split('-');
                             return new Date(year, month - 1, day).toLocaleDateString('es');
                           }
                           
                           // Para tareas normales, usar la fecha de fin con formato consistente
+                          if (!task.endDate || task.endDate === null || task.endDate === undefined) return '';
                           const [year, month, day] = task.endDate.split('-');
                           return new Date(year, month - 1, day).toLocaleDateString('es');
                         })()}
