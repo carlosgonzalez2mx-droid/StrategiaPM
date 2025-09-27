@@ -362,15 +362,22 @@ function MainApp() {
     let duplicatesFound = 0;
     let invalidIdsFixed = 0;
     
+    // CORRECCIÓN: Crear mapeo de IDs originales a nuevos UUIDs para preservar orden
+    const idMapping = new Map();
+    
     for (const task of newTasks) {
       // Verificar si el ID es un UUID válido
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
       let taskId = task.id;
+      const originalId = task.id;
       
       if (!uuidRegex.test(taskId)) {
         console.warn(`⚠️ ID inválido detectado: ${taskId} - ${task.name}, generando nuevo UUID`);
         taskId = generateUUID();
         invalidIdsFixed++;
+        
+        // Guardar mapeo para actualizar referencias
+        idMapping.set(originalId, taskId);
       }
       
       // Crear hash de contenido más robusto para detectar duplicados
@@ -397,6 +404,14 @@ function MainApp() {
       taskIds.add(taskId);
       taskContentHashes.add(contentHash);
       
+      // CORRECCIÓN: Actualizar referencias de predecessors y successors con nuevos IDs
+      const updatedPredecessors = (task.predecessors || []).map(predId => 
+        idMapping.get(predId) || predId
+      );
+      const updatedSuccessors = (task.successors || []).map(succId => 
+        idMapping.get(succId) || succId
+      );
+      
       // Crear objeto limpio de la tarea
       const cleanTask = {
         id: taskId,
@@ -408,8 +423,8 @@ function MainApp() {
         progress: task.progress || 0,
         priority: task.priority,
         cost: task.cost || 0,
-        predecessors: task.predecessors || [],
-        successors: task.successors || [],
+        predecessors: updatedPredecessors,
+        successors: updatedSuccessors,
         resources: task.resources || [],
         status: task.status || 'pending',
         wbsCode: task.wbsCode,
@@ -434,6 +449,7 @@ function MainApp() {
     
     if (invalidIdsFixed > 0) {
       console.warn(`🔧 Se corrigieron ${invalidIdsFixed} IDs inválidos con UUIDs válidos`);
+      console.log('🔍 Mapeo de IDs actualizado:', Array.from(idMapping.entries()));
     }
     
     // Solo loggear si hay un problema potencial
