@@ -600,75 +600,87 @@ class AISchedulerService {
     
     console.log('📋 Fases ordenadas:', sortedPhases);
     
-    // 4. Ordenar actividades dentro de cada fase
+    // 4. Ordenar actividades dentro de cada fase por lógica de negocio
     const orderedActivities = [];
     
     sortedPhases.forEach(phaseName => {
       const phaseActivities = activitiesByPhase[phaseName];
       
-      // Ordenar actividades dentro de la fase por:
-      // 1. Prioridad (high > medium > low)
-      // 2. Duración (más cortas primero para dependencias)
-      // 3. Índice original si está disponible
+      // Ordenar actividades dentro de la fase por lógica de negocio
       phaseActivities.sort((a, b) => {
-        // Prioridad
+        // 1. Ordenar por tipo de actividad (análisis → especificaciones → compras → instalación → pruebas → entrega)
+        const activityTypeOrder = {
+          'análisis': 1, 'necesidades': 1, 'requerimientos': 1,
+          'especificaciones': 2, 'especificación': 2, 'diseño': 2,
+          'búsqueda': 3, 'proveedores': 3, 'evaluación': 3, 'propuestas': 3,
+          'aprobación': 4, 'compras': 4, 'contratos': 4, 'negociación': 4,
+          'fabricación': 5, 'producción': 5, 'manufactura': 5,
+          'instalación': 6, 'instalar': 6, 'montaje': 6, 'configuración': 6,
+          'pruebas': 7, 'testing': 7, 'validación': 7, 'inspección': 7,
+          'capacitación': 8, 'training': 8, 'documentación': 8,
+          'entrega': 9, 'delivery': 9, 'garantía': 9, 'soporte': 9
+        };
+        
+        const getActivityType = (name) => {
+          const lowerName = name.toLowerCase();
+          for (const [type, order] of Object.entries(activityTypeOrder)) {
+            if (lowerName.includes(type)) return order;
+          }
+          return 10; // Actividades no categorizadas al final
+        };
+        
+        const typeA = getActivityType(a.name);
+        const typeB = getActivityType(b.name);
+        if (typeA !== typeB) return typeA - typeB;
+        
+        // 2. Si son del mismo tipo, ordenar por duración (más cortas primero)
+        const durationDiff = (a.duration || 0) - (b.duration || 0);
+        if (durationDiff !== 0) return durationDiff;
+        
+        // 3. Si tienen la misma duración, ordenar por prioridad
         const priorityOrder = { 'high': 0, 'medium': 1, 'low': 2 };
         const priorityDiff = (priorityOrder[a.priority] || 1) - (priorityOrder[b.priority] || 1);
         if (priorityDiff !== 0) return priorityDiff;
         
-        // Duración (actividades más cortas primero)
-        const durationDiff = (a.duration || 0) - (b.duration || 0);
-        if (durationDiff !== 0) return durationDiff;
-        
-        // Índice de fase y actividad si está disponible
-        if (a.phaseIndex !== undefined && b.phaseIndex !== undefined) {
-          const phaseDiff = a.phaseIndex - b.phaseIndex;
-          if (phaseDiff !== 0) return phaseDiff;
-          
-          if (a.activityIndex !== undefined && b.activityIndex !== undefined) {
-            return a.activityIndex - b.activityIndex;
-          }
-        }
-        
-        // Orden alfabético como último recurso
+        // 4. Orden alfabético como último recurso
         return a.name.localeCompare(b.name);
       });
       
       orderedActivities.push(...phaseActivities);
     });
     
-    // 5. Insertar hitos en posiciones lógicas
+    // 5. Insertar hitos inmediatamente después de las actividades que los completan
     const finalSchedule = [];
-    let currentPhase = null;
     
     orderedActivities.forEach(activity => {
-      // Si cambiamos de fase, agregar hitos de la fase anterior
-      if (currentPhase !== activity.phase) {
-        if (currentPhase) {
-          const phaseMilestones = milestones.filter(m => m.phase === currentPhase);
-          finalSchedule.push(...phaseMilestones);
-        }
-        currentPhase = activity.phase;
-      }
-      
       finalSchedule.push(activity);
+      
+      // Buscar hitos que dependen de esta actividad
+      const relatedMilestones = milestones.filter(milestone => {
+        // Verificar si este hito depende de la actividad actual
+        return milestone.dependencies && milestone.dependencies.includes(activity.id);
+      });
+      
+      // Insertar hitos relacionados inmediatamente después de la actividad
+      finalSchedule.push(...relatedMilestones);
     });
     
-    // Agregar hitos de la última fase
-    if (currentPhase) {
-      const lastPhaseMilestones = milestones.filter(m => m.phase === currentPhase);
-      finalSchedule.push(...lastPhaseMilestones);
-    }
-    
-    // Agregar hitos específicos que no tienen fase asignada
-    const unassignedMilestones = milestones.filter(m => !m.phase || m.phase === 'General');
+    // 6. Agregar hitos que no tienen dependencias específicas al final
+    const unassignedMilestones = milestones.filter(milestone => {
+      return !milestone.dependencies || milestone.dependencies.length === 0;
+    });
     finalSchedule.push(...unassignedMilestones);
     
-    console.log('✅ Cronograma ordenado:', {
+    console.log('✅ Cronograma ordenado lógicamente:', {
       totalItems: finalSchedule.length,
       activities: finalSchedule.filter(item => !item.isMilestone).length,
       milestones: finalSchedule.filter(item => item.isMilestone).length,
-      phases: [...new Set(finalSchedule.map(item => item.phase))]
+      phases: [...new Set(finalSchedule.map(item => item.phase))],
+      order: finalSchedule.map(item => ({
+        name: item.name,
+        type: item.isMilestone ? 'MILESTONE' : 'ACTIVITY',
+        phase: item.phase
+      }))
     });
     
     return finalSchedule;
