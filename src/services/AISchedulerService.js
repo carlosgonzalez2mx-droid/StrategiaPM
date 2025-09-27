@@ -50,13 +50,10 @@ class AISchedulerService {
       const recommendations = this.generateRecommendations(wizardData, adjustedActivities);
       console.log('💡 Recomendaciones generadas:', recommendations.length);
 
-      // 6. Ordenar y combinar actividades y hitos de forma lógica
-      const orderedSchedule = this.orderScheduleLogically(adjustedActivities, smartMilestones);
-
-      // 7. Crear el cronograma final
+      // 6. Crear el cronograma final
       const generatedSchedule = {
-        activities: orderedSchedule,
-        milestones: smartMilestones, // Mantener hitos separados para referencia
+        activities: adjustedActivities,
+        milestones: smartMilestones,
         criticalPath: criticalPath,
         recommendations: recommendations,
         metadata: {
@@ -68,7 +65,7 @@ class AISchedulerService {
         }
       };
 
-      // 8. Guardar en historial para aprendizaje
+      // 7. Guardar en historial para aprendizaje
       await this.saveGenerationHistory(wizardData, generatedSchedule);
 
       console.log('✅ Cronograma generado exitosamente');
@@ -278,7 +275,7 @@ class AISchedulerService {
         status: 'pending',
         priority: 'high',
         assignedTo: context.projectManager || 'Pendiente',
-        dependencies: phaseActivities.map(a => a.id),
+        dependencies: [],
         criteria: this.generateMilestoneCriteria(phaseName, phaseActivities),
         generatedBy: 'ai',
         confidence: 0.9
@@ -554,137 +551,6 @@ class AISchedulerService {
     return specificMilestones;
   }
 
-  /**
-   * Ordenar cronograma de forma lógica por fases y secuencia
-   */
-  orderScheduleLogically(activities, milestones) {
-    console.log('🔄 Ordenando cronograma lógicamente...');
-    
-    // 1. Agrupar actividades por fase
-    const activitiesByPhase = {};
-    activities.forEach(activity => {
-      const phase = activity.phase || 'General';
-      if (!activitiesByPhase[phase]) {
-        activitiesByPhase[phase] = [];
-      }
-      activitiesByPhase[phase].push(activity);
-    });
-    
-    // 2. Definir orden lógico de fases
-    const phaseOrder = [
-      'Inicio', 'Planificación', 'Planning', 'Preparación',
-      'Diseño', 'Design', 'Desarrollo', 'Development', 
-      'Implementación', 'Implementation', 'Ejecución', 'Execution',
-      'Compra e Instalación', 'Procurement', 'Instalación', 'Installation',
-      'Pruebas', 'Testing', 'Validación', 'Validation',
-      'Capacitación', 'Training', 'Cierre', 'Closure', 'Entrega', 'Delivery'
-    ];
-    
-    // 3. Ordenar fases según el orden lógico
-    const sortedPhases = Object.keys(activitiesByPhase).sort((a, b) => {
-      const indexA = phaseOrder.findIndex(phase => a.toLowerCase().includes(phase.toLowerCase()));
-      const indexB = phaseOrder.findIndex(phase => b.toLowerCase().includes(phase.toLowerCase()));
-      
-      // Si ambas fases están en el orden definido, usar ese orden
-      if (indexA !== -1 && indexB !== -1) {
-        return indexA - indexB;
-      }
-      
-      // Si solo una está en el orden definido, priorizarla
-      if (indexA !== -1) return -1;
-      if (indexB !== -1) return 1;
-      
-      // Si ninguna está en el orden definido, ordenar alfabéticamente
-      return a.localeCompare(b);
-    });
-    
-    console.log('📋 Fases ordenadas:', sortedPhases);
-    
-    // 4. Ordenar actividades dentro de cada fase por lógica de negocio
-    const orderedActivities = [];
-    
-    sortedPhases.forEach(phaseName => {
-      const phaseActivities = activitiesByPhase[phaseName];
-      
-      // Ordenar actividades dentro de la fase por lógica de negocio
-      phaseActivities.sort((a, b) => {
-        // 1. Ordenar por tipo de actividad (análisis → especificaciones → compras → instalación → pruebas → entrega)
-        const activityTypeOrder = {
-          'análisis': 1, 'necesidades': 1, 'requerimientos': 1,
-          'especificaciones': 2, 'especificación': 2, 'diseño': 2,
-          'búsqueda': 3, 'proveedores': 3, 'evaluación': 3, 'propuestas': 3,
-          'aprobación': 4, 'compras': 4, 'contratos': 4, 'negociación': 4,
-          'fabricación': 5, 'producción': 5, 'manufactura': 5,
-          'instalación': 6, 'instalar': 6, 'montaje': 6, 'configuración': 6,
-          'pruebas': 7, 'testing': 7, 'validación': 7, 'inspección': 7,
-          'capacitación': 8, 'training': 8, 'documentación': 8,
-          'entrega': 9, 'delivery': 9, 'garantía': 9, 'soporte': 9
-        };
-        
-        const getActivityType = (name) => {
-          const lowerName = name.toLowerCase();
-          for (const [type, order] of Object.entries(activityTypeOrder)) {
-            if (lowerName.includes(type)) return order;
-          }
-          return 10; // Actividades no categorizadas al final
-        };
-        
-        const typeA = getActivityType(a.name);
-        const typeB = getActivityType(b.name);
-        if (typeA !== typeB) return typeA - typeB;
-        
-        // 2. Si son del mismo tipo, ordenar por duración (más cortas primero)
-        const durationDiff = (a.duration || 0) - (b.duration || 0);
-        if (durationDiff !== 0) return durationDiff;
-        
-        // 3. Si tienen la misma duración, ordenar por prioridad
-        const priorityOrder = { 'high': 0, 'medium': 1, 'low': 2 };
-        const priorityDiff = (priorityOrder[a.priority] || 1) - (priorityOrder[b.priority] || 1);
-        if (priorityDiff !== 0) return priorityDiff;
-        
-        // 4. Orden alfabético como último recurso
-        return a.name.localeCompare(b.name);
-      });
-      
-      orderedActivities.push(...phaseActivities);
-    });
-    
-    // 5. Insertar hitos inmediatamente después de las actividades que los completan
-    const finalSchedule = [];
-    
-    orderedActivities.forEach(activity => {
-      finalSchedule.push(activity);
-      
-      // Buscar hitos que dependen de esta actividad
-      const relatedMilestones = milestones.filter(milestone => {
-        // Verificar si este hito depende de la actividad actual
-        return milestone.dependencies && milestone.dependencies.includes(activity.id);
-      });
-      
-      // Insertar hitos relacionados inmediatamente después de la actividad
-      finalSchedule.push(...relatedMilestones);
-    });
-    
-    // 6. Agregar hitos que no tienen dependencias específicas al final
-    const unassignedMilestones = milestones.filter(milestone => {
-      return !milestone.dependencies || milestone.dependencies.length === 0;
-    });
-    finalSchedule.push(...unassignedMilestones);
-    
-    console.log('✅ Cronograma ordenado lógicamente:', {
-      totalItems: finalSchedule.length,
-      activities: finalSchedule.filter(item => !item.isMilestone).length,
-      milestones: finalSchedule.filter(item => item.isMilestone).length,
-      phases: [...new Set(finalSchedule.map(item => item.phase))],
-      order: finalSchedule.map(item => ({
-        name: item.name,
-        type: item.isMilestone ? 'MILESTONE' : 'ACTIVITY',
-        phase: item.phase
-      }))
-    });
-    
-    return finalSchedule;
-  }
 
   /**
    * Calcular duración total del proyecto
