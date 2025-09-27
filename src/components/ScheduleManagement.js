@@ -4014,6 +4014,17 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         phases: [...new Set(allAITasks.map(item => item.phase))]
       });
 
+      console.log('🔍 DEBUG - Orden de tareas antes de CPM:', {
+        activitiesByPhase: Object.keys(activitiesByPhase),
+        allAITasksOrder: allAITasks.map((task, index) => ({
+          index,
+          id: task.id,
+          name: task.name,
+          isMilestone: task.isMilestone,
+          phase: task.phase
+        }))
+      });
+
       // Confirmar reemplazo del cronograma actual
       const activitiesCount = allAITasks.filter(item => !item.isMilestone).length;
       const milestonesCount = allAITasks.filter(item => item.isMilestone).length;
@@ -4067,6 +4078,19 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
       console.log('🔄 Orden preservado después de CPM:', {
         originalOrder: allAITasks.map(t => ({ id: t.id, name: t.name, isMilestone: t.isMilestone })),
         finalOrder: orderedTasksWithCPM.map(t => ({ id: t.id, name: t.name, isMilestone: t.isMilestone }))
+      });
+
+      console.log('🔍 DEBUG - Verificación de intercalado:', {
+        milestonesPositions: orderedTasksWithCPM.map((task, index) => 
+          task.isMilestone ? { index, name: task.name, phase: task.phase } : null
+        ).filter(Boolean),
+        activitiesBeforeMilestones: orderedTasksWithCPM.map((task, index) => {
+          if (task.isMilestone) {
+            const activitiesBefore = orderedTasksWithCPM.slice(0, index).filter(t => !t.isMilestone);
+            return { milestone: task.name, activitiesBefore: activitiesBefore.length };
+          }
+          return null;
+        }).filter(Boolean)
       });
 
       // Actualizar el estado de tareas con el orden preservado
