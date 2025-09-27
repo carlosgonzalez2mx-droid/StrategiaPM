@@ -3924,53 +3924,66 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
       console.log('🤖 Aplicando cronograma generado por IA:', generatedSchedule);
       
       // CORRECCIÓN: Combinar actividades e hitos en el orden correcto
-      // 1. Procesar actividades
-      const aiActivities = generatedSchedule.activities.map(item => ({
-        id: item.id,
-        name: item.name,
-        description: item.description || '',
-        duration: item.duration || 1,
-        startDate: null, // Se calculará con CPM
-        endDate: null,   // Se calculará con CPM
-        progress: 0,
-        status: 'pending',
-        priority: item.priority || 'medium',
-        assignedTo: item.assignedTo || 'Pendiente',
-        dependencies: item.dependencies || [],
-        predecessors: item.dependencies || [],
-        successors: [],
-        isMilestone: false,
-        estimatedCost: item.estimatedCost || 0,
-        category: item.category || 'execution',
-        phase: item.phase || 'General',
-        generatedBy: 'ai',
-        confidence: item.confidence || 0.8,
-        criteria: item.criteria || ''
-      }));
+      // CORRECCIÓN: Calcular fechas iniciales antes de CPM para evitar errores
+      const today = new Date();
+      const projectStartDate = toISO(today);
 
-      // 2. Procesar hitos
-      const aiMilestones = (generatedSchedule.milestones || []).map(item => ({
-        id: item.id,
-        name: item.name,
-        description: item.description || '',
-        duration: 0, // Los hitos no tienen duración
-        startDate: null, // Se calculará con CPM
-        endDate: null,   // Se calculará con CPM
-        progress: 0,
-        status: 'pending',
-        priority: item.priority || 'high',
-        assignedTo: item.assignedTo || 'Pendiente',
-        dependencies: item.dependencies || [],
-        predecessors: item.dependencies || [],
-        successors: [],
-        isMilestone: true,
-        estimatedCost: item.estimatedCost || 0,
-        category: item.category || 'milestone',
-        phase: item.phase || 'General',
-        generatedBy: 'ai',
-        confidence: item.confidence || 0.9,
-        criteria: item.criteria || ''
-      }));
+      // 1. Procesar actividades con fechas iniciales
+      const aiActivities = generatedSchedule.activities.map((item, index) => {
+        const startDate = addDays(projectStartDate, index, includeWeekends);
+        const endDate = addDays(startDate, (item.duration || 1) - 1, includeWeekends);
+        
+        return {
+          id: item.id,
+          name: item.name,
+          description: item.description || '',
+          duration: item.duration || 1,
+          startDate: startDate,
+          endDate: endDate,
+          progress: 0,
+          status: 'pending',
+          priority: item.priority || 'medium',
+          assignedTo: item.assignedTo || 'Pendiente',
+          dependencies: item.dependencies || [],
+          predecessors: item.dependencies || [],
+          successors: [],
+          isMilestone: false,
+          estimatedCost: item.estimatedCost || 0,
+          category: item.category || 'execution',
+          phase: item.phase || 'General',
+          generatedBy: 'ai',
+          confidence: item.confidence || 0.8,
+          criteria: item.criteria || ''
+        };
+      });
+
+      // 2. Procesar hitos con fechas iniciales
+      const aiMilestones = (generatedSchedule.milestones || []).map((item, index) => {
+        const milestoneDate = addDays(projectStartDate, aiActivities.length + index, includeWeekends);
+        
+        return {
+          id: item.id,
+          name: item.name,
+          description: item.description || '',
+          duration: 0, // Los hitos no tienen duración
+          startDate: milestoneDate,
+          endDate: milestoneDate, // Para hitos, startDate = endDate
+          progress: 0,
+          status: 'pending',
+          priority: item.priority || 'high',
+          assignedTo: item.assignedTo || 'Pendiente',
+          dependencies: item.dependencies || [],
+          predecessors: item.dependencies || [],
+          successors: [],
+          isMilestone: true,
+          estimatedCost: item.estimatedCost || 0,
+          category: item.category || 'milestone',
+          phase: item.phase || 'General',
+          generatedBy: 'ai',
+          confidence: item.confidence || 0.9,
+          criteria: item.criteria || ''
+        };
+      });
 
       // 3. Intercalar hitos con sus actividades relacionadas
       const allAITasks = [];
@@ -4090,7 +4103,14 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
             return { milestone: task.name, activitiesBefore: activitiesBefore.length };
           }
           return null;
-        }).filter(Boolean)
+        }).filter(Boolean),
+        sampleTasksWithDates: orderedTasksWithCPM.slice(0, 5).map(task => ({
+          id: task.id,
+          name: task.name,
+          startDate: task.startDate,
+          endDate: task.endDate,
+          isMilestone: task.isMilestone
+        }))
       });
 
       // Actualizar el estado de tareas con el orden preservado
