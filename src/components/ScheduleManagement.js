@@ -5730,22 +5730,6 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                 </thead>
                 <tbody onKeyDown={handleKeyDown}>
                   {tasksWithCPM
-                    .sort((a, b) => {
-                      // Ordenar por wbsCode (campo #) si existe, sino por nombre
-                      const aCode = a.wbsCode || a.name;
-                      const bCode = b.wbsCode || b.name;
-                      
-                      // Si ambos tienen códigos numéricos, ordenar numéricamente
-                      const aNum = parseInt(aCode);
-                      const bNum = parseInt(bCode);
-                      
-                      if (!isNaN(aNum) && !isNaN(bNum)) {
-                        return aNum - bNum;
-                      }
-                      
-                      // Si no, ordenar alfabéticamente
-                      return aCode.localeCompare(bCode);
-                    })
                     .map((task, index) => (
                     <tr 
                       key={task.id} 
