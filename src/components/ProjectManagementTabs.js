@@ -572,9 +572,40 @@ const ProjectManagementTabs = ({
   const calculateProjectStartDate = () => {
     if (!tasks || tasks.length === 0) return null;
     
-    const startDates = tasks.map(task => new Date(task.startDate));
-    const minStartDate = new Date(Math.min(...startDates));
+    // DEBUG: Logging para identificar fechas inválidas
+    const invalidTasks = tasks.filter(task => 
+      !task.startDate || task.startDate === null || task.startDate === undefined
+    );
     
+    if (invalidTasks.length > 0) {
+      console.log('⚠️ Tareas con fechas de inicio inválidas:', invalidTasks.map(t => ({
+        id: t.id,
+        name: t.name,
+        startDate: t.startDate,
+        isMilestone: t.isMilestone
+      })));
+    }
+    
+    // Filtrar tareas con fechas válidas
+    const validStartDates = tasks
+      .filter(task => task.startDate && task.startDate !== null && task.startDate !== undefined)
+      .map(task => new Date(task.startDate))
+      .filter(date => !isNaN(date.getTime())); // Filtrar fechas inválidas
+    
+    if (validStartDates.length === 0) {
+      console.log('⚠️ No se encontraron fechas de inicio válidas');
+      return null;
+    }
+    
+    const minStartDate = new Date(Math.min(...validStartDates));
+    
+    // Verificar que la fecha mínima sea válida
+    if (isNaN(minStartDate.getTime())) {
+      console.log('⚠️ Fecha mínima calculada es inválida');
+      return null;
+    }
+    
+    console.log('✅ Fecha de inicio calculada:', minStartDate.toISOString().split('T')[0]);
     return minStartDate.toISOString().split('T')[0];
   };
 
@@ -582,9 +613,40 @@ const ProjectManagementTabs = ({
   const calculateProjectEndDate = () => {
     if (!tasks || tasks.length === 0) return null;
     
-    const endDates = tasks.map(task => new Date(task.endDate));
-    const maxEndDate = new Date(Math.max(...endDates));
+    // DEBUG: Logging para identificar fechas inválidas
+    const invalidTasks = tasks.filter(task => 
+      !task.endDate || task.endDate === null || task.endDate === undefined
+    );
     
+    if (invalidTasks.length > 0) {
+      console.log('⚠️ Tareas con fechas de fin inválidas:', invalidTasks.map(t => ({
+        id: t.id,
+        name: t.name,
+        endDate: t.endDate,
+        isMilestone: t.isMilestone
+      })));
+    }
+    
+    // Filtrar tareas con fechas válidas
+    const validEndDates = tasks
+      .filter(task => task.endDate && task.endDate !== null && task.endDate !== undefined)
+      .map(task => new Date(task.endDate))
+      .filter(date => !isNaN(date.getTime())); // Filtrar fechas inválidas
+    
+    if (validEndDates.length === 0) {
+      console.log('⚠️ No se encontraron fechas de fin válidas');
+      return null;
+    }
+    
+    const maxEndDate = new Date(Math.max(...validEndDates));
+    
+    // Verificar que la fecha máxima sea válida
+    if (isNaN(maxEndDate.getTime())) {
+      console.log('⚠️ Fecha máxima calculada es inválida');
+      return null;
+    }
+    
+    console.log('✅ Fecha de fin calculada:', maxEndDate.toISOString().split('T')[0]);
     return maxEndDate.toISOString().split('T')[0];
   };
 
