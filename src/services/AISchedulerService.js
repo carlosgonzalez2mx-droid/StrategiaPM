@@ -50,10 +50,13 @@ class AISchedulerService {
       const recommendations = this.generateRecommendations(wizardData, adjustedActivities);
       console.log('💡 Recomendaciones generadas:', recommendations.length);
 
-      // 6. Crear el cronograma final
+      // 6. Ordenar y combinar actividades y hitos de forma lógica
+      const orderedSchedule = this.orderScheduleLogically(adjustedActivities, smartMilestones);
+
+      // 7. Crear el cronograma final
       const generatedSchedule = {
-        activities: adjustedActivities,
-        milestones: smartMilestones,
+        activities: orderedSchedule,
+        milestones: smartMilestones, // Mantener hitos separados para referencia
         criticalPath: criticalPath,
         recommendations: recommendations,
         metadata: {
@@ -65,7 +68,7 @@ class AISchedulerService {
         }
       };
 
-      // 7. Guardar en historial para aprendizaje
+      // 8. Guardar en historial para aprendizaje
       await this.saveGenerationHistory(wizardData, generatedSchedule);
 
       console.log('✅ Cronograma generado exitosamente');
@@ -549,6 +552,126 @@ class AISchedulerService {
     }
 
     return specificMilestones;
+  }
+
+  /**
+   * Ordenar cronograma de forma lógica por fases y secuencia
+   */
+  orderScheduleLogically(activities, milestones) {
+    console.log('🔄 Ordenando cronograma lógicamente...');
+    
+    // 1. Agrupar actividades por fase
+    const activitiesByPhase = {};
+    activities.forEach(activity => {
+      const phase = activity.phase || 'General';
+      if (!activitiesByPhase[phase]) {
+        activitiesByPhase[phase] = [];
+      }
+      activitiesByPhase[phase].push(activity);
+    });
+    
+    // 2. Definir orden lógico de fases
+    const phaseOrder = [
+      'Inicio', 'Planificación', 'Planning', 'Preparación',
+      'Diseño', 'Design', 'Desarrollo', 'Development', 
+      'Implementación', 'Implementation', 'Ejecución', 'Execution',
+      'Compra e Instalación', 'Procurement', 'Instalación', 'Installation',
+      'Pruebas', 'Testing', 'Validación', 'Validation',
+      'Capacitación', 'Training', 'Cierre', 'Closure', 'Entrega', 'Delivery'
+    ];
+    
+    // 3. Ordenar fases según el orden lógico
+    const sortedPhases = Object.keys(activitiesByPhase).sort((a, b) => {
+      const indexA = phaseOrder.findIndex(phase => a.toLowerCase().includes(phase.toLowerCase()));
+      const indexB = phaseOrder.findIndex(phase => b.toLowerCase().includes(phase.toLowerCase()));
+      
+      // Si ambas fases están en el orden definido, usar ese orden
+      if (indexA !== -1 && indexB !== -1) {
+        return indexA - indexB;
+      }
+      
+      // Si solo una está en el orden definido, priorizarla
+      if (indexA !== -1) return -1;
+      if (indexB !== -1) return 1;
+      
+      // Si ninguna está en el orden definido, ordenar alfabéticamente
+      return a.localeCompare(b);
+    });
+    
+    console.log('📋 Fases ordenadas:', sortedPhases);
+    
+    // 4. Ordenar actividades dentro de cada fase
+    const orderedActivities = [];
+    
+    sortedPhases.forEach(phaseName => {
+      const phaseActivities = activitiesByPhase[phaseName];
+      
+      // Ordenar actividades dentro de la fase por:
+      // 1. Prioridad (high > medium > low)
+      // 2. Duración (más cortas primero para dependencias)
+      // 3. Índice original si está disponible
+      phaseActivities.sort((a, b) => {
+        // Prioridad
+        const priorityOrder = { 'high': 0, 'medium': 1, 'low': 2 };
+        const priorityDiff = (priorityOrder[a.priority] || 1) - (priorityOrder[b.priority] || 1);
+        if (priorityDiff !== 0) return priorityDiff;
+        
+        // Duración (actividades más cortas primero)
+        const durationDiff = (a.duration || 0) - (b.duration || 0);
+        if (durationDiff !== 0) return durationDiff;
+        
+        // Índice de fase y actividad si está disponible
+        if (a.phaseIndex !== undefined && b.phaseIndex !== undefined) {
+          const phaseDiff = a.phaseIndex - b.phaseIndex;
+          if (phaseDiff !== 0) return phaseDiff;
+          
+          if (a.activityIndex !== undefined && b.activityIndex !== undefined) {
+            return a.activityIndex - b.activityIndex;
+          }
+        }
+        
+        // Orden alfabético como último recurso
+        return a.name.localeCompare(b.name);
+      });
+      
+      orderedActivities.push(...phaseActivities);
+    });
+    
+    // 5. Insertar hitos en posiciones lógicas
+    const finalSchedule = [];
+    let currentPhase = null;
+    
+    orderedActivities.forEach(activity => {
+      // Si cambiamos de fase, agregar hitos de la fase anterior
+      if (currentPhase !== activity.phase) {
+        if (currentPhase) {
+          const phaseMilestones = milestones.filter(m => m.phase === currentPhase);
+          finalSchedule.push(...phaseMilestones);
+        }
+        currentPhase = activity.phase;
+      }
+      
+      finalSchedule.push(activity);
+    });
+    
+    // Agregar hitos de la última fase
+    if (currentPhase) {
+      const lastPhaseMilestones = milestones.filter(m => m.phase === currentPhase);
+      finalSchedule.push(...lastPhaseMilestones);
+    }
+    
+    // Agregar hitos específicos que no tienen fase asignada
+    const unassignedMilestones = milestones.filter(m => !m.phase || m.phase === 'General');
+    finalSchedule.push(...unassignedMilestones);
+    
+    console.log('✅ Cronograma ordenado:', {
+      totalItems: finalSchedule.length,
+      activities: finalSchedule.filter(item => !item.isMilestone).length,
+      milestones: finalSchedule.filter(item => item.isMilestone).length,
+      phases: [...new Set(finalSchedule.map(item => item.phase))]
+    });
+    
+    return finalSchedule;
   }
 
   /**

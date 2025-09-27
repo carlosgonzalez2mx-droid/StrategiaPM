@@ -3923,60 +3923,45 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
     try {
       console.log('🤖 Aplicando cronograma generado por IA:', generatedSchedule);
       
-      // Convertir actividades generadas por IA al formato de tareas
-      const aiTasks = generatedSchedule.activities.map(activity => ({
-        id: activity.id,
-        name: activity.name,
-        description: activity.description || '',
-        duration: activity.duration || 1,
+      // CORRECCIÓN: Las actividades ya vienen ordenadas lógicamente desde el servicio de IA
+      // No necesitamos separar actividades y hitos, ya están combinados y ordenados
+      const allAITasks = generatedSchedule.activities.map(item => ({
+        id: item.id,
+        name: item.name,
+        description: item.description || '',
+        duration: item.duration || (item.isMilestone ? 0 : 1),
         startDate: null, // Se calculará con CPM
         endDate: null,   // Se calculará con CPM
         progress: 0,
         status: 'pending',
-        priority: activity.priority || 'medium',
-        assignedTo: activity.assignedTo || 'Pendiente',
-        dependencies: activity.dependencies || [],
-        predecessors: activity.dependencies || [],
+        priority: item.priority || (item.isMilestone ? 'high' : 'medium'),
+        assignedTo: item.assignedTo || 'Pendiente',
+        dependencies: item.dependencies || [],
+        predecessors: item.dependencies || [],
         successors: [],
-        isMilestone: activity.isMilestone || false,
-        estimatedCost: activity.estimatedCost || 0,
-        category: activity.category || 'execution',
-        phase: activity.phase || 'General',
+        isMilestone: item.isMilestone || false,
+        estimatedCost: item.estimatedCost || 0,
+        category: item.category || (item.isMilestone ? 'milestone' : 'execution'),
+        phase: item.phase || 'General',
         generatedBy: 'ai',
-        confidence: activity.confidence || 0.8
+        confidence: item.confidence || (item.isMilestone ? 0.9 : 0.8),
+        criteria: item.criteria || ''
       }));
 
-      // Agregar hitos generados por IA
-      const aiMilestones = generatedSchedule.milestones.map(milestone => ({
-        id: milestone.id,
-        name: milestone.name,
-        description: milestone.description || '',
-        duration: 0, // Los hitos no tienen duración
-        startDate: null, // Se calculará con CPM
-        endDate: null,   // Se calculará con CPM
-        progress: 0,
-        status: 'pending',
-        priority: milestone.priority || 'high',
-        assignedTo: milestone.assignedTo || 'Pendiente',
-        dependencies: milestone.dependencies || [],
-        predecessors: milestone.dependencies || [],
-        successors: [],
-        isMilestone: true,
-        estimatedCost: 0,
-        category: 'milestone',
-        phase: milestone.phase || 'General',
-        generatedBy: 'ai',
-        confidence: milestone.confidence || 0.9,
-        criteria: milestone.criteria || ''
-      }));
-
-      // Combinar tareas y hitos
-      const allAITasks = [...aiTasks, ...aiMilestones];
+      console.log('🔄 Cronograma IA procesado:', {
+        totalItems: allAITasks.length,
+        activities: allAITasks.filter(item => !item.isMilestone).length,
+        milestones: allAITasks.filter(item => item.isMilestone).length,
+        phases: [...new Set(allAITasks.map(item => item.phase))]
+      });
 
       // Confirmar reemplazo del cronograma actual
+      const activitiesCount = allAITasks.filter(item => !item.isMilestone).length;
+      const milestonesCount = allAITasks.filter(item => item.isMilestone).length;
+      
       const confirmMessage = `🤖 CRONOGRAMA GENERADO POR IA\n\n` +
-        `Actividades: ${aiTasks.length}\n` +
-        `Hitos: ${aiMilestones.length}\n` +
+        `Actividades: ${activitiesCount}\n` +
+        `Hitos: ${milestonesCount}\n` +
         `Duración estimada: ${Math.round(generatedSchedule.metadata?.estimatedDuration || 0)} días\n\n` +
         `Esto REEMPLAZARÁ COMPLETAMENTE el cronograma actual.\n` +
         `¿Continuar con la aplicación del cronograma generado por IA?`;
@@ -4010,8 +3995,8 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         action: 'schedule-applied',
         description: 'Cronograma generado por IA aplicado al proyecto',
         details: {
-          activitiesCount: aiTasks.length,
-          milestonesCount: aiMilestones.length,
+          activitiesCount: activitiesCount,
+          milestonesCount: milestonesCount,
           templateUsed: generatedSchedule.metadata?.templateUsed,
           estimatedDuration: generatedSchedule.metadata?.estimatedDuration,
           complexity: generatedSchedule.metadata?.complexity
@@ -4026,13 +4011,13 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         
         alert(`✅ CRONOGRAMA DE IA APLICADO EXITOSAMENTE!\n\n` +
           `📊 ${allAITasks.length} elementos generados\n` +
-          `🎯 ${aiMilestones.length} hitos creados\n` +
+          `🎯 ${milestonesCount} hitos creados\n` +
           `⏱️ Duración estimada: ${Math.round(generatedSchedule.metadata?.estimatedDuration || 0)} días\n\n` +
           `💡 RECOMENDACIONES:\n${recommendationsText}`);
       } else {
         alert(`✅ CRONOGRAMA DE IA APLICADO EXITOSAMENTE!\n\n` +
           `📊 ${allAITasks.length} elementos generados\n` +
-          `🎯 ${aiMilestones.length} hitos creados\n` +
+          `🎯 ${milestonesCount} hitos creados\n` +
           `⏱️ Duración estimada: ${Math.round(generatedSchedule.metadata?.estimatedDuration || 0)} días`);
       }
 
