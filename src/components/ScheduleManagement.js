@@ -3923,30 +3923,89 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
     try {
       console.log('🤖 Aplicando cronograma generado por IA:', generatedSchedule);
       
-      // CORRECCIÓN: Las actividades ya vienen ordenadas lógicamente desde el servicio de IA
-      // No necesitamos separar actividades y hitos, ya están combinados y ordenados
-      const allAITasks = generatedSchedule.activities.map(item => ({
+      // CORRECCIÓN: Combinar actividades e hitos en el orden correcto
+      // 1. Procesar actividades
+      const aiActivities = generatedSchedule.activities.map(item => ({
         id: item.id,
         name: item.name,
         description: item.description || '',
-        duration: item.duration || (item.isMilestone ? 0 : 1),
+        duration: item.duration || 1,
         startDate: null, // Se calculará con CPM
         endDate: null,   // Se calculará con CPM
         progress: 0,
         status: 'pending',
-        priority: item.priority || (item.isMilestone ? 'high' : 'medium'),
+        priority: item.priority || 'medium',
         assignedTo: item.assignedTo || 'Pendiente',
         dependencies: item.dependencies || [],
         predecessors: item.dependencies || [],
         successors: [],
-        isMilestone: item.isMilestone || false,
+        isMilestone: false,
         estimatedCost: item.estimatedCost || 0,
-        category: item.category || (item.isMilestone ? 'milestone' : 'execution'),
+        category: item.category || 'execution',
         phase: item.phase || 'General',
         generatedBy: 'ai',
-        confidence: item.confidence || (item.isMilestone ? 0.9 : 0.8),
+        confidence: item.confidence || 0.8,
         criteria: item.criteria || ''
       }));
+
+      // 2. Procesar hitos
+      const aiMilestones = (generatedSchedule.milestones || []).map(item => ({
+        id: item.id,
+        name: item.name,
+        description: item.description || '',
+        duration: 0, // Los hitos no tienen duración
+        startDate: null, // Se calculará con CPM
+        endDate: null,   // Se calculará con CPM
+        progress: 0,
+        status: 'pending',
+        priority: item.priority || 'high',
+        assignedTo: item.assignedTo || 'Pendiente',
+        dependencies: item.dependencies || [],
+        predecessors: item.dependencies || [],
+        successors: [],
+        isMilestone: true,
+        estimatedCost: item.estimatedCost || 0,
+        category: item.category || 'milestone',
+        phase: item.phase || 'General',
+        generatedBy: 'ai',
+        confidence: item.confidence || 0.9,
+        criteria: item.criteria || ''
+      }));
+
+      // 3. Intercalar hitos con sus actividades relacionadas
+      const allAITasks = [];
+      const processedMilestones = new Set();
+
+      // Agrupar actividades por fase
+      const activitiesByPhase = {};
+      aiActivities.forEach(activity => {
+        const phase = activity.phase || 'General';
+        if (!activitiesByPhase[phase]) {
+          activitiesByPhase[phase] = [];
+        }
+        activitiesByPhase[phase].push(activity);
+      });
+
+      // Procesar cada fase
+      Object.entries(activitiesByPhase).forEach(([phaseName, phaseActivities]) => {
+        // Agregar actividades de la fase
+        allAITasks.push(...phaseActivities);
+
+        // Buscar hitos de esta fase
+        const phaseMilestones = aiMilestones.filter(milestone => 
+          milestone.phase === phaseName && !processedMilestones.has(milestone.id)
+        );
+
+        // Agregar hitos de la fase después de sus actividades
+        allAITasks.push(...phaseMilestones);
+        phaseMilestones.forEach(m => processedMilestones.add(m.id));
+      });
+
+      // Agregar hitos sin fase específica al final
+      const unassignedMilestones = aiMilestones.filter(milestone => 
+        !milestone.phase || milestone.phase === 'General'
+      );
+      allAITasks.push(...unassignedMilestones);
 
       console.log('🔄 Cronograma IA procesado:', {
         totalItems: allAITasks.length,
