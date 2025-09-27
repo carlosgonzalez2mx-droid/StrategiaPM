@@ -4030,23 +4030,47 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         return;
       }
 
-      // Aplicar CPM a las nuevas tareas
+      // Aplicar CPM a las nuevas tareas manteniendo el orden original
       const cpmResult = calculateCPM(allAITasks, includeWeekends);
-
-      // CORRECCIÓN: calculateCPM devuelve un objeto con {tasks, criticalPath, criticalPathLength}
-      // Necesitamos extraer solo el array de tareas
       const tasksWithCPM = cpmResult.tasks || cpmResult;
+
+      // CORRECCIÓN: Mantener el orden original de la IA después del CPM
+      // El CPM puede reordenar las tareas, pero queremos preservar el orden lógico de la IA
+      const orderedTasksWithCPM = [];
+      const tasksMap = new Map(tasksWithCPM.map(task => [task.id, task]));
+      
+      // Reconstruir el orden usando el array original allAITasks
+      allAITasks.forEach(originalTask => {
+        const cpmTask = tasksMap.get(originalTask.id);
+        if (cpmTask) {
+          orderedTasksWithCPM.push(cpmTask);
+        }
+      });
+      
+      // Agregar cualquier tarea que no esté en el orden original (por seguridad)
+      tasksWithCPM.forEach(task => {
+        if (!tasksMap.has(task.id) || !allAITasks.find(t => t.id === task.id)) {
+          orderedTasksWithCPM.push(task);
+        }
+      });
 
       console.log('🔍 DEBUG - Resultado CPM:', {
         cpmResultType: typeof cpmResult,
         cpmResultKeys: Object.keys(cpmResult),
         tasksType: typeof tasksWithCPM,
         tasksIsArray: Array.isArray(tasksWithCPM),
-        tasksLength: Array.isArray(tasksWithCPM) ? tasksWithCPM.length : 'N/A'
+        tasksLength: Array.isArray(tasksWithCPM) ? tasksWithCPM.length : 'N/A',
+        orderedTasksLength: orderedTasksWithCPM.length,
+        orderPreserved: allAITasks.length === orderedTasksWithCPM.length
       });
 
-      // Actualizar el estado de tareas
-      setTasks(tasksWithCPM);
+      console.log('🔄 Orden preservado después de CPM:', {
+        originalOrder: allAITasks.map(t => ({ id: t.id, name: t.name, isMilestone: t.isMilestone })),
+        finalOrder: orderedTasksWithCPM.map(t => ({ id: t.id, name: t.name, isMilestone: t.isMilestone }))
+      });
+
+      // Actualizar el estado de tareas con el orden preservado
+      setTasks(orderedTasksWithCPM);
 
       // Registrar evento de auditoría
       addAuditEvent({
