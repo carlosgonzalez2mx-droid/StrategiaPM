@@ -9,6 +9,8 @@ Sistema integral de gestión de proyectos desarrollado en React con integración
 - Indicadores de progreso y salud financiera
 - **Alertas unificadas de tareas por vencer** (cronograma + minutas)
 - **Detección automática de tareas huérfanas** con interfaz de reasignación
+- **Hitos del proyecto ordenados cronológicamente** con actualización en tiempo real
+- **Sincronización automática** entre cronograma y dashboard
 - Visualización de tendencias y KPIs
 
 ### 🎯 Gestión de Proyectos
@@ -24,14 +26,17 @@ Sistema integral de gestión de proyectos desarrollado en React con integración
 - Categorización por severidad
 
 ### 📅 Cronograma y Tareas
-- Gestión de cronograma de proyecto con vista Gantt mejorada
-- Creación y seguimiento de tareas con fechas precisas
-- Hitos y dependencias con cálculo automático de ruta crítica
+- **Gestión de cronograma estilo MS Project** con cálculo automático de dependencias Finish-to-Start
+- **Cálculo de ruta crítica (CPM)** con fechas automáticas basadas en dependencias
+- **Importación desde Excel** con preservación del orden original por columna "#"
+- **Vista Gantt mejorada** con fechas precisas y headers fijos
+- **Cálculo de días hábiles** excluyendo fines de semana automáticamente
 - **Minutas de reunión** con tareas asignadas y seguimiento
 - **Dashboard unificado** que combina tareas del cronograma y minutas
 - **Manejo inteligente de tareas huérfanas** cuando se modifican hitos
 - **Eliminación inteligente de tareas** con manejo automático de dependencias
 - **Importación de cronogramas** con reemplazo completo (no mezcla)
+- **Actualización en tiempo real** de hitos en el dashboard
 
 ### 💰 Gestión Financiera
 - Control de presupuesto del proyecto
@@ -182,6 +187,14 @@ El sistema registra automáticamente:
 
 ## 📅 Mejoras del Cronograma y Dashboard
 
+### Cronograma Estilo MS Project
+- **Cálculo automático de dependencias Finish-to-Start**: Las tareas sucesoras inician exactamente al día siguiente de que termine la predecesora
+- **Cálculo de ruta crítica (CPM)**: Identificación automática de tareas críticas del proyecto
+- **Cálculo de días hábiles**: Exclusión automática de fines de semana en las duraciones
+- **Aplicación automática de fechas**: Las fechas calculadas se aplican automáticamente a la visualización
+- **Validación de gaps**: Corrección automática de inconsistencias en dependencias
+- **Preservación del orden**: Mantiene el orden original del Excel por columna "#"
+
 ### Vista Gantt Mejorada
 - **Fechas precisas**: Las barras del Gantt se alinean exactamente con las fechas de la tabla
 - **Headers fijos**: Los encabezados de fechas permanecen visibles durante el scroll vertical
@@ -195,6 +208,8 @@ El sistema registra automáticamente:
   - 📝 **Minuta** (verde) para tareas de minutas
 - **Agrupación por hitos**: Mantiene la organización por hitos del proyecto
 - **Filtrado inteligente**: Muestra solo tareas próximas a vencer (15 días)
+- **Actualización en tiempo real**: Los hitos se actualizan inmediatamente al modificar el cronograma
+- **Ordenamiento cronológico**: Los hitos se muestran en orden de fecha de inicio
 
 ### Manejo de Tareas Huérfanas
 - **Detección automática**: Identifica tareas de minuta que perdieron su hito asignado
@@ -270,8 +285,33 @@ La aplicación está configurada para desplegarse fácilmente en:
 - ✅ **Gestión de archivos con Supabase Storage**
 - ✅ **Eliminación inteligente de tareas con manejo de dependencias**
 - ✅ **Importación de cronogramas con reemplazo completo**
+- ✅ **Cronograma estilo MS Project con cálculo automático de dependencias**
+- ✅ **Cálculo de ruta crítica (CPM) con fechas automáticas**
+- ✅ **Actualización en tiempo real de hitos en dashboard**
+- ✅ **Preservación del orden Excel por columna "#"**
 
 ## 📝 Changelog
+
+### v2.4.0 (Enero 2025)
+#### 🎯 Cronograma Estilo MS Project
+- **Cálculo automático de dependencias Finish-to-Start**: Implementación completa de lógica como MS Project
+- **Cálculo de ruta crítica (CPM)**: Fechas automáticas basadas en dependencias
+- **Cálculo de días hábiles**: Exclusión automática de fines de semana
+- **Aplicación automática de fechas**: Las fechas calculadas se aplican directamente a la visualización
+- **Validación y corrección de gaps**: Corrección automática de inconsistencias en dependencias
+- **Preservación del orden Excel**: Mantiene el orden original por columna "#" del archivo Excel
+
+#### 📊 Dashboard en Tiempo Real
+- **Actualización automática de hitos**: Los hitos se actualizan inmediatamente al modificar el cronograma
+- **Ordenamiento cronológico**: Los hitos se muestran en orden de fecha de inicio
+- **Sincronización bidireccional**: Cambios en cronograma se reflejan instantáneamente en dashboard
+- **Uso de useMemo**: Optimización de rendimiento para actualizaciones reactivas
+
+#### 🔧 Mejoras Técnicas
+- **Corrección de función addWorkingDays**: Cálculo correcto de duraciones incluyendo día de inicio
+- **Inicialización correcta de fechas**: Mejor manejo de tareas con y sin predecesoras
+- **Lógica de templateCalculated**: Solo aplica a tareas sin predecesoras para respetar dependencias
+- **Logs de debugging**: Mejor trazabilidad de actualizaciones y cálculos
 
 ### v2.3.0 (Enero 2025)
 #### 🗑️ Gestión Inteligente de Tareas
@@ -336,5 +376,5 @@ Este proyecto es privado y propietario. Todos los derechos reservados.
 ---
 
 **Última actualización**: Enero 2025
-**Versión**: 2.3.0
+**Versión**: 2.4.0
 **Estado**: Producción
