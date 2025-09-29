@@ -75,6 +75,15 @@ const isWorkingDay = (date) => {
   return dayOfWeek >= 1 && dayOfWeek <= 5; // 1=Lunes, 5=Viernes
 };
 
+// Función para ajustar una fecha al siguiente día laborable
+const adjustToWorkingDay = (date) => {
+  let adjustedDate = new Date(date);
+  while (!isWorkingDay(adjustedDate)) {
+    adjustedDate.setDate(adjustedDate.getDate() + 1);
+  }
+  return adjustedDate;
+};
+
 // Función para añadir días (laborales o calendario)
 const addDays = (date, days, includeWeekends = false) => {
   // Si la duración es 0, devolver la misma fecha
@@ -104,12 +113,21 @@ const addWorkingDays = (date, days) => {
   let currentDate = new Date(date + 'T00:00:00');
   let daysAdded = 0;
   
+  // CORRECCIÓN: Incluir el día de inicio en el conteo
+  // Si el día de inicio es laborable, contarlo como día 1
+  if (isWorkingDay(currentDate)) {
+    daysAdded = 1;
+  }
   
+  // Si ya tenemos todos los días necesarios, devolver la fecha actual
+  if (daysAdded >= days) {
+    return toISO(currentDate);
+  }
+  
+  // Continuar añadiendo días hasta completar la duración
   while (daysAdded < days) {
     currentDate.setDate(currentDate.getDate() + 1);
     const isWorking = isWorkingDay(currentDate);
-    const dayName = currentDate.toLocaleDateString('es-ES', { weekday: 'long' });
-    
     
     if (isWorking) {
       daysAdded++;
@@ -291,7 +309,23 @@ const calculateCPM = (tasks, includeWeekends = false) => {
       const task = taskMap.get(taskId);
       if (!task) return;
 
-      let maxEarlyFinish = new Date(task.startDate);
+      // CORRECCIÓN: Solo respetar fechas de template si NO tiene predecesoras
+      // Las tareas con predecesoras deben recalcularse para respetar dependencias
+      if (task.templateCalculated && task.predecessors.length === 0) {
+        console.log(`🔒 Respetando fechas calculadas por template para tarea sin predecesoras: ${task.name}`);
+        return; // No recalcular fechas ya calculadas por template
+      }
+
+      // CORRECCIÓN: Inicializar correctamente según si tiene predecesoras
+      let maxEarlyFinish;
+      
+      if (task.predecessors.length === 0) {
+        // Para tareas sin predecesoras, usar la fecha de inicio original
+        maxEarlyFinish = new Date(task.startDate);
+      } else {
+        // Para tareas con predecesoras, inicializar con fecha muy temprana
+        maxEarlyFinish = new Date('1900-01-01');
+      }
 
       for (const predId of task.predecessors) {
         calculateEarly(predId);
@@ -304,10 +338,15 @@ const calculateCPM = (tasks, includeWeekends = false) => {
         }
       }
 
-      // Aplicar regla de dependencias DESPUÉS de encontrar la fecha máxima
+      // Aplicar regla de dependencias Finish-to-Start como MS Project
       if (task.predecessors.length > 0 && !task.isMilestone) {
-        // Solo para tareas normales: empezar al día siguiente del predecesor
+        // Para dependencias Finish-to-Start: empezar al día siguiente del predecesor
         maxEarlyFinish.setDate(maxEarlyFinish.getDate() + 1);
+      }
+
+      // Ajustar fecha de inicio a día laborable si es necesario
+      if (!includeWeekends) {
+        maxEarlyFinish = adjustToWorkingDay(maxEarlyFinish);
       }
 
       task.earlyStart = toISO(maxEarlyFinish);
@@ -315,10 +354,14 @@ const calculateCPM = (tasks, includeWeekends = false) => {
       // Para hitos: fecha de fin = fecha de inicio (exactamente igual)
       if (task.isMilestone) {
         task.earlyFinish = task.earlyStart;  // MISMO día
-        // NO sobrescribir startDate y endDate - mantener fechas originales de la tabla
+        // CORRECCIÓN: Aplicar fechas calculadas por CPM como MS Project
+        task.startDate = task.earlyStart;
+        task.endDate = task.earlyFinish;
       } else {
         task.earlyFinish = addDays(task.earlyStart, task.duration, includeWeekends);
-        // NO sobrescribir startDate y endDate - mantener fechas originales de la tabla
+        // CORRECCIÓN: Aplicar fechas calculadas por CPM como MS Project
+        task.startDate = task.earlyStart;
+        task.endDate = task.earlyFinish;
       }
 
       calculating.delete(taskId);
@@ -975,17 +1018,17 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
       totalTasks: cpmResult.tasks.length
     });
     
-    // CORRECCIÓN: NO forzar dependencias - usar las dependencias originales del usuario
-    console.log('🚀 CORRECCIÓN SCHEDULE - Usando dependencias originales del usuario');
+    // CORRECCIÓN: Aplicar fechas calculadas por CPM como MS Project
+    console.log('🚀 CORRECCIÓN SCHEDULE - Aplicando fechas calculadas por CPM como MS Project');
     const tasksWithForcedDeps = cpmResult.tasks.map((task) => {
-      // Mantener las dependencias originales que el usuario definió
+      // Aplicar las fechas calculadas por CPM a la tabla (como MS Project)
       return {
         id: task.id,
         wbsCode: task.wbsCode,
         name: task.name,
         duration: task.duration,
-        startDate: task.startDate,
-        endDate: task.endDate,
+        startDate: task.earlyStart, // Usar fecha calculada por CPM
+        endDate: task.earlyFinish,  // Usar fecha calculada por CPM
         progress: task.progress,
         predecessors: task.predecessors || [],
         cost: task.cost,
@@ -1023,8 +1066,16 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
     };
   }, [tasks, includeWeekends, tasks.length]);
   // CORRECCIÓN FINAL: Asegurar que todos los hitos tengan fecha inicio = fecha fin
+  // Y APLICAR FECHAS CALCULADAS POR CPM COMO MS PROJECT
   const tasksWithCPM = useMemo(() => {
     return cmpResult.tasks.map(task => {
+      // CORRECCIÓN: Aplicar fechas calculadas por CPM como MS Project
+      const taskWithCPMDates = {
+        ...task,
+        startDate: task.earlyStart, // Usar fecha calculada por CPM
+        endDate: task.earlyFinish   // Usar fecha calculada por CPM
+      };
+      
       if (task.isMilestone) {
         // DEBUG: Ver qué fechas tiene el hito
         console.log('🔍 HITO DETECTADO:', {
@@ -1035,18 +1086,37 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
           isMilestone: task.isMilestone
         });
 
-        if (task.startDate !== task.endDate) {
+        if (taskWithCPMDates.startDate !== taskWithCPMDates.endDate) {
           console.log('🔧 CORRIGIENDO HITO - FORZANDO endDate = startDate');
           return {
-            ...task,
-            endDate: task.startDate // FORZAR: fecha fin = fecha inicio para hitos
+            ...taskWithCPMDates,
+            endDate: taskWithCPMDates.startDate // FORZAR: fecha fin = fecha inicio para hitos
           };
         }
       }
-      return task;
+      
+      return taskWithCPMDates;
     });
   }, [cmpResult.tasks]);
 
+  // CORRECCIÓN: Actualizar automáticamente las tareas con fechas calculadas por CPM
+  useEffect(() => {
+    if (tasksWithCPM.length > 0 && setTasks) {
+      // Verificar si las fechas calculadas por CPM son diferentes a las fechas actuales
+      const needsUpdate = tasksWithCPM.some(task => {
+        const currentTask = tasks.find(t => t.id === task.id);
+        if (!currentTask) return false;
+        
+        return currentTask.startDate !== task.startDate || 
+               currentTask.endDate !== task.endDate;
+      });
+      
+      if (needsUpdate) {
+        console.log('🔄 Actualizando tareas con fechas calculadas por CPM...');
+        setTasks(tasksWithCPM);
+      }
+    }
+  }, [tasksWithCPM, tasks, setTasks]);
 
   // ===== Funciones de Control de Costos EVM =====
   
@@ -2214,7 +2284,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
       
       return updatedTasks;
     });
-  }, [hasCircularDependency, selectedTask]);
+  }, [hasCircularDependency]); // CORRECCIÓN: Remover selectedTask para evitar bucle infinito
 
   // Función para manejar cambios en el campo nombre (sin loop infinito)
   const handleNameChange = useCallback((e) => {
@@ -2436,7 +2506,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         predecessorSelectRef.current.value = '';
       }
     }
-  }, [selectedTask, hasCircularDependency, updatePredecessors]);
+  }, [hasCircularDependency]); // CORRECCIÓN: Remover selectedTask y updatePredecessors para evitar bucle infinito
 
   // Actualizar tempTaskName cuando cambie selectedTask
   // TEMPORALMENTE DESHABILITADO COMPLETAMENTE PARA DEBUGGING
@@ -2536,8 +2606,22 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
     }
   }, [selectedTask, tasks]);
 
+  // Refs para acceder a valores actuales sin causar re-renders
+  const selectedTaskRef = useRef(selectedTask);
+  const hasCircularDependencyRef = useRef(hasCircularDependency);
+  const updatePredecessorsRef = useRef(updatePredecessors);
+
+  // Actualizar refs cuando cambien los valores
   useEffect(() => {
-    console.log('🔧 CONFIGURANDO EVENT DELEGATION GLOBAL');
+    selectedTaskRef.current = selectedTask;
+    hasCircularDependencyRef.current = hasCircularDependency;
+    updatePredecessorsRef.current = updatePredecessors;
+  }, [selectedTask, hasCircularDependency]); // CORRECCIÓN: Remover updatePredecessors para evitar bucle infinito
+
+  // TEMPORALMENTE DESHABILITADO PARA EVITAR BUCLE INFINITO
+  useEffect(() => {
+    console.log('🔧 EVENT DELEGATION GLOBAL DESHABILITADO TEMPORALMENTE');
+    return; // Salir inmediatamente sin configurar listeners
 
     const handleGlobalChange = (e) => {
       // EXCEPCIÓN: No procesar el checkbox includeWeekends aquí
@@ -2583,63 +2667,63 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         
         console.warn('🚨 VERIFICANDO CONDICIONES:', {
           taskId,
-          selectedTask: selectedTask?.id,
-          predecessors: selectedTask?.predecessors,
-          includes: selectedTask?.predecessors?.includes(taskId)
+          selectedTask: selectedTaskRef.current?.id,
+          predecessors: selectedTaskRef.current?.predecessors,
+          includes: selectedTaskRef.current?.predecessors?.includes(taskId)
         });
         
-        if (taskId && selectedTask && !selectedTask.predecessors.includes(taskId)) {
+        if (taskId && selectedTaskRef.current && !selectedTaskRef.current.predecessors.includes(taskId)) {
           // Validar dependencia circular
-          if (hasCircularDependency(selectedTask.id, taskId)) {
-            alert(`❌ No se puede crear la dependencia: se detectaría una dependencia circular entre ${selectedTask.id} y ${taskId}`);
+          if (hasCircularDependencyRef.current(selectedTaskRef.current.id, taskId)) {
+            alert(`❌ No se puede crear la dependencia: se detectaría una dependencia circular entre ${selectedTaskRef.current.id} y ${taskId}`);
             e.target.value = '';
             return;
           }
           
-          const newPreds = [...(selectedTask.predecessors || []), taskId];
+          const newPreds = [...(selectedTaskRef.current.predecessors || []), taskId];
           const dependencyType = document.getElementById('newDependencyType')?.value || 'FS';
           
           console.log('🔄 Agregando predecesora desde delegation:', {
-            tarea: selectedTask.id,
+            tarea: selectedTaskRef.current.id,
             nuevaPredecesora: taskId,
-            predecesorasAntes: selectedTask.predecessors,
+            predecesorasAntes: selectedTaskRef.current.predecessors,
             predecesorasDespues: newPreds,
             dependencyType
           });
           
           console.warn('🚨 LLAMANDO updatePredecessors:', {
-            taskId: selectedTask.id,
+            taskId: selectedTaskRef.current.id,
             predecessors: newPreds.join(','),
             dependencyType
           });
           
           // SOLUCIÓN: Solo actualizar selectedTask, NO el estado global hasta guardar
           const updatedTask = {
-            id: selectedTask.id,
-            wbsCode: selectedTask.wbsCode,
-            name: selectedTask.name,
-            duration: selectedTask.duration,
-            startDate: selectedTask.startDate,
-            endDate: selectedTask.endDate,
-            progress: selectedTask.progress,
+            id: selectedTaskRef.current.id,
+            wbsCode: selectedTaskRef.current.wbsCode,
+            name: selectedTaskRef.current.name,
+            duration: selectedTaskRef.current.duration,
+            startDate: selectedTaskRef.current.startDate,
+            endDate: selectedTaskRef.current.endDate,
+            progress: selectedTaskRef.current.progress,
             predecessors: newPreds,
-            cost: selectedTask.cost,
-            priority: selectedTask.priority,
-            assignedTo: selectedTask.assignedTo,
-            isMilestone: selectedTask.isMilestone,
-            isCritical: selectedTask.isCritical,
-            originalDuration: selectedTask.originalDuration,
-            earlyStart: selectedTask.earlyStart,
-            earlyFinish: selectedTask.earlyFinish,
-            lateStart: selectedTask.lateStart,
-            lateFinish: selectedTask.lateFinish,
-            totalFloat: selectedTask.totalFloat,
-            freeFloat: selectedTask.freeFloat,
-            description: selectedTask.description,
-            resources: [...(selectedTask.resources || [])],
-            workPackageId: selectedTask.workPackageId,
-            status: selectedTask.status,
-            successors: [...(selectedTask.successors || [])]
+            cost: selectedTaskRef.current.cost,
+            priority: selectedTaskRef.current.priority,
+            assignedTo: selectedTaskRef.current.assignedTo,
+            isMilestone: selectedTaskRef.current.isMilestone,
+            isCritical: selectedTaskRef.current.isCritical,
+            originalDuration: selectedTaskRef.current.originalDuration,
+            earlyStart: selectedTaskRef.current.earlyStart,
+            earlyFinish: selectedTaskRef.current.earlyFinish,
+            lateStart: selectedTaskRef.current.lateStart,
+            lateFinish: selectedTaskRef.current.lateFinish,
+            totalFloat: selectedTaskRef.current.totalFloat,
+            freeFloat: selectedTaskRef.current.freeFloat,
+            description: selectedTaskRef.current.description,
+            resources: [...(selectedTaskRef.current.resources || [])],
+            workPackageId: selectedTaskRef.current.workPackageId,
+            status: selectedTaskRef.current.status,
+            successors: [...(selectedTaskRef.current.successors || [])]
           };
           setSelectedTask(updatedTask);
           console.log('🎯 PREDECESORA AGREGADA A selectedTask (NO al estado global aún)');
@@ -2683,13 +2767,13 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
           const taskId = actualValue;
             console.warn('🚨 VERIFICANDO CONDICIONES SUCESORA:', {
               taskId,
-              selectedTask: selectedTask?.id,
-              successors: selectedTask?.successors,
-              includes: selectedTask?.successors?.includes(taskId)
+              selectedTask: selectedTaskRef.current?.id,
+              successors: selectedTaskRef.current?.successors,
+              includes: selectedTaskRef.current?.successors?.includes(taskId)
             });
             
             // VERIFICACIÓN DE SEGURIDAD: Si selectedTask es undefined, obtenerlo del estado global
-            let currentSelectedTask = selectedTask;
+            let currentSelectedTask = selectedTaskRef.current;
             if (!currentSelectedTask) {
               console.warn('🚨 selectedTask es undefined, obteniendo del estado global...');
               // Buscar la tarea que tiene el modal abierto (la que está siendo editada)
@@ -2862,8 +2946,9 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
     return () => {
       document.removeEventListener('change', handleGlobalChange);
       document.removeEventListener('input', handleGlobalChange);
+      document.removeEventListener('click', handleGlobalChange);
     };
-  }, [selectedTask, hasCircularDependency, updatePredecessors]);
+  }, []); // CORRECCIÓN: Remover dependencias que causan bucle infinito
 
   // Función para actualizar datos del proyecto (ya no se usa)
   const updateBusinessCase = useCallback((field, value) => {
@@ -5730,6 +5815,12 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                 </thead>
                 <tbody onKeyDown={handleKeyDown}>
                   {tasksWithCPM
+                    .sort((a, b) => {
+                      // Ordenar por la columna # (wbsCode) del Excel
+                      const aNum = parseInt(a.wbsCode) || 0;
+                      const bNum = parseInt(b.wbsCode) || 0;
+                      return aNum - bNum;
+                    })
                     .map((task, index) => (
                     <tr 
                       key={task.id} 
@@ -9858,12 +9949,21 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
       />
 
       {/* Asistente Inteligente de Cronogramas */}
+      {showAIWizard && console.log('🔍 DEBUG - ScheduleWizard props:', {
+        projectId: projectData?.id,
+        organizationId: projectData?.organizationId,
+        userId: supabaseService.currentUser?.id,
+        projectDataKeys: projectData ? Object.keys(projectData) : 'null',
+        projectData: projectData
+      })}
       <ScheduleWizard
         isOpen={showAIWizard}
         onClose={() => setShowAIWizard(false)}
         onComplete={handleAIScheduleGenerated}
         projectId={projectData?.id}
         currentProject={projectData}
+        organizationId={projectData?.organizationId}
+        userId={supabaseService.currentUser?.id}
       />
     </div>
   );

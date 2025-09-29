@@ -2,12 +2,15 @@
  * ScheduleWizard - Componente principal del Asistente Inteligente de Cronogramas
  * StrategiaPM - MVP Implementation
  * 
- * Wizard de 3 pasos para generar cronogramas automáticamente con IA
+ * Wizard de 5 pasos para generar cronogramas automáticamente con IA
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import ProjectAnalysisStep from './ProjectAnalysisStep';
 import ResourceConfigStep from './ResourceConfigStep';
+import MilestoneDefinitionStep from './MilestoneDefinitionStep';
+import LearningStep from './LearningStep';
+import MachineryConfigStep from './MachineryConfigStep';
 import SchedulePreview from './SchedulePreview';
 import aiSchedulerService from '../../services/AISchedulerService';
 
@@ -16,7 +19,9 @@ const ScheduleWizard = ({
   onClose, 
   onComplete, 
   projectId, 
-  currentProject = null 
+  currentProject = null,
+  organizationId,
+  userId
 }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [wizardData, setWizardData] = useState({});
@@ -78,16 +83,16 @@ const ScheduleWizard = ({
   };
 
   // Actualizar datos del wizard
-  const updateWizardData = (newData) => {
+  const updateWizardData = useCallback((newData) => {
     setWizardData(prev => ({
       ...prev,
       ...newData
     }));
-  };
+  }, []); // CORRECCIÓN: useCallback para evitar recreación en cada render
 
   // Avanzar al siguiente paso
   const nextStep = () => {
-    if (currentStep < 3) {
+    if (currentStep < 5) {
       setCurrentStep(prev => prev + 1);
     }
   };
@@ -108,13 +113,24 @@ const ScheduleWizard = ({
       console.log('🤖 Iniciando generación de cronograma...');
       console.log('📊 Datos del wizard:', wizardData);
 
+      // Validar que tenemos datos suficientes
+      if (!wizardData.projectType) {
+        throw new Error('Tipo de proyecto no definido');
+      }
+
       // Generar cronograma usando el servicio de IA
       const schedule = await aiSchedulerService.generateSmartSchedule(wizardData);
       
-      setGeneratedSchedule(schedule);
-      setCurrentStep(3); // Ir al paso de vista previa
+      if (!schedule) {
+        throw new Error('No se pudo generar el cronograma');
+      }
       
-      console.log('✅ Cronograma generado exitosamente');
+      setGeneratedSchedule(schedule);
+      setCurrentStep(5); // Ir al paso 5 (vista previa del cronograma)
+      
+      console.log('✅ Cronograma generado exitosamente:', schedule);
+      console.log('📊 Actividades generadas:', schedule.activities?.length || 0);
+      console.log('🎯 Hitos generados:', schedule.milestones?.length || 0);
       
     } catch (error) {
       console.error('❌ Error generando cronograma:', error);
@@ -142,6 +158,17 @@ const ScheduleWizard = ({
     onClose();
   };
 
+  // Determinar si necesita paso de configuración de maquinaria
+  const needsMachineryStep = () => {
+    return wizardData.projectType === 'equipment_installation';
+  };
+
+  // Obtener el número total de pasos
+  const getTotalSteps = () => {
+    return 5; // Siempre 5 pasos (sin aprendizaje)
+  };
+
+
   // Validar paso actual
   const isCurrentStepValid = () => {
     switch (currentStep) {
@@ -150,6 +177,13 @@ const ScheduleWizard = ({
       case 2:
         return wizardData.teamSize && wizardData.teamExperience;
       case 3:
+        return wizardData.milestones && wizardData.milestones.length > 0;
+      case 4:
+        if (needsMachineryStep()) {
+          return wizardData.deliveryTime && wizardData.advancePayments;
+        }
+        return true; // Paso opcional para otros tipos de proyecto
+      case 5:
         return generatedSchedule !== null;
       default:
         return false;
@@ -184,13 +218,13 @@ const ScheduleWizard = ({
           {/* Progress Bar */}
           <div className="mt-4">
             <div className="flex items-center justify-between text-sm text-purple-100 mb-2">
-              <span>Paso {currentStep} de 3</span>
-              <span>{Math.round((currentStep / 3) * 100)}% completado</span>
+              <span>Paso {currentStep} de {getTotalSteps()}</span>
+              <span>{Math.round((currentStep / getTotalSteps()) * 100)}% completado</span>
             </div>
             <div className="w-full bg-purple-300 rounded-full h-2">
               <div 
                 className="bg-white h-2 rounded-full transition-all duration-300"
-                style={{ width: `${(currentStep / 3) * 100}%` }}
+                style={{ width: `${(currentStep / getTotalSteps()) * 100}%` }}
               />
             </div>
           </div>
@@ -227,8 +261,39 @@ const ScheduleWizard = ({
             />
           )}
 
-          {/* Step 3: Vista Previa del Cronograma */}
+          {/* Step 3: Definición de Hitos */}
           {currentStep === 3 && (
+            <MilestoneDefinitionStep
+              wizardData={wizardData}
+              onUpdate={updateWizardData}
+            />
+          )}
+
+          {/* Step 4: Configuración de Maquinaria (solo para equipment_installation) */}
+          {currentStep === 4 && needsMachineryStep() && (
+            <MachineryConfigStep
+              wizardData={wizardData}
+              onUpdate={updateWizardData}
+            />
+          )}
+
+          {/* Step 4: Aprendizaje de Patrones (solo si no es equipment_installation) */}
+          {currentStep === 4 && !needsMachineryStep() && (
+            <LearningStep
+              wizardData={wizardData}
+              onUpdate={updateWizardData}
+              onComplete={(learningData) => {
+                updateWizardData(learningData);
+                nextStep();
+              }}
+              projectType={wizardData.projectType}
+              organizationId={organizationId}
+              userId={userId}
+            />
+          )}
+
+          {/* Step 5: Vista Previa del Cronograma */}
+          {currentStep === 5 && (
             <SchedulePreview
               wizardData={wizardData}
               generatedSchedule={generatedSchedule}
@@ -259,7 +324,7 @@ const ScheduleWizard = ({
               Cancelar
             </button>
 
-            {currentStep < 3 ? (
+            {currentStep < 5 ? (
               <button
                 onClick={nextStep}
                 disabled={!isCurrentStepValid()}

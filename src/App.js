@@ -67,7 +67,8 @@ function MainApp() {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       version: '1.0.0',
-      progress: 0
+      progress: 0,
+      organizationId: 'demo-org-001' // CORRECCIÓN: Agregar organizationId para compatibilidad con localStorage
     }
   ]);
 

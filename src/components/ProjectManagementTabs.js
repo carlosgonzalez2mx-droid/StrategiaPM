@@ -499,7 +499,11 @@ const ProjectManagementTabs = ({
   const projectWorkPackages = Array.isArray(workPackages) ? workPackages : [];
 
   // 2. Tasks: Usar la función setTasks que ya filtra por proyecto
-  const projectTasks = Array.isArray(tasks) ? tasks : [];
+  // CORRECCIÓN: Usar useMemo para asegurar actualización en tiempo real
+  const projectTasks = useMemo(() => {
+    console.log('🔄 ProjectManagementTabs - Recalculando projectTasks:', tasks?.length || 0);
+    return Array.isArray(tasks) ? tasks : [];
+  }, [tasks]);
 
   // 3. Purchase Orders: Usar la función setPurchaseOrders que ya filtra por proyecto
   const projectPurchaseOrders = Array.isArray(purchaseOrders) ? purchaseOrders : [];
@@ -1005,12 +1009,21 @@ const ProjectManagementTabs = ({
                   </span>
                 </h2>
                 <div className="space-y-4 max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-                  {projectTasks?.filter(task => task.isMilestone)
+                  {(() => {
+                    const milestones = projectTasks?.filter(task => task.isMilestone) || [];
+                    console.log('🎯 Dashboard - Hitos actualizados:', milestones.map(m => ({ 
+                      id: m.id, 
+                      name: m.name, 
+                      startDate: m.startDate, 
+                      endDate: m.endDate 
+                    })));
+                    return milestones;
+                  })()
                     .sort((a, b) => {
-                      // Ordenar por wbsCode (campo #) si existe, sino por nombre
-                      const aCode = a.wbsCode || a.name;
-                      const bCode = b.wbsCode || b.name;
-                      return aCode.localeCompare(bCode, 'es', { numeric: true });
+                      // CORRECCIÓN: Ordenar por fecha de inicio para seguir secuencia del cronograma
+                      const aDate = new Date(a.startDate || a.endDate || '1900-01-01');
+                      const bDate = new Date(b.startDate || b.endDate || '1900-01-01');
+                      return aDate - bDate;
                     })
                     .map((milestone, index) => (
                     <div key={milestone.id} className="bg-gradient-to-r from-gray-50 to-gray-100 p-4 rounded-lg border border-gray-200">

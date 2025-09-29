@@ -20,6 +20,7 @@ const ResourceConfigStep = ({ wizardData, onUpdate }) => {
   const teamRoles = [
     { value: 'project_manager', label: 'Project Manager', icon: '👨‍💼' },
     { value: 'team_lead', label: 'Team Lead', icon: '👨‍💻' },
+    { value: 'buyer', label: 'Comprador(a)', icon: '🛒' },
     { value: 'developer', label: 'Desarrollador', icon: '💻' },
     { value: 'designer', label: 'Diseñador', icon: '🎨' },
     { value: 'qa_tester', label: 'QA/Tester', icon: '🔍' },
@@ -70,7 +71,7 @@ const ResourceConfigStep = ({ wizardData, onUpdate }) => {
         teamMembers: []
       });
     }
-  }, [teamMembers, onUpdate]);
+  }, [teamMembers]); // CORRECCIÓN: Remover onUpdate para evitar bucle infinito
 
   // Agregar miembro al equipo
   const addTeamMember = () => {

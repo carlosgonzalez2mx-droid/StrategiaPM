@@ -9,6 +9,14 @@ const SchedulePreview = ({ wizardData, generatedSchedule, isGenerating, onGenera
   const [selectedView, setSelectedView] = useState('overview');
   const [showRecommendations, setShowRecommendations] = useState(true);
 
+  // Debug logging
+  console.log('🔍 SchedulePreview props:', {
+    wizardData,
+    generatedSchedule: generatedSchedule ? 'Presente' : 'Ausente',
+    isGenerating,
+    hasOnGenerate: !!onGenerate
+  });
+
   // Generar cronograma si no existe
   const handleGenerate = () => {
     if (!generatedSchedule && !isGenerating) {

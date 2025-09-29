@@ -476,6 +476,8 @@ class SupabaseService {
         managementReserve: project.management_reserve || project.managementReserve,
         createdAt: project.created_at || project.createdAt,
         updatedAt: project.updated_at || project.updatedAt,
+        organizationId: project.organization_id || project.organizationId, // CORRECCIÓN: Agregar conversión de organization_id
+        ownerId: project.owner_id || project.ownerId, // CORRECCIÓN: Agregar conversión de owner_id
         // Mantener también los nombres originales para compatibilidad hacia atrás
         start_date: project.start_date,
         end_date: project.end_date,
@@ -484,7 +486,9 @@ class SupabaseService {
         contingency_reserve: project.contingency_reserve,
         management_reserve: project.management_reserve,
         created_at: project.created_at,
-        updated_at: project.updated_at
+        updated_at: project.updated_at,
+        organization_id: project.organization_id,
+        owner_id: project.owner_id
       }));
 
       console.log(`✅ Proyectos convertidos: ${convertedProjects?.length || 0}`);
