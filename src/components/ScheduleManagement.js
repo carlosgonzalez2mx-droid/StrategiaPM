@@ -1084,38 +1084,48 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
       totalTasks: cpmResult.tasks.length
     });
     
-    // CORRECCIÓN: Aplicar fechas calculadas por CPM como MS Project
-    console.log('🚀 CORRECCIÓN SCHEDULE - Aplicando fechas calculadas por CPM como MS Project');
-    const tasksWithForcedDeps = cpmResult.tasks.map((task) => {
-      // Aplicar las fechas calculadas por CPM a la tabla (como MS Project)
-      return {
-        id: task.id,
-        wbsCode: task.wbsCode,
-        name: task.name,
-        duration: task.duration,
-        startDate: task.earlyStart, // Usar fecha calculada por CPM
-        endDate: task.earlyFinish,  // Usar fecha calculada por CPM
-        progress: task.progress,
-        predecessors: task.predecessors || [],
-        cost: task.cost,
-        priority: task.priority,
-        assignedTo: task.assignedTo,
-        isMilestone: task.isMilestone,
-        isCritical: task.isCritical,
-        originalDuration: task.originalDuration,
-        earlyStart: task.earlyStart,
-        earlyFinish: task.earlyFinish,
-        lateStart: task.lateStart,
-        lateFinish: task.lateFinish,
-        totalFloat: task.totalFloat,
-        freeFloat: task.freeFloat,
-        description: task.description,
-        resources: [...(task.resources || [])],
-        workPackageId: task.workPackageId,
-        status: task.status,
-        successors: task.successors || []
-      };
-    });
+  // CORRECCIÓN: Aplicar fechas calculadas por CPM como MS Project
+  console.log('🚀 CORRECCIÓN SCHEDULE - Aplicando fechas calculadas por CPM como MS Project');
+  
+  // CORRECCIÓN: Preservar el orden original de las tareas basado en wbsCode
+  const tasksWithForcedDeps = tasks.map((originalTask) => {
+    // Buscar la tarea procesada por CPM que corresponde a la tarea original
+    const cpmTask = cpmResult.tasks.find(t => t.id === originalTask.id);
+    
+    if (!cpmTask) {
+      console.warn(`⚠️ Tarea no encontrada en resultado CPM: ${originalTask.name} (${originalTask.id})`);
+      return originalTask; // Devolver tarea original si no se encuentra en CPM
+    }
+    
+    // Aplicar las fechas calculadas por CPM a la tabla (como MS Project)
+    return {
+      id: cpmTask.id,
+      wbsCode: cpmTask.wbsCode,
+      name: cpmTask.name,
+      duration: cpmTask.duration,
+      startDate: cpmTask.earlyStart, // Usar fecha calculada por CPM
+      endDate: cpmTask.earlyFinish,  // Usar fecha calculada por CPM
+      progress: cpmTask.progress,
+      predecessors: cpmTask.predecessors || [],
+      cost: cpmTask.cost,
+      priority: cpmTask.priority,
+      assignedTo: cpmTask.assignedTo,
+      isMilestone: cpmTask.isMilestone,
+      isCritical: cpmTask.isCritical,
+      originalDuration: cpmTask.originalDuration,
+      earlyStart: cpmTask.earlyStart,
+      earlyFinish: cpmTask.earlyFinish,
+      lateStart: cpmTask.lateStart,
+      lateFinish: cpmTask.lateFinish,
+      totalFloat: cpmTask.totalFloat,
+      freeFloat: cpmTask.freeFloat,
+      description: cpmTask.description,
+      resources: [...(cpmTask.resources || [])],
+      workPackageId: cpmTask.workPackageId,
+      status: cpmTask.status,
+      successors: cpmTask.successors || []
+    };
+  });
     
     console.log('🔄 Tareas con dependencias FORZADAS después de CPM:', tasksWithForcedDeps.map(t => ({
       id: t.id,
