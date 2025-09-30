@@ -743,47 +743,132 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
   // Estados principales - INDEPENDIENTES de Work Packages
   // NOTA: tasks y setTasks ahora vienen como props del componente padre
   
-  // Corregir hitos existentes cuando se cargan las tareas (solo una vez)
+  // Función de migración automática para proyectos existentes
+  const migrateExistingProject = useCallback((projectTasks) => {
+    if (!Array.isArray(projectTasks) || projectTasks.length === 0) {
+      return projectTasks;
+    }
+    
+    console.log('🔄 MIGRACIÓN AUTOMÁTICA - Iniciando migración de proyecto existente...');
+    console.log(`📊 Tareas a migrar: ${projectTasks.length}`);
+    
+    // Verificar si ya está migrado (tiene wbsCode secuencial)
+    const hasSequentialWbs = projectTasks.every((task, index) => 
+      parseInt(task.wbsCode) === index + 1
+    );
+    
+    if (hasSequentialWbs) {
+      console.log('✅ MIGRACIÓN AUTOMÁTICA - Proyecto ya migrado, no se requiere migración');
+      return projectTasks;
+    }
+    
+    // Crear mapeo de wbsCode actual a nuevo wbsCode secuencial
+    const wbsMapping = new Map();
+    projectTasks.forEach((task, index) => {
+      const newWbsCode = `${index + 1}`;
+      wbsMapping.set(task.wbsCode, newWbsCode);
+    });
+    
+    console.log('🔄 MIGRACIÓN AUTOMÁTICA - Mapeo de wbsCode:', Array.from(wbsMapping.entries()));
+    
+    // Migrar cada tarea
+    const migratedTasks = projectTasks.map((task, index) => {
+      const newWbsCode = `${index + 1}`;
+      
+      // Convertir predecesoras de wbsCode antiguo a nuevo
+      let migratedPredecessors = [];
+      if (task.predecessors && task.predecessors.length > 0) {
+        migratedPredecessors = task.predecessors.map(predId => {
+          // Buscar la tarea predecesora por ID
+          const predTask = projectTasks.find(t => t.id === predId);
+          if (predTask) {
+            // Obtener el nuevo wbsCode de la predecesora
+            const newPredWbsCode = wbsMapping.get(predTask.wbsCode);
+            if (newPredWbsCode) {
+              // Buscar la tarea con el nuevo wbsCode y devolver su ID
+              const newPredTask = projectTasks.find(t => wbsMapping.get(t.wbsCode) === newPredWbsCode);
+              return newPredTask ? newPredTask.id : predId;
+            }
+          }
+          return predId;
+        }).filter(Boolean);
+      }
+      
+      const migratedTask = {
+        ...task,
+        wbsCode: newWbsCode,
+        predecessors: migratedPredecessors
+      };
+      
+      if (migratedPredecessors.length > 0) {
+        console.log(`🔄 Tarea "${task.name}": wbsCode ${task.wbsCode} → ${newWbsCode}, predecesoras migradas: [${migratedPredecessors.join(', ')}]`);
+      }
+      
+      return migratedTask;
+    });
+    
+    console.log('✅ MIGRACIÓN AUTOMÁTICA - Migración completada exitosamente');
+    return migratedTasks;
+  }, []);
+  
+  // Migrar proyecto existente y corregir hitos cuando se cargan las tareas
   useEffect(() => {
     console.log('🔧 useEffect EJECUTÁNDOSE - TAREAS:', tasks?.length || 0);
     
     if (tasks && tasks.length > 0) {
+      // MIGRACIÓN AUTOMÁTICA: Migrar proyecto existente si es necesario
+      const migratedTasks = migrateExistingProject(tasks);
+      
       // Verificar si hay hitos con fechas incorrectas
-      const milestonesWithWrongDates = tasks.filter(task => 
+      const milestonesWithWrongDates = migratedTasks.filter(task => 
         task.isMilestone && task.startDate !== task.endDate
       );
       
       console.log('🔧 HITOS CON FECHAS INCORRECTAS DETECTADOS:', milestonesWithWrongDates.length);
       
-      if (milestonesWithWrongDates.length > 0) {
-        console.log('🔧 EJECUTANDO CORRECCIÓN AUTOMÁTICA');
+      if (milestonesWithWrongDates.length > 0 || migratedTasks !== tasks) {
+        console.log('🔧 EJECUTANDO CORRECCIÓN AUTOMÁTICA Y/O MIGRACIÓN');
         
-        // Corregir directamente sin usar la función
-        setTasks(prev => prev.map(task => {
-          if (!task.isMilestone) return task;
+        setTasks(prev => {
+          let finalTasks = prev;
           
-          // Verificar si la fecha de fin es diferente a la de inicio
-          if (task.startDate !== task.endDate) {
-            console.log('🔧 CORRIGIENDO HITO AUTOMÁTICAMENTE:', {
-              taskId: task.id,
-              taskName: task.name,
-              startDateOriginal: task.startDate,
-              endDateOriginal: task.endDate,
-              endDateCorregida: task.startDate
-            });
-            
-            return {
-              ...task,
-              endDate: task.startDate, // Corregir: fin = inicio
-              updatedAt: new Date().toISOString()
-            };
+          // Aplicar migración si es necesaria
+          if (migratedTasks !== tasks) {
+            console.log('🔄 MIGRACIÓN AUTOMÁTICA - Aplicando migración a las tareas');
+            finalTasks = migratedTasks;
           }
           
-          return task;
-        }));
+          // Corregir hitos si es necesario
+          if (milestonesWithWrongDates.length > 0) {
+            finalTasks = finalTasks.map(task => {
+              if (!task.isMilestone) return task;
+              
+              // Verificar si la fecha de fin es diferente a la de inicio
+              if (task.startDate !== task.endDate) {
+                console.log('🔧 CORRIGIENDO HITO AUTOMÁTICAMENTE:', {
+                  taskId: task.id,
+                  taskName: task.name,
+                  startDateOriginal: task.startDate,
+                  endDateOriginal: task.endDate,
+                  endDateCorregida: task.startDate
+                });
+                
+                return {
+                  ...task,
+                  endDate: task.startDate, // Corregir: fin = inicio
+                  updatedAt: new Date().toISOString()
+                };
+              }
+              
+              return task;
+            });
+          }
+          
+          return finalTasks;
+        });
       }
     }
-  }, [tasks.length]); // Solo ejecutar cuando cambie el número de tareas
+  }, [tasks.length, migrateExistingProject]); // Incluir migrateExistingProject en las dependencias
 
   // ELIMINADO: Sincronización con Work Packages - ya no es necesaria
 
@@ -3681,18 +3766,18 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
           status: 'pending' // Agregar status por defecto
         };
         
-        // Procesar predecesoras si existen - USAR EL PROCESAMIENTO CORRECTO
+        // Procesar predecesoras si existen - USAR wbsCode COMO REFERENCIA
         if (row[columnMap.predecesoras]) {
           const predStr = row[columnMap.predecesoras].toString();
           console.log(`🔍 Procesando predecesoras para tarea ${i}: "${predStr}"`);
           
-          // PROCESAMIENTO CORRECTO: Dividir por comas y mantener los valores originales
+          // Dividir por comas y procesar números de wbsCode
           const predValues = predStr.split(',').map(s => s.trim()).filter(Boolean);
           console.log(`🔍 Valores de predecesoras procesados: [${predValues.join(', ')}]`);
           
-          // Mantener los valores originales como están (no convertir a números de fila)
+          // Guardar temporalmente los números de wbsCode para procesar después
           task.predecessors = predValues;
-          console.log(`🔍 Predecesoras finales: [${task.predecessors.join(', ')}]`);
+          console.log(`🔍 Predecesoras temporales (wbsCode): [${task.predecessors.join(', ')}]`);
         }
         
         newTasks.push(task);
@@ -3704,6 +3789,26 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         alert('No se encontraron tareas válidas en el archivo Excel');
         return;
       }
+      
+      // PROCESAR PREDECESORAS: Convertir números de wbsCode a IDs
+      console.log('🔄 Procesando predecesoras con wbsCode como referencia...');
+      newTasks.forEach(task => {
+        if (task.predecessors && task.predecessors.length > 0) {
+          const predecessorIds = task.predecessors.map(predWbsCode => {
+            const predTask = newTasks.find(t => t.wbsCode === predWbsCode);
+            if (predTask) {
+              console.log(`✅ Predecesora encontrada: wbsCode ${predWbsCode} → ID ${predTask.id}`);
+              return predTask.id;
+            } else {
+              console.warn(`⚠️ Predecesora no encontrada: wbsCode ${predWbsCode}`);
+              return null;
+            }
+          }).filter(Boolean);
+          
+          task.predecessors = predecessorIds;
+          console.log(`🔗 Tarea "${task.name}": predecesoras convertidas a IDs: [${predecessorIds.join(', ')}]`);
+        }
+      });
       
       // VALIDAR PREDECESORAS DEL EXCEL
       console.log('🔍 Validando predecesoras del Excel...');
@@ -4580,14 +4685,15 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
     
-    // Convertir IDs a números de fila y mostrar solo los números
+    // Convertir IDs a números de wbsCode para mostrar números correctos
     const predecessorNumbers = task.predecessors.map(predId => {
-      const predIndex = tasks.findIndex(t => t.id === predId);
-      return predIndex + 1; // +1 porque los números de fila empiezan en 1
-    });
+      const predTask = tasks.find(t => t.id === predId);
+      return predTask ? parseInt(predTask.wbsCode) : null;
+    }).filter(Boolean);
     
     setEditingCell({ taskId, field: 'dependencies' });
-    setEditingValue(predecessorNumbers.join(', ')); // Solo números separados por comas
+    setEditingValue(predecessorNumbers.join(', ')); // Mostrar números de wbsCode
+    console.log(`🔍 Editando dependencias de tarea ${task.wbsCode}: mostrando números wbsCode [${predecessorNumbers.join(', ')}]`);
   };
 
   const saveDependenciesEdit = () => {
@@ -4595,16 +4701,24 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
     
     const { taskId } = editingCell;
     try {
-      // Procesar números separados por comas
+      // Procesar números separados por comas (números de wbsCode)
       const predecessorNumbers = editingValue
         .split(',')
         .map(num => parseInt(num.trim()))
-        .filter(num => !isNaN(num) && num > 0 && num <= tasks.length);
+        .filter(num => !isNaN(num) && num > 0);
       
-      // Convertir números de fila a IDs
-      const predecessorIds = predecessorNumbers.map(rowNumber => {
-        const taskIndex = rowNumber - 1; // -1 porque los números de fila empiezan en 1
-        return tasks[taskIndex]?.id;
+      console.log(`💾 Guardando dependencias para tarea ${taskId}: números wbsCode [${predecessorNumbers.join(', ')}]`);
+      
+      // Convertir números de wbsCode a IDs
+      const predecessorIds = predecessorNumbers.map(wbsCode => {
+        const predTask = tasks.find(t => parseInt(t.wbsCode) === wbsCode);
+        if (predTask) {
+          console.log(`✅ Predecesora encontrada: wbsCode ${wbsCode} → ID ${predTask.id}`);
+          return predTask.id;
+        } else {
+          console.warn(`⚠️ Predecesora no encontrada: wbsCode ${wbsCode}`);
+          return null;
+        }
       }).filter(id => id); // Filtrar IDs válidos
       
       setTasks(prev => prev.map(task => {
@@ -6127,19 +6241,11 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                               {task.predecessors.length > 0 ? (
                                 <div className="flex flex-wrap gap-1">
                                   {task.predecessors.map(predId => {
-                                    // Primero intentar buscar por ID exacto
-                                    let predIndex = tasks.findIndex(t => t.id === predId);
+                                    // Buscar la tarea predecesora por ID
+                                    const predTask = tasks.find(t => t.id === predId);
                                     
-                                    // Si no se encuentra por ID, buscar por número de fila (para Excel importado)
-                                    if (predIndex === -1 && !isNaN(predId)) {
-                                      const rowNumber = parseInt(predId);
-                                      if (rowNumber > 0 && rowNumber <= tasks.length) {
-                                        predIndex = rowNumber - 1; // Las filas empiezan en 1, el array en 0
-                                      }
-                                    }
-                                    
-                                    // Si aún no se encuentra, mostrar el valor original
-                                    const predNumber = predIndex !== -1 ? predIndex + 1 : predId;
+                                    // Mostrar el número de wbsCode de la predecesora
+                                    const predNumber = predTask ? parseInt(predTask.wbsCode) : predId;
                                     
                                     return (
                                       <span
