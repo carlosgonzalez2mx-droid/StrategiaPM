@@ -271,13 +271,20 @@ const ProjectManagementTabs = ({
     const fifteenDaysFromNow = new Date();
     fifteenDaysFromNow.setDate(today.getDate() + 15);
     
-    // Filtrar tareas que vencen en menos de 15 días y no están completadas
+    // Filtrar tareas que vencen en menos de 15 días Y tareas vencidas no completadas
     const tasksNearDeadline = allTasks.filter(task => {
       if (task.isMilestone) return false; // Excluir hitos
       if (task.progress >= 100) return false; // Excluir tareas completadas
       
       const endDate = new Date(task.endDate);
-      return endDate >= today && endDate <= fifteenDaysFromNow;
+      
+      // Incluir tareas vencidas (ya pasó la fecha) que no están completadas
+      const isOverdue = endDate < today;
+      
+      // Incluir tareas que vencen en los próximos 15 días
+      const isUpcoming = endDate >= today && endDate <= fifteenDaysFromNow;
+      
+      return isOverdue || isUpcoming;
     });
     
     // CORRECCIÓN: Agrupar tareas por hito - las tareas pertenecen al hito que las ANTECEDE
@@ -339,12 +346,19 @@ const ProjectManagementTabs = ({
     const fifteenDaysFromNow = new Date();
     fifteenDaysFromNow.setDate(today.getDate() + 15);
     
-    // Filtrar tareas de minuta que vencen en menos de 15 días y no están completadas
+    // Filtrar tareas de minuta que vencen en menos de 15 días Y tareas vencidas no completadas
     const minutaTasksNearDeadline = minutaTasks.filter(minutaTask => {
       if (minutaTask.estatus === 'Completado') return false; // Excluir tareas completadas
       
       const endDate = new Date(minutaTask.fecha);
-      return endDate >= today && endDate <= fifteenDaysFromNow;
+      
+      // Incluir tareas vencidas (ya pasó la fecha) que no están completadas
+      const isOverdue = endDate < today;
+      
+      // Incluir tareas que vencen en los próximos 15 días
+      const isUpcoming = endDate >= today && endDate <= fifteenDaysFromNow;
+      
+      return isOverdue || isUpcoming;
     });
     
     // Agrupar tareas por hito
@@ -1115,7 +1129,7 @@ const ProjectManagementTabs = ({
                   <div className="flex items-center">
                     <span className="text-3xl mr-3">⚠️</span>
                     Alerta Tareas por Vencer
-                    <span className="text-sm text-gray-500 ml-2">(Cronograma + Minutas)</span>
+                    <span className="text-sm text-gray-500 ml-2">(Vencidas + Próximas a vencer - Cronograma + Minutas)</span>
                   </div>
                   <span className="text-sm bg-orange-100 text-orange-800 px-3 py-1 rounded-full">
                     {(() => {
@@ -1164,9 +1178,14 @@ const ProjectManagementTabs = ({
                         <div className="space-y-2">
                           {group.tasks.map((task, taskIndex) => {
                             const daysUntilDeadline = Math.ceil((new Date(task.endDate) - new Date()) / (1000 * 60 * 60 * 24));
-                            const urgencyColor = daysUntilDeadline <= 3 ? 'text-red-600 bg-red-100' : 
-                                               daysUntilDeadline <= 7 ? 'text-orange-600 bg-orange-100' : 
-                                               'text-yellow-600 bg-yellow-100';
+                            const isOverdue = daysUntilDeadline < 0;
+                            
+                            // Colores mejorados para distinguir tareas vencidas vs próximas a vencer
+                            const urgencyColor = isOverdue ? 'text-red-700 bg-red-200 border-red-300' : // Tareas vencidas
+                                               daysUntilDeadline === 0 ? 'text-red-600 bg-red-100 border-red-200' : // Vence hoy
+                                               daysUntilDeadline <= 3 ? 'text-orange-600 bg-orange-100 border-orange-200' : // 1-3 días
+                                               daysUntilDeadline <= 7 ? 'text-yellow-600 bg-yellow-100 border-yellow-200' : // 4-7 días
+                                               'text-blue-600 bg-blue-100 border-blue-200'; // 8-15 días
                             
                             return (
                               <div key={task.id} className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
@@ -1203,10 +1222,11 @@ const ProjectManagementTabs = ({
                                     </div>
                                   </div>
                                   <div className="flex items-center space-x-2">
-                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${urgencyColor}`}>
-                                      {daysUntilDeadline === 0 ? 'Hoy' : 
-                                       daysUntilDeadline === 1 ? 'Mañana' : 
-                                       `${daysUntilDeadline} días`}
+                                    <span className={`px-2 py-1 rounded-full text-xs font-medium border ${urgencyColor}`}>
+                                      {isOverdue ? `Vencida hace ${Math.abs(daysUntilDeadline)} días` :
+                                       daysUntilDeadline === 0 ? 'Vence hoy' : 
+                                       daysUntilDeadline === 1 ? 'Vence mañana' : 
+                                       `Vence en ${daysUntilDeadline} días`}
                                     </span>
                                     <div className="w-16 bg-gray-200 rounded-full h-2">
                                       <div 
