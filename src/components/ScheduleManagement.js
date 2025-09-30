@@ -5920,6 +5920,12 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                 </thead>
                 <tbody onKeyDown={handleKeyDown}>
                   {tasksWithCPM
+                    .sort((a, b) => {
+                      // Ordenar por wbsCode (columna #) para mantener el orden del Excel
+                      const aNum = parseInt(a.wbsCode) || 0;
+                      const bNum = parseInt(b.wbsCode) || 0;
+                      return aNum - bNum;
+                    })
                     .map((task, index) => (
                     <tr 
                       key={task.id} 
