@@ -762,35 +762,32 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
       return projectTasks;
     }
     
-    // Crear mapeo de wbsCode actual a nuevo wbsCode secuencial
-    const wbsMapping = new Map();
+    // CORRECCIÓN: Crear mapeo de ID a nuevo wbsCode para referencias correctas
+    const idToNewWbsMapping = new Map();
     projectTasks.forEach((task, index) => {
       const newWbsCode = `${index + 1}`;
-      wbsMapping.set(task.wbsCode, newWbsCode);
+      idToNewWbsMapping.set(task.id, newWbsCode);
     });
     
-    console.log('🔄 MIGRACIÓN AUTOMÁTICA - Mapeo de wbsCode:', Array.from(wbsMapping.entries()));
+    console.log('🔄 MIGRACIÓN AUTOMÁTICA - Mapeo de ID a wbsCode:', Array.from(idToNewWbsMapping.entries()));
     
     // Migrar cada tarea
     const migratedTasks = projectTasks.map((task, index) => {
       const newWbsCode = `${index + 1}`;
       
-      // Convertir predecesoras de wbsCode antiguo a nuevo
+      // Convertir predecesoras manteniendo las referencias por ID
       let migratedPredecessors = [];
       if (task.predecessors && task.predecessors.length > 0) {
         migratedPredecessors = task.predecessors.map(predId => {
-          // Buscar la tarea predecesora por ID
+          // Verificar si la predecesora existe en el proyecto
           const predTask = projectTasks.find(t => t.id === predId);
           if (predTask) {
-            // Obtener el nuevo wbsCode de la predecesora
-            const newPredWbsCode = wbsMapping.get(predTask.wbsCode);
-            if (newPredWbsCode) {
-              // Buscar la tarea con el nuevo wbsCode y devolver su ID
-              const newPredTask = projectTasks.find(t => wbsMapping.get(t.wbsCode) === newPredWbsCode);
-              return newPredTask ? newPredTask.id : predId;
-            }
+            console.log(`✅ Predecesora válida encontrada: ${predTask.name} (ID: ${predId})`);
+            return predId; // Mantener el ID original
+          } else {
+            console.warn(`⚠️ Predecesora no encontrada: ID ${predId}`);
+            return null;
           }
-          return predId;
         }).filter(Boolean);
       }
       
@@ -801,7 +798,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
       };
       
       if (migratedPredecessors.length > 0) {
-        console.log(`🔄 Tarea "${task.name}": wbsCode ${task.wbsCode} → ${newWbsCode}, predecesoras migradas: [${migratedPredecessors.join(', ')}]`);
+        console.log(`🔄 Tarea "${task.name}": wbsCode ${task.wbsCode} → ${newWbsCode}, predecesoras: [${migratedPredecessors.join(', ')}]`);
       }
       
       return migratedTask;
@@ -811,64 +808,48 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
     return migratedTasks;
   }, []);
   
-  // Migrar proyecto existente y corregir hitos cuando se cargan las tareas
+  // Corregir hitos cuando se cargan las tareas (SIN REORDENAR)
   useEffect(() => {
     console.log('🔧 useEffect EJECUTÁNDOSE - TAREAS:', tasks?.length || 0);
     
     if (tasks && tasks.length > 0) {
-      // MIGRACIÓN AUTOMÁTICA: Migrar proyecto existente si es necesario
-      const migratedTasks = migrateExistingProject(tasks);
-      
       // Verificar si hay hitos con fechas incorrectas
-      const milestonesWithWrongDates = migratedTasks.filter(task => 
+      const milestonesWithWrongDates = tasks.filter(task => 
         task.isMilestone && task.startDate !== task.endDate
       );
       
       console.log('🔧 HITOS CON FECHAS INCORRECTAS DETECTADOS:', milestonesWithWrongDates.length);
       
-      if (milestonesWithWrongDates.length > 0 || migratedTasks !== tasks) {
-        console.log('🔧 EJECUTANDO CORRECCIÓN AUTOMÁTICA Y/O MIGRACIÓN');
+      if (milestonesWithWrongDates.length > 0) {
+        console.log('🔧 EJECUTANDO CORRECCIÓN AUTOMÁTICA DE HITOS');
         
         setTasks(prev => {
-          let finalTasks = prev;
-          
-          // Aplicar migración si es necesaria
-          if (migratedTasks !== tasks) {
-            console.log('🔄 MIGRACIÓN AUTOMÁTICA - Aplicando migración a las tareas');
-            finalTasks = migratedTasks;
-          }
-          
-          // Corregir hitos si es necesario
-          if (milestonesWithWrongDates.length > 0) {
-            finalTasks = finalTasks.map(task => {
-              if (!task.isMilestone) return task;
+          return prev.map(task => {
+            if (!task.isMilestone) return task;
+            
+            // Verificar si la fecha de fin es diferente a la de inicio
+            if (task.startDate !== task.endDate) {
+              console.log('🔧 CORRIGIENDO HITO AUTOMÁTICAMENTE:', {
+                taskId: task.id,
+                taskName: task.name,
+                startDateOriginal: task.startDate,
+                endDateOriginal: task.endDate,
+                endDateCorregida: task.startDate
+              });
               
-              // Verificar si la fecha de fin es diferente a la de inicio
-              if (task.startDate !== task.endDate) {
-                console.log('🔧 CORRIGIENDO HITO AUTOMÁTICAMENTE:', {
-                  taskId: task.id,
-                  taskName: task.name,
-                  startDateOriginal: task.startDate,
-                  endDateOriginal: task.endDate,
-                  endDateCorregida: task.startDate
-                });
-                
-                return {
-                  ...task,
-                  endDate: task.startDate, // Corregir: fin = inicio
-                  updatedAt: new Date().toISOString()
-                };
-              }
-              
-              return task;
-            });
-          }
-          
-          return finalTasks;
+              return {
+                ...task,
+                endDate: task.startDate, // Corregir: fin = inicio
+                updatedAt: new Date().toISOString()
+              };
+            }
+            
+            return task;
+          });
         });
       }
     }
-  }, [tasks.length, migrateExistingProject]); // Incluir migrateExistingProject en las dependencias
+  }, [tasks.length]); // Solo ejecutar cuando cambie el número de tareas
 
   // ELIMINADO: Sincronización con Work Packages - ya no es necesaria
 
@@ -5929,12 +5910,6 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                 </thead>
                 <tbody onKeyDown={handleKeyDown}>
                   {tasksWithCPM
-                    .sort((a, b) => {
-                      // Ordenar por la columna # (wbsCode) del Excel
-                      const aNum = parseInt(a.wbsCode) || 0;
-                      const bNum = parseInt(b.wbsCode) || 0;
-                      return aNum - bNum;
-                    })
                     .map((task, index) => (
                     <tr 
                       key={task.id} 
