@@ -35,6 +35,40 @@ import supabaseService from './services/SupabaseService';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProjectProvider } from './contexts/ProjectContext';
 
+// Función de ordenamiento de tareas por wbsCode (importada desde ScheduleManagement)
+const sortTasksByWbsCode = (tasks) => {
+  return [...tasks].sort((a, b) => {
+    // Función mejorada para manejar diferentes formatos de wbsCode
+    const getNumericValue = (wbsCode) => {
+      if (!wbsCode) return 0;
+      
+      // Si es un número directo
+      if (typeof wbsCode === 'number') return wbsCode;
+      
+      // Si es string, extraer solo los números
+      const numericMatch = String(wbsCode).match(/\d+/);
+      if (numericMatch) {
+        return parseInt(numericMatch[0], 10);
+      }
+      
+      // Si contiene "Sin predecesoras" o similar, poner al final
+      if (String(wbsCode).toLowerCase().includes('sin')) return 999999;
+      
+      return 0;
+    };
+    
+    const aNum = getNumericValue(a.wbsCode);
+    const bNum = getNumericValue(b.wbsCode);
+    
+    // Si los números son iguales, mantener orden original
+    if (aNum === bNum) {
+      return 0;
+    }
+    
+    return aNum - bNum;
+  });
+};
+
 // Componente principal de la aplicación (requiere autenticación)
 function MainApp() {
   const { user, showSplash, completeSplash } = useAuth();
@@ -311,7 +345,18 @@ function MainApp() {
       console.warn(`⚠️ safeSetTasksByProject - DUPLICADOS DETECTADOS: ${totalDuplicates} de ${totalTasks} tareas`);
     }
 
-    setTasksByProject(newTasksByProject);
+    // Aplicar ordenamiento por wbsCode a todas las tareas de todos los proyectos
+    const sortedTasksByProject = {};
+    for (const [projectId, tasks] of Object.entries(newTasksByProject)) {
+      if (Array.isArray(tasks) && tasks.length > 0) {
+        sortedTasksByProject[projectId] = sortTasksByWbsCode(tasks);
+        console.log(`📊 Proyecto ${projectId}: ${tasks.length} tareas ordenadas por wbsCode`);
+      } else {
+        sortedTasksByProject[projectId] = tasks;
+      }
+    }
+
+    setTasksByProject(sortedTasksByProject);
 
     // Liberar flag después de un delay
     setTimeout(() => {
@@ -479,13 +524,17 @@ function MainApp() {
       }
       
       const updatedProjects = Object.assign({}, prev);
-      updatedProjects[currentProjectId] = uniqueTasks;
+      
+      // Aplicar ordenamiento por wbsCode a las tareas del proyecto actual
+      const sortedTasks = sortTasksByWbsCode(uniqueTasks);
+      updatedProjects[currentProjectId] = sortedTasks;
       
       console.log('📊 updateCurrentProjectTasks - setTasksByProject COMPLETADO:', {
         currentProjectId,
         updatedKeys: Object.keys(updatedProjects),
         tasksInProject: updatedProjects[currentProjectId]?.length,
-        duplicatesRemoved: duplicatesFound
+        duplicatesRemoved: duplicatesFound,
+        sortedByWbsCode: true
       });
       
       return updatedProjects;

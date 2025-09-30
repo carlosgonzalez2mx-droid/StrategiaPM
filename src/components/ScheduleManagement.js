@@ -51,6 +51,44 @@ const validateDate = (date) => {
   return { valid: true, value: toISO(dateObj) };
 };
 
+// ===== Función de Ordenamiento de Tareas por wbsCode =====
+const sortTasksByWbsCode = (tasks) => {
+  return [...tasks].sort((a, b) => {
+    // Función mejorada para manejar diferentes formatos de wbsCode
+    const getNumericValue = (wbsCode) => {
+      if (!wbsCode) return 0;
+      
+      // Si es un número directo
+      if (typeof wbsCode === 'number') return wbsCode;
+      
+      // Si es string, extraer solo los números
+      const numericMatch = String(wbsCode).match(/\d+/);
+      if (numericMatch) {
+        return parseInt(numericMatch[0], 10);
+      }
+      
+      // Si contiene "Sin predecesoras" o similar, poner al final
+      if (String(wbsCode).toLowerCase().includes('sin')) return 999999;
+      
+      return 0;
+    };
+    
+    const aNum = getNumericValue(a.wbsCode);
+    const bNum = getNumericValue(b.wbsCode);
+    
+    // Si los números son iguales, mantener orden original
+    if (aNum === bNum) {
+      return 0;
+    }
+    
+    return aNum - bNum;
+  });
+};
+
+// FUNCIÓN ELIMINADA: reorderTasksForProjectP1
+// Esta función causaba restricciones innecesarias en el proyecto P1
+// Ahora todos los proyectos se manejan de manera uniforme
+
 // Función para encontrar el primer día laboral desde una fecha
 const findFirstWorkingDay = (startDate) => {
   let current = new Date(startDate);
@@ -3094,11 +3132,15 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         }
       }
 
+      // Aplicar ordenamiento por wbsCode antes de importar
+      const sortedImported = sortTasksByWbsCode(imported);
+      console.log('📊 IMPORTACIÓN - Tareas ordenadas por wbsCode:', sortedImported.map(t => ({ name: t.name, wbsCode: t.wbsCode })));
+      
       if (typeof importTasks === 'function') {
-        importTasks(imported);
+        importTasks(sortedImported);
         console.log('📊 IMPORTACIÓN ANTIGUA - importTasks llamado exitosamente');
       } else {
-        setTasks(imported);
+        setTasks(sortedImported);
         console.log('📊 IMPORTACIÓN ANTIGUA - setTasks llamado como fallback');
       }
       setBaselineTasks([]);
@@ -3840,13 +3882,17 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         return;
       }
       
+      // Aplicar ordenamiento por wbsCode antes de importar
+      const sortedNewTasks = sortTasksByWbsCode(newTasks);
+      console.log('📊 IMPORTACIÓN - Tareas ordenadas por wbsCode:', sortedNewTasks.map(t => ({ name: t.name, wbsCode: t.wbsCode })));
+      
       if (typeof importTasks === 'function') {
-        importTasks(newTasks);
+        importTasks(sortedNewTasks);
         console.log('📊 IMPORTACIÓN - importTasks llamado exitosamente - CRONOGRAMA REEMPLAZADO');
       } else {
         console.error('❌ IMPORTACIÓN - importTasks no está disponible, usando setTasks como fallback');
         if (typeof setTasks === 'function') {
-          setTasks(newTasks);
+          setTasks(sortedNewTasks);
           console.log('📊 IMPORTACIÓN - setTasks llamado como fallback - CRONOGRAMA REEMPLAZADO');
         } else {
           console.error('❌ IMPORTACIÓN - Ni importTasks ni setTasks están disponibles');
@@ -3887,36 +3933,142 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
     }
   };
 
-  // NUEVA FUNCIÓN: Insertar tarea en posición específica
-  const insertTaskAtPosition = (insertAfterTaskId) => {
-    console.log('🚀 NUEVA FUNCIÓN - Insertando tarea después de:', insertAfterTaskId);
+  // FUNCIÓN CORREGIDA: Insertar tarea inmediatamente después de la fila seleccionada
+  const insertTaskAtPosition = (insertAfterTaskId, visualIndex = null) => {
+    console.log('🚀 AGREGANDO TAREA - Insertando después de:', insertAfterTaskId, 'en índice visual:', visualIndex);
     
-    // Encontrar la posición de inserción
-    const insertIndex = tasksWithCPM.findIndex(task => task.id === insertAfterTaskId);
-    if (insertIndex === -1) {
-      console.error('❌ No se encontró la tarea para insertar después');
+    // Encontrar la tarea de referencia
+    const referenceTask = tasks.find(task => task.id === insertAfterTaskId);
+    if (!referenceTask) {
+      console.error('❌ No se encontró la tarea de referencia');
       return;
     }
     
-    // Calcular fechas basadas en la tarea anterior
-    const previousTask = tasksWithCPM[insertIndex];
-    const newStartDate = addDays(previousTask.endDate, 1, includeWeekends); // Un día después de que termine la anterior
-    const newEndDate = addDays(newStartDate, 5, includeWeekends); // 5 días de duración por defecto
+    // Calcular fechas basadas en la tarea de referencia
+    const newStartDate = addDays(referenceTask.endDate, 1, includeWeekends);
+    const newEndDate = addDays(newStartDate, 5, includeWeekends);
     
-    setNewTaskData({
-      name: '',
+    // Generar ID único
+    const generateUniqueId = () => {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    };
+    
+    // Generar código WBS único basado en la posición
+    const generateWbsForPosition = (insertIndex) => {
+      // Si es la primera tarea, usar 1
+      if (insertIndex === 0) {
+        return 1;
+      }
+      
+      // Buscar el wbsCode de la tarea anterior
+      const prevTask = tasks[insertIndex - 1];
+      if (prevTask && prevTask.wbsCode) {
+        // Si el wbsCode es numérico, incrementar
+        if (typeof prevTask.wbsCode === 'number') {
+          return prevTask.wbsCode + 1;
+        }
+        // Si es string con formato "1.1", "1.2", etc., incrementar la parte decimal
+        const wbsStr = String(prevTask.wbsCode);
+        const parts = wbsStr.split('.');
+        if (parts.length === 2) {
+          const major = parseInt(parts[0]);
+          const minor = parseInt(parts[1]) + 1;
+          return `${major}.${minor}`;
+        }
+        // Fallback: usar el índice + 1
+        return insertIndex + 1;
+      }
+      
+      // Fallback: usar el índice + 1
+      return insertIndex + 1;
+    };
+    
+    const newTaskId = generateUniqueId();
+    const newWbsCode = generateWbsForPosition(visualIndex !== null ? visualIndex + 1 : tasks.length);
+    
+    // Crear nueva tarea
+    const newTask = {
+      id: newTaskId,
+      wbsCode: newWbsCode,
+      name: `Nueva Tarea ${newWbsCode}`,
       duration: 5,
       startDate: newStartDate,
       endDate: newEndDate,
+      progress: 0,
+      predecessors: [insertAfterTaskId],
+      successors: [],
+      resources: [],
+      cost: 0,
+      isMilestone: false,
+      isCritical: false,
+      originalDuration: 5,
+      earlyStart: newStartDate,
+      earlyFinish: newEndDate,
+      lateStart: newStartDate,
+      lateFinish: newEndDate,
+      totalFloat: 0,
+      freeFloat: 0,
+      status: 'pending',
+      workPackageId: newTaskId,
+      plannedValue: 0,
+      earnedValue: 0,
+      actualCost: 0,
       description: '',
       priority: 'medium',
       assignedTo: '',
-      cost: 0,
-      selectedPredecessors: [insertAfterTaskId], // Automáticamente depende de la tarea anterior
-      selectedSuccessors: [],
-      insertAfterTaskId: insertAfterTaskId // Guardar la posición de inserción
+      createdDate: toISO(new Date()),
+      lastModified: toISO(new Date())
+    };
+    
+    console.log('🚀 NUEVA TAREA CREADA:', newTask);
+    
+    // CORRECCIÓN: Insertar la tarea en la posición exacta después de la fila seleccionada
+    setTasks(prev => {
+      console.log('🔍 DEBUG - Array antes de inserción:', prev.map((t, i) => ({ index: i, id: t.id, name: t.name, wbsCode: t.wbsCode })));
+      
+      // 1. Encontrar el índice de la tarea de referencia
+      const referenceIndex = prev.findIndex(task => task.id === insertAfterTaskId);
+      if (referenceIndex === -1) {
+        console.error('❌ No se encontró la tarea de referencia en el array');
+        return prev;
+      }
+      
+      // 2. Insertar la nueva tarea inmediatamente después de la tarea de referencia
+      const insertPosition = referenceIndex + 1;
+      const newTasks = [
+        ...prev.slice(0, insertPosition),
+        newTask,
+        ...prev.slice(insertPosition)
+      ];
+      
+      console.log('🔍 DEBUG - Tarea insertada en posición:', insertPosition);
+      console.log('🔍 DEBUG - Array después de inserción:', newTasks.map((t, i) => ({ index: i, id: t.id, name: t.name, wbsCode: t.wbsCode })));
+      
+      // 3. Actualizar dependencias de la tarea anterior
+      const updatedTasks = newTasks.map(task => {
+        if (task.id === insertAfterTaskId) {
+          return {
+            ...task,
+            successors: [...(task.successors || []), newTaskId]
+          };
+        }
+        return task;
+      });
+      
+      // 4. Actualizar wbsCode de todas las tareas para mantener secuencia correcta
+      const finalTasks = updatedTasks.map((task, index) => ({
+        ...task,
+        wbsCode: index + 1
+      }));
+      
+      console.log('🔍 DEBUG - Array final con wbsCode actualizado:', finalTasks.map((t, i) => ({ index: i, id: t.id, name: t.name, wbsCode: t.wbsCode })));
+      console.log('✅ Tarea agregada exitosamente en posición correcta');
+      return finalTasks;
     });
-    setShowAddTaskModal(true);
   };
 
   // NUEVAS FUNCIONES PARA VISTA TABLA
@@ -4424,10 +4576,112 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
     window.dispatchEvent(dataChangeEvent);
   };
 
-  // Función para eliminar una tarea
+  // FUNCIÓN SIMPLIFICADA: Agregar tarea al final del cronograma
+  const addTaskAtEnd = () => {
+    console.log('🚀 AGREGANDO TAREA AL FINAL');
+    
+    // Calcular fechas basadas en la última tarea
+    let newStartDate = toISO(new Date());
+    let newEndDate = addDays(newStartDate, 5, includeWeekends);
+    
+    if (tasks.length > 0) {
+      const lastTask = tasks[tasks.length - 1];
+      newStartDate = addDays(lastTask.endDate, 1, includeWeekends);
+      newEndDate = addDays(newStartDate, 5, includeWeekends);
+    }
+    
+    // Generar ID único
+    const generateUniqueId = () => {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    };
+    
+    // Generar código WBS único
+    const generateUniqueWbs = () => {
+      let counter = 1;
+      let newWbs;
+      do {
+        newWbs = counter;
+        counter++;
+      } while (tasks.some(task => task.wbsCode === newWbs));
+      return newWbs;
+    };
+    
+    const newTaskId = generateUniqueId();
+    const newWbsCode = generateUniqueWbs();
+    
+    // Crear nueva tarea
+    const newTask = {
+      id: newTaskId,
+      wbsCode: newWbsCode,
+      name: `Nueva Tarea ${newWbsCode}`,
+      duration: 5,
+      startDate: newStartDate,
+      endDate: newEndDate,
+      progress: 0,
+      predecessors: tasks.length > 0 ? [tasks[tasks.length - 1].id] : [], // Depende de la última tarea
+      successors: [],
+      resources: [],
+      cost: 0,
+      isMilestone: false,
+      isCritical: false,
+      originalDuration: 5,
+      earlyStart: newStartDate,
+      earlyFinish: newEndDate,
+      lateStart: newStartDate,
+      lateFinish: newEndDate,
+      totalFloat: 0,
+      freeFloat: 0,
+      status: 'pending',
+      workPackageId: newTaskId,
+      plannedValue: 0,
+      earnedValue: 0,
+      actualCost: 0,
+      description: '',
+      priority: 'medium',
+      assignedTo: '',
+      createdDate: toISO(new Date()),
+      lastModified: toISO(new Date())
+    };
+    
+    console.log('🚀 NUEVA TAREA AL FINAL CREADA:', newTask);
+    
+    // Agregar la tarea al final
+    setTasks(prev => {
+      const newTasks = [...prev, newTask];
+      
+      // Si hay una tarea anterior, actualizar sus dependencias
+      if (prev.length > 0) {
+        const lastTaskId = prev[prev.length - 1].id;
+        const updatedTasks = newTasks.map(task => {
+          if (task.id === lastTaskId) {
+            return {
+              ...task,
+              successors: [...(task.successors || []), newTaskId]
+            };
+          }
+          return task;
+        });
+        
+        console.log('✅ Tarea agregada al final exitosamente');
+        return updatedTasks;
+      }
+      
+      console.log('✅ Primera tarea agregada exitosamente');
+      return newTasks;
+    });
+  };
+
+  // FUNCIÓN SIMPLIFICADA: Eliminar tarea directamente (como MS Project)
   const deleteTask = (taskId) => {
     const taskToDelete = tasks.find(t => t.id === taskId);
-    if (!taskToDelete) return;
+    if (!taskToDelete) {
+      console.error('❌ Tarea no encontrada para eliminar');
+      return;
+    }
 
     // Verificar dependencias antes de eliminar
     const dependentTasks = tasks.filter(task => 
@@ -4446,7 +4700,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
           confirmMessage += `• Esta tarea depende de "${task.name}"\n`;
         }
       });
-      confirmMessage += `\nLas dependencias se limpiarán automáticamente, pero esto podría afectar el cronograma.`;
+      confirmMessage += `\nLas dependencias se limpiarán automáticamente.`;
     }
     
     confirmMessage += `\n\nEsta acción no se puede deshacer.`;
@@ -4455,30 +4709,22 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
       return;
     }
 
-    console.log('🗑️ Eliminando tarea:', taskToDelete.name, 'ID:', taskId);
+    console.log('🗑️ ELIMINANDO TAREA:', taskToDelete.name, 'ID:', taskId);
     console.log('🔗 Tareas dependientes encontradas:', dependentTasks.length);
     
+    // Eliminar la tarea y limpiar dependencias
     setTasks(prev => {
       const updatedTasks = prev.filter(task => task.id !== taskId);
       
-      // Actualizar dependencias: remover referencias a la tarea eliminada
+      // Limpiar referencias a la tarea eliminada en todas las demás tareas
       const cleanedTasks = updatedTasks.map(task => ({
         ...task,
         predecessors: task.predecessors?.filter(predId => predId !== taskId) || [],
         successors: task.successors?.filter(succId => succId !== taskId) || []
       }));
       
-      // Recalcular CPM para las tareas afectadas
-      const affectedTaskIds = dependentTasks.map(t => t.id);
-      console.log('🔄 Recalculando CPM para tareas afectadas:', affectedTaskIds);
-      
-      // Aplicar CPM a todas las tareas para actualizar fechas
-      const tasksWithCPM = calculateCPM(cleanedTasks, includeWeekends);
-      
       console.log('✅ Tarea eliminada exitosamente');
-      console.log('📊 Cronograma recalculado automáticamente');
-      
-      return tasksWithCPM;
+      return cleanedTasks;
     });
   };
 
@@ -4763,12 +5009,24 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
   };
 
   // Función para crear la tarea desde el modal
-  const createTaskFromModal = () => {
+  const createTaskFromModal = (insertIndexOverride = null) => {
     try {
       console.log('🚀 NUEVO SISTEMA - Creando tarea desde modal');
       console.log('🚀 NUEVO SISTEMA - Datos completos del modal:', newTaskData);
       console.log('🚀 NUEVO SISTEMA - Predecesoras seleccionadas:', newTaskData.selectedPredecessors);
       console.log('🚀 NUEVO SISTEMA - Sucesoras seleccionadas:', newTaskData.selectedSuccessors);
+      // Usar insertIndexOverride si está disponible, sino usar el del estado
+      const finalInsertIndex = insertIndexOverride !== null ? insertIndexOverride : newTaskData.insertIndex;
+      const finalInsertAfterTaskId = newTaskData.insertAfterTaskId;
+      
+      console.log('🚀 DEBUG - Valores de inserción:', {
+        insertIndex: newTaskData.insertIndex,
+        insertAfterTaskId: newTaskData.insertAfterTaskId,
+        insertIndexType: typeof newTaskData.insertIndex,
+        insertAfterTaskIdType: typeof newTaskData.insertAfterTaskId,
+        insertIndexOverride: insertIndexOverride,
+        finalInsertIndex: finalInsertIndex
+      });
       
       // Validaciones
       if (!newTaskData.name.trim()) {
@@ -4781,15 +5039,14 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         return;
       }
       
-      // Generar ID único
+      // Generar ID único usando UUID para evitar conflictos
       const generateUniqueId = () => {
-        let counter = 1;
-        let newId;
-        do {
-          newId = `TASK-${String(counter).padStart(4, '0')}`;
-          counter++;
-        } while (tasks.some(task => task.id === newId));
-        return newId;
+        // Generar un UUID válido directamente
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+          const r = Math.random() * 16 | 0;
+          const v = c == 'x' ? r : (r & 0x3 | 0x8);
+          return v.toString(16);
+        });
       };
       
       // Generar código WBS único
@@ -4805,6 +5062,13 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
       
       const newTaskId = generateUniqueId();
       const newWbsCode = generateUniqueWbs();
+      
+      console.log('🚀 DEBUG - IDs generados:', {
+        newTaskId,
+        newWbsCode,
+        insertIndex: newTaskData.insertIndex,
+        insertAfterTaskId: newTaskData.insertAfterTaskId
+      });
       
       // Crear nueva tarea
       console.log('🚀 DEBUG - Creando tarea con dependencias:', {
@@ -4862,18 +5126,42 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
       });
       
       // Agregar la tarea al estado y sincronizar dependencias en una sola operación
+      console.log('🚀 NUEVO SISTEMA - Llamando a setTasks con nueva tarea');
+      console.log('🚀 NUEVO SISTEMA - Tareas actuales antes de agregar:', tasks.length);
+      
       setTasks(prev => {
+        console.log('🚀 NUEVO SISTEMA - setTasks ejecutándose, tareas previas:', prev.length);
+        console.log('🚀 DEBUG - Tarea a insertar:', {
+          id: newTask.id,
+          name: newTask.name,
+          wbsCode: newTask.wbsCode
+        });
         let updatedTasks;
         
         // Si hay una posición específica de inserción, insertar ahí
-        if (newTaskData.insertAfterTaskId) {
+        console.log('🚀 DEBUG - Verificando insertIndex:', {
+          insertIndex: newTaskData.insertIndex,
+          insertIndexUndefined: newTaskData.insertIndex === undefined,
+          insertAfterTaskId: newTaskData.insertAfterTaskId,
+          finalInsertIndex: finalInsertIndex,
+          finalInsertIndexUndefined: finalInsertIndex === undefined
+        });
+        
+        if (finalInsertIndex !== undefined && finalInsertIndex !== null) {
+          // Usar el índice calculado previamente
+          const newTasks = prev.slice();
+          newTasks.splice(finalInsertIndex, 0, newTask);
+          updatedTasks = newTasks;
+          console.log('🚀 NUEVA FUNCIÓN - Tarea insertada en posición:', finalInsertIndex);
+        } else if (newTaskData.insertAfterTaskId) {
+          // Fallback: buscar por ID de tarea
           const insertIndex = prev.findIndex(task => task.id === newTaskData.insertAfterTaskId);
           if (insertIndex !== -1) {
             // Insertar después de la tarea especificada
             const newTasks = prev.slice();
             newTasks.splice(insertIndex + 1, 0, newTask);
             updatedTasks = newTasks;
-            console.log('🚀 NUEVA FUNCIÓN - Tarea insertada en posición:', insertIndex + 1);
+            console.log('🚀 NUEVA FUNCIÓN - Tarea insertada después de:', insertIndex + 1);
           } else {
             // Si no se encuentra la tarea, agregar al final
             const newTasks = prev.slice();
@@ -4889,16 +5177,42 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
           console.log('🚀 NUEVO SISTEMA - Tarea agregada al final. Total tareas:', updatedTasks.length);
         }
         
-        // Verificar que la tarea agregada mantenga sus dependencias
+        // Aplicar ordenamiento por wbsCode para todos los proyectos
+        updatedTasks = sortTasksByWbsCode(updatedTasks);
+        
+        // Actualizar wbsCode de todas las tareas para mantener secuencia correcta
+        updatedTasks = updatedTasks.map((task, index) => ({
+          ...task,
+          wbsCode: index + 1
+        }));
+        
+        console.log('🚀 NUEVA FUNCIÓN - wbsCode actualizados para mantener secuencia:', 
+          updatedTasks.map(t => ({ name: t.name, wbsCode: t.wbsCode }))
+        );
+        
+        // Verificar que la tarea agregada mantenga sus dependencias y posición
         const addedTask = updatedTasks.find(t => t.id === newTaskId);
+        const addedTaskIndex = updatedTasks.findIndex(t => t.id === newTaskId);
         console.log('🚀 DEBUG - Tarea en el estado después de agregar:', {
           id: addedTask?.id,
           name: addedTask?.name,
+          position: addedTaskIndex,
+          wbsCode: addedTask?.wbsCode,
           predecessors: addedTask?.predecessors,
           successors: addedTask?.successors,
           predecessorsLength: addedTask?.predecessors?.length,
           successorsLength: addedTask?.successors?.length
         });
+        
+        // Log de las primeras 15 tareas para verificar el orden
+        console.log('🚀 DEBUG - Primeras 15 tareas después de inserción:', 
+          updatedTasks.slice(0, 15).map((t, i) => ({ 
+            position: i, 
+            wbsCode: t.wbsCode, 
+            name: t.name, 
+            id: t.id 
+          }))
+        );
         
         // Sincronizar dependencias bidireccionalmente inmediatamente
         if (newTaskData.selectedPredecessors.length > 0 || newTaskData.selectedSuccessors.length > 0) {
@@ -4961,8 +5275,21 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
           });
         }
         
+        console.log('🚀 DEBUG - setTasks retornando:', {
+          totalTasks: updatedTasks.length,
+          newTaskIncluded: updatedTasks.some(t => t.id === newTaskId),
+          newTaskPosition: updatedTasks.findIndex(t => t.id === newTaskId)
+        });
         return updatedTasks;
       });
+      
+      // Verificar que el estado se actualizó correctamente
+      setTimeout(() => {
+        console.log('🚀 DEBUG - Estado después de setTasks:', {
+          tasksLength: tasks.length,
+          newTaskExists: tasks.some(t => t.id === newTaskId)
+        });
+      }, 100);
       
       // ELIMINADO: Creación de Work Package - ya no es necesaria
       
@@ -4987,6 +5314,8 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
       setTimeout(() => {
         console.log('🚀 DEBUG - Estado final de todas las tareas:');
         setTasks(currentTasks => {
+          console.log('🚀 DEBUG - Total de tareas después de crear:', currentTasks.length);
+          console.log('🚀 DEBUG - Últimas 3 tareas:', currentTasks.slice(-3).map(t => ({ name: t.name, wbsCode: t.wbsCode, id: t.id })));
           currentTasks.forEach(task => {
             console.log(`🚀 DEBUG - Tarea ${task.name} (${task.id}):`, {
               predecessors: task.predecessors,
@@ -5919,19 +6248,68 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                   </tr>
                 </thead>
                 <tbody onKeyDown={handleKeyDown}>
-                  {tasksWithCPM
-                    .sort((a, b) => {
-                      // Ordenar por wbsCode (columna #) para mantener el orden del Excel
-                      const aNum = parseInt(a.wbsCode) || 0;
-                      const bNum = parseInt(b.wbsCode) || 0;
-                      return aNum - bNum;
-                    })
-                    .map((task, index) => (
-                    <tr 
-                      key={task.id} 
-                      className={`hover:bg-gray-50 ${selectedRow === task.id ? 'bg-blue-50' : ''}`}
-                      onClick={() => setSelectedRow(task.id)}
-                    >
+                  {(() => {
+                    // DEBUG: Mostrar valores de wbsCode antes del ordenamiento
+                    console.log('🔍 DEBUG - Valores de wbsCode antes del ordenamiento:', 
+                      tasksWithCPM.map(t => ({ 
+                        name: t.name, 
+                        wbsCode: t.wbsCode, 
+                        wbsCodeType: typeof t.wbsCode 
+                      }))
+                    );
+                    
+                    // Aplicar ordenamiento por wbsCode para todos los proyectos
+                    const sortedTasks = sortTasksByWbsCode(tasksWithCPM);
+                    
+                    // DEBUG: Mostrar valores después del ordenamiento
+                    console.log('🔍 DEBUG - Valores de wbsCode después del ordenamiento:', 
+                      sortedTasks.map(t => ({ 
+                        name: t.name, 
+                        wbsCode: t.wbsCode, 
+                        wbsCodeType: typeof t.wbsCode 
+                      }))
+                    );
+                    
+                    return sortedTasks;
+                  })()
+                    .concat([{ id: 'add-new-task', isAddButton: true }]) // Agregar botón de nueva tarea al final
+                    .map((task, index) => {
+                      // Si es el botón de agregar nueva tarea
+                      if (task.isAddButton) {
+                        return (
+                          <tr key="add-new-task" className="hover:bg-gray-50">
+                            <td className="border border-gray-300 px-2 py-1 text-sm text-gray-400 text-center">
+                              +
+                            </td>
+                            <td className="border border-gray-300 px-2 py-1">
+                              <div className="flex justify-center">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    addTaskAtEnd();
+                                  }}
+                                  className="bg-blue-500 hover:bg-blue-600 text-white text-sm px-4 py-2 rounded-md shadow-sm transition-colors duration-200 flex items-center space-x-2"
+                                  title="Agregar nueva tarea al final"
+                                >
+                                  <span>➕</span>
+                                  <span>Nueva Tarea</span>
+                                </button>
+                              </div>
+                            </td>
+                            <td colSpan="10" className="border border-gray-300 px-2 py-1 text-sm text-gray-400 text-center">
+                              Agregar nueva tarea al final del cronograma
+                            </td>
+                          </tr>
+                        );
+                      }
+                      
+                      // Tarea normal
+                      return (
+                        <tr 
+                          key={task.id} 
+                          className={`hover:bg-gray-50 ${selectedRow === task.id ? 'bg-blue-50' : ''}`}
+                          onClick={() => setSelectedRow(task.id)}
+                        >
                       {/* Número de fila */}
                       <td className="border border-gray-300 px-2 py-1 text-sm text-gray-600 text-center">
                         {index + 1}
@@ -5939,14 +6317,14 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                       
                       {/* Acciones */}
                       <td className="border border-gray-300 px-2 py-1">
-                        <div className="flex space-x-1">
+                        <div className="flex space-x-1 justify-center">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              insertRowAfter(task.id);
+                              insertTaskAtPosition(task.id, index);
                             }}
-                            className="text-green-600 hover:text-green-800 text-xs px-1 py-1 rounded"
-                            title="Insertar fila después"
+                            className="bg-green-500 hover:bg-green-600 text-white text-sm px-2 py-1 rounded-md shadow-sm transition-colors duration-200 flex items-center justify-center min-w-[32px]"
+                            title="Insertar fila después (como MS Project)"
                           >
                             ➕
                           </button>
@@ -5955,12 +6333,12 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                               e.stopPropagation();
                               deleteTask(task.id);
                             }}
-                            className="text-red-600 hover:text-red-800 text-xs px-1 py-1 rounded"
-                            title="Eliminar tarea"
+                            className="bg-red-500 hover:bg-red-600 text-white text-sm px-2 py-1 rounded-md shadow-sm transition-colors duration-200 flex items-center justify-center min-w-[32px]"
+                            title="Eliminar tarea (como MS Project)"
                           >
                             🗑️
                           </button>
-            </div>
+                        </div>
                       </td>
                       
                       {/* Nombre de la tarea */}
@@ -5979,9 +6357,10 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                           <div
                             className="cursor-pointer hover:bg-gray-100 px-2 py-1 rounded min-h-[24px] flex items-center"
                             onClick={() => startEditing(task.id, 'name', task.name)}
+                            title="Click para editar nombre (como MS Project)"
                           >
                             {task.name}
-            </div>
+                        </div>
                         )}
                       </td>
 
@@ -6020,9 +6399,10 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                           <div
                             className="cursor-pointer hover:bg-gray-100 px-2 py-1 rounded min-h-[24px] flex items-center"
                             onClick={() => startEditing(task.id, 'duration', task.duration)}
+                            title="Click para editar duración (como MS Project)"
                           >
                             {task.duration}d
-          </div>
+                          </div>
                         )}
                       </td>
                       
@@ -6042,9 +6422,10 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                           <div
                             className="cursor-pointer hover:bg-gray-100 px-2 py-1 rounded min-h-[24px] flex items-center text-sm"
                             onClick={() => startEditing(task.id, 'startDate', task.startDate)}
+                            title="Click para editar fecha de inicio (como MS Project)"
                           >
                             {task.startDate && task.startDate !== null && task.startDate !== undefined ? task.startDate.split('-').reverse().join('/') : ''}
-                </div>
+                          </div>
                         )}
                       </td>
                       
@@ -6072,12 +6453,13 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                           <div
                             className="cursor-pointer hover:bg-gray-100 px-2 py-1 rounded min-h-[24px] flex items-center text-sm"
                             onClick={() => startEditing(task.id, 'endDate', task.endDate)}
+                            title="Click para editar fecha de fin (como MS Project)"
                           >
                             {task.isMilestone 
                               ? (task.startDate && task.startDate !== null && task.startDate !== undefined ? task.startDate.split('-').reverse().join('/') : '')
                               : (task.endDate && task.endDate !== null && task.endDate !== undefined ? task.endDate.split('-').reverse().join('/') : '')
                             }
-                    </div>
+                          </div>
                         )}
                       </td>
                       
@@ -6255,8 +6637,9 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
             </div>
                         )}
                       </td>
-                    </tr>
-                  ))}
+                        </tr>
+                      );
+                    })}
                 </tbody>
               </table>
           </div>
@@ -10016,7 +10399,27 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                   Cancelar
                 </button>
                 <button
-                  onClick={createTaskFromModal}
+                  onClick={() => {
+                    // Calcular insertIndex en el momento del clic
+                    const currentTasks = tasks || [];
+                    const insertAfterTaskId = newTaskData.insertAfterTaskId;
+                    let calculatedInsertIndex = null;
+                    
+                    if (insertAfterTaskId) {
+                      const insertAfterIndex = currentTasks.findIndex(task => task.id === insertAfterTaskId);
+                      if (insertAfterIndex !== -1) {
+                        calculatedInsertIndex = insertAfterIndex + 1;
+                        console.log('🚀 DEBUG - Calculando insertIndex en el momento del clic:', {
+                          insertAfterTaskId,
+                          insertAfterIndex,
+                          calculatedInsertIndex,
+                          totalTasks: currentTasks.length
+                        });
+                      }
+                    }
+                    
+                    createTaskFromModal(calculatedInsertIndex);
+                  }}
                   className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
                 >
                   <span>✅</span>
