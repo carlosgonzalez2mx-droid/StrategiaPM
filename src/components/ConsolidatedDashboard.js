@@ -49,37 +49,43 @@ const ConsolidatedDashboard = ({
   const allTasks = Object.values(tasksByProject || {}).flat();
   const milestones = allTasks.filter(task => task.isMilestone);
   
-  // Usar directamente el status que viene de la lista de "Hitos del Proyecto"
-  // donde el usuario puede seleccionar: "En Proceso", "Realizado", "Atrasado"
-  // Si no tiene status definido, tratarlo como "in-progress" (En Proceso)
-  const completedMilestones = milestones.filter(m => m.status === 'completed');
-  const inProgressMilestones = milestones.filter(m => 
-    m.status === 'in-progress' || 
-    m.status === 'pending' || 
-    m.status === undefined || 
-    m.status === null
-  );
-  const delayedMilestones = milestones.filter(m => m.status === 'delayed');
+  // CORRECCIÓN: Usar el progreso real de las tareas en lugar del status
+  // Un hito está completado si su progreso es 100%
+  // Un hito está en proceso si su progreso es mayor a 0% pero menor a 100%
+  // Un hito está pendiente si su progreso es 0%
+  const completedMilestones = milestones.filter(m => (m.progress || 0) >= 100);
+  const inProgressMilestones = milestones.filter(m => {
+    const progress = m.progress || 0;
+    return progress > 0 && progress < 100;
+  });
+  const pendingMilestones = milestones.filter(m => (m.progress || 0) === 0);
   
-  // Logs de depuración
-  const uniqueStatuses = [...new Set(milestones.map(m => m.status))];
-  console.log('🔍 DEBUG HITOS PORTFOLIO:', {
+  // Para mantener compatibilidad con el código existente, usar delayed como pendientes
+  const delayedMilestones = pendingMilestones;
+  
+  // Logs de depuración actualizados
+  console.log('🔍 DEBUG HITOS PORTFOLIO CORREGIDO:', {
     totalTasks: allTasks.length,
     totalMilestones: milestones.length,
     completed: completedMilestones.length,
     inProgress: inProgressMilestones.length,
     delayed: delayedMilestones.length,
-    uniqueStatuses: uniqueStatuses,
+    pending: pendingMilestones.length,
     milestonesData: milestones.slice(0, 10).map(m => ({
       id: m.id,
       name: m.name,
-      status: m.status,
-      statusType: typeof m.status,
       progress: m.progress,
+      status: m.status,
       endDate: m.endDate,
-      isMilestone: m.isMilestone
+      isMilestone: m.isMilestone,
+      classification: (m.progress || 0) >= 100 ? 'completed' : 
+                     (m.progress || 0) > 0 ? 'in-progress' : 'pending'
     })),
-    allMilestonesStatuses: milestones.map(m => m.status)
+    progressDistribution: {
+      '0%': milestones.filter(m => (m.progress || 0) === 0).length,
+      '1-99%': milestones.filter(m => (m.progress || 0) > 0 && (m.progress || 0) < 100).length,
+      '100%': milestones.filter(m => (m.progress || 0) >= 100).length
+    }
   });
 
   // Calcular métricas EVM consolidadas basadas en tareas reales
@@ -424,14 +430,13 @@ const ConsolidatedDashboard = ({
                 const projectTasks = tasksByProject?.[project.id] || [];
                 const projectMilestones = projectTasks.filter(task => task.isMilestone);
                 
-                const projectCompleted = projectMilestones.filter(m => m.status === 'completed');
-                const projectInProgress = projectMilestones.filter(m => 
-                  m.status === 'in-progress' || 
-                  m.status === 'pending' || 
-                  m.status === undefined || 
-                  m.status === null
-                );
-                const projectDelayed = projectMilestones.filter(m => m.status === 'delayed');
+                // CORRECCIÓN: Usar progreso real en lugar de status para consistencia
+                const projectCompleted = projectMilestones.filter(m => (m.progress || 0) >= 100);
+                const projectInProgress = projectMilestones.filter(m => {
+                  const progress = m.progress || 0;
+                  return progress > 0 && progress < 100;
+                });
+                const projectDelayed = projectMilestones.filter(m => (m.progress || 0) === 0);
                 const projectProgress = projectMilestones.length > 0 
                   ? Math.round((projectCompleted.length / projectMilestones.length) * 100) 
                   : 0;
