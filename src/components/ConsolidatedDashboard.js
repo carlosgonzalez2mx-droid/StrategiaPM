@@ -49,35 +49,50 @@ const ConsolidatedDashboard = ({
   const allTasks = Object.values(tasksByProject || {}).flat();
   const milestones = allTasks.filter(task => task.isMilestone);
   
-  // CORRECCIÓN: Usar el progreso real de las tareas en lugar del status
+  // CORRECCIÓN MEJORADA: Clasificación más precisa de hitos
   // Un hito está completado si su progreso es 100%
-  // Un hito está en proceso si su progreso es mayor a 0% pero menor a 100%
-  // Un hito está pendiente si su progreso es 0%
+  // Un hito está en proceso si tiene algún progreso (mayor a 0%)
+  // Un hito está retrasado solo si tiene fecha de fin pasada y progreso < 100%
   const completedMilestones = milestones.filter(m => (m.progress || 0) >= 100);
-  const inProgressMilestones = milestones.filter(m => {
+  const inProgressMilestones = milestones.filter(m => (m.progress || 0) > 0);
+  
+  // Para hitos retrasados: verificar si la fecha de fin ya pasó y no está completado
+  const currentDate = new Date();
+  const delayedMilestones = milestones.filter(m => {
     const progress = m.progress || 0;
-    return progress > 0 && progress < 100;
+    if (progress >= 100) return false; // Si está completado, no está retrasado
+    
+    // Si tiene fecha de fin, verificar si ya pasó
+    if (m.endDate) {
+      const endDate = new Date(m.endDate);
+      return endDate < currentDate && progress < 100;
+    }
+    
+    // Si no tiene fecha de fin, no considerarlo retrasado
+    return false;
   });
-  const pendingMilestones = milestones.filter(m => (m.progress || 0) === 0);
   
-  // Para mantener compatibilidad con el código existente, usar delayed como pendientes
-  const delayedMilestones = pendingMilestones;
+  // Hitos pendientes: los que no están en ninguna de las categorías anteriores
+  const pendingMilestones = milestones.filter(m => {
+    const progress = m.progress || 0;
+    return progress === 0 && !delayedMilestones.includes(m);
+  });
   
-  // Logs de depuración actualizados
-  console.log('🔍 DEBUG HITOS PORTFOLIO CORREGIDO:', {
+  // Logs de depuración mejorados
+  console.log('🔍 DEBUG HITOS PORTFOLIO MEJORADO:', {
     totalTasks: allTasks.length,
     totalMilestones: milestones.length,
     completed: completedMilestones.length,
     inProgress: inProgressMilestones.length,
     delayed: delayedMilestones.length,
     pending: pendingMilestones.length,
-    milestonesData: milestones.slice(0, 10).map(m => ({
+    currentDate: currentDate.toISOString().split('T')[0],
+    milestonesData: milestones.slice(0, 5).map(m => ({
       id: m.id,
       name: m.name,
       progress: m.progress,
-      status: m.status,
       endDate: m.endDate,
-      isMilestone: m.isMilestone,
+      isDelayed: m.endDate ? new Date(m.endDate) < currentDate && (m.progress || 0) < 100 : false,
       classification: (m.progress || 0) >= 100 ? 'completed' : 
                      (m.progress || 0) > 0 ? 'in-progress' : 'pending'
     })),
@@ -85,6 +100,11 @@ const ConsolidatedDashboard = ({
       '0%': milestones.filter(m => (m.progress || 0) === 0).length,
       '1-99%': milestones.filter(m => (m.progress || 0) > 0 && (m.progress || 0) < 100).length,
       '100%': milestones.filter(m => (m.progress || 0) >= 100).length
+    },
+    dateAnalysis: {
+      milestonesWithEndDate: milestones.filter(m => m.endDate).length,
+      milestonesPastDueDate: milestones.filter(m => m.endDate && new Date(m.endDate) < currentDate).length,
+      milestonesPastDueAndIncomplete: delayedMilestones.length
     }
   });
 
@@ -430,13 +450,25 @@ const ConsolidatedDashboard = ({
                 const projectTasks = tasksByProject?.[project.id] || [];
                 const projectMilestones = projectTasks.filter(task => task.isMilestone);
                 
-                // CORRECCIÓN: Usar progreso real en lugar de status para consistencia
+                // CORRECCIÓN MEJORADA: Lógica consistente con el resumen consolidado
                 const projectCompleted = projectMilestones.filter(m => (m.progress || 0) >= 100);
-                const projectInProgress = projectMilestones.filter(m => {
+                const projectInProgress = projectMilestones.filter(m => (m.progress || 0) > 0);
+                
+                // Para hitos retrasados del proyecto: verificar fecha de fin pasada
+                const currentDate = new Date();
+                const projectDelayed = projectMilestones.filter(m => {
                   const progress = m.progress || 0;
-                  return progress > 0 && progress < 100;
+                  if (progress >= 100) return false; // Si está completado, no está retrasado
+                  
+                  // Si tiene fecha de fin, verificar si ya pasó
+                  if (m.endDate) {
+                    const endDate = new Date(m.endDate);
+                    return endDate < currentDate && progress < 100;
+                  }
+                  
+                  // Si no tiene fecha de fin, no considerarlo retrasado
+                  return false;
                 });
-                const projectDelayed = projectMilestones.filter(m => (m.progress || 0) === 0);
                 const projectProgress = projectMilestones.length > 0 
                   ? Math.round((projectCompleted.length / projectMilestones.length) * 100) 
                   : 0;
