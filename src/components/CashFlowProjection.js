@@ -73,8 +73,12 @@ const CashFlowProjection = ({
       return 0;
     }
 
+    // Normalizar fechas del rango mensual
     const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+    monthStart.setHours(0, 0, 0, 0);
+    
     const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+    monthEnd.setHours(23, 59, 59, 999);
     
     console.log('🔍 CashFlow: Calculando gasto planificado para mes:', {
       month: monthDate.toLocaleDateString('es-ES', { year: 'numeric', month: 'long' }),
@@ -101,13 +105,26 @@ const CashFlowProjection = ({
 
           // Verificar si la tarea está en julio 2026
           const taskStart = new Date(task.startDate);
+          const normalizedTaskStart = new Date(
+            taskStart.getFullYear(), 
+            taskStart.getMonth(), 
+            taskStart.getDate(),
+            0, 0, 0, 0
+          );
+          
           const taskEnd = new Date(task.endDate);
+          const normalizedTaskEnd = new Date(
+            taskEnd.getFullYear(), 
+            taskEnd.getMonth(), 
+            taskEnd.getDate(),
+            23, 59, 59, 999
+          );
 
           let isInMonth = false;
           if (task.isMilestone || task.duration === 0) {
-            isInMonth = taskStart >= monthStart && taskStart <= monthEnd;
+            isInMonth = normalizedTaskStart >= monthStart && normalizedTaskStart <= monthEnd;
           } else {
-            isInMonth = taskStart <= monthEnd && taskEnd >= monthStart;
+            isInMonth = normalizedTaskStart <= monthEnd && normalizedTaskEnd >= monthStart;
           }
 
           if (isInMonth) {
@@ -202,7 +219,20 @@ const CashFlowProjection = ({
       if (task.cost && task.startDate && task.endDate) {
         tasksWithCosts++;
         const taskStart = new Date(task.startDate);
+        const normalizedTaskStart = new Date(
+          taskStart.getFullYear(), 
+          taskStart.getMonth(), 
+          taskStart.getDate(),
+          0, 0, 0, 0
+        );
+        
         const taskEnd = new Date(task.endDate);
+        const normalizedTaskEnd = new Date(
+          taskEnd.getFullYear(), 
+          taskEnd.getMonth(), 
+          taskEnd.getDate(),
+          23, 59, 59, 999
+        );
         
         // DEBUG: Logging específico para julio y agosto 2026
         const monthName = monthDate.toLocaleDateString('es-ES', { year: 'numeric', month: 'long' });
@@ -228,7 +258,7 @@ const CashFlowProjection = ({
         
         if (task.isMilestone || task.duration === 0) {
           // Para hitos: verificar que la fecha esté dentro del mes
-          isInMonth = taskStart >= monthStart && taskStart <= monthEnd;
+          isInMonth = normalizedTaskStart >= monthStart && normalizedTaskStart <= monthEnd;
           
   // DEBUG: Logging detallado solo para tareas con costos altos y meses específicos
   if (task.cost > 0 && (monthName === 'julio de 2026' || monthName === 'agosto de 2026')) {
@@ -241,9 +271,9 @@ const CashFlowProjection = ({
       isInMonth: isInMonth,
       monthName: monthName,
       comparison: {
-        taskStartGreaterEqualMonthStart: taskStart >= monthStart,
-        taskStartLessEqualMonthEnd: taskStart <= monthEnd,
-        taskStartTime: taskStart.getTime(),
+        taskStartGreaterEqualMonthStart: normalizedTaskStart >= monthStart,
+        taskStartLessEqualMonthEnd: normalizedTaskStart <= monthEnd,
+        taskStartTime: normalizedTaskStart.getTime(),
         monthStartTime: monthStart.getTime(),
         monthEndTime: monthEnd.getTime()
       }
@@ -251,7 +281,7 @@ const CashFlowProjection = ({
   }
         } else {
           // Para tareas normales: verificar intersección de fechas
-          isInMonth = taskStart <= monthEnd && taskEnd >= monthStart;
+          isInMonth = normalizedTaskStart <= monthEnd && normalizedTaskEnd >= monthStart;
         }
         
         if (isInMonth) {
@@ -280,7 +310,7 @@ const CashFlowProjection = ({
                 taskEndDate: task.endDate,
                 monthStart: monthStart.toISOString().split('T')[0],
                 monthEnd: monthEnd.toISOString().split('T')[0],
-                isInMonth: taskStart <= monthEnd && taskEnd >= monthStart,
+                isInMonth: normalizedTaskStart <= monthEnd && normalizedTaskEnd >= monthStart,
                 plannedExpenseBefore: plannedExpense - taskCostInMonth,
                 plannedExpenseAfter: plannedExpense
               });
@@ -288,11 +318,11 @@ const CashFlowProjection = ({
           } else {
             // Para tareas normales: calcular porcentaje basado en duración
             const monthDuration = monthEnd - monthStart + 1; // Duración del mes en ms
-            const taskDuration = taskEnd - taskStart + 1; // Duración de la tarea en ms
+            const taskDuration = normalizedTaskEnd - normalizedTaskStart + 1; // Duración de la tarea en ms
             
             // Calcular intersección de fechas
-            const intersectionStart = new Date(Math.max(taskStart.getTime(), monthStart.getTime()));
-            const intersectionEnd = new Date(Math.min(taskEnd.getTime(), monthEnd.getTime()));
+            const intersectionStart = new Date(Math.max(normalizedTaskStart.getTime(), monthStart.getTime()));
+            const intersectionEnd = new Date(Math.min(normalizedTaskEnd.getTime(), monthEnd.getTime()));
             const intersectionDuration = intersectionEnd - intersectionStart + 1;
             
             if (intersectionDuration > 0) {
@@ -356,11 +386,11 @@ const CashFlowProjection = ({
     })));
 
     let committedExpense = 0;
+    // Normalizar fechas del rango mensual
     const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
-    const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
-
-    // Ajustar las fechas para incluir todo el día
     monthStart.setHours(0, 0, 0, 0);
+    
+    const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
     monthEnd.setHours(23, 59, 59, 999);
 
     console.log('🔍 CASHFLOW PROJECTION - Rango de fechas:', {
@@ -386,8 +416,16 @@ const CashFlowProjection = ({
       
       // CORREGIDO: Usar fecha local para evitar problemas de zona horaria
       const approvalDate = new Date(po.approvalDate + 'T00:00:00');
-      const adjustedDate = new Date(approvalDate);
-      adjustedDate.setDate(approvalDate.getDate() + daysToPayment);
+      const normalizedApprovalDate = new Date(
+        approvalDate.getFullYear(),
+        approvalDate.getMonth(),
+        approvalDate.getDate(),
+        0, 0, 0, 0
+      );
+      
+      const adjustedDate = new Date(normalizedApprovalDate);
+      adjustedDate.setDate(normalizedApprovalDate.getDate() + daysToPayment);
+      adjustedDate.setHours(0, 0, 0, 0);
       
       const isInMonth = adjustedDate >= monthStart && adjustedDate <= monthEnd;
       
@@ -428,15 +466,25 @@ const CashFlowProjection = ({
     if (!currentProject) return 0;
 
     let realExpense = 0;
+    // Normalizar fechas del rango mensual
     const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+    monthStart.setHours(0, 0, 0, 0);
+    
     const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+    monthEnd.setHours(23, 59, 59, 999);
 
     // ANTICIPOS PAGADOS
     const monthAdvances = advances?.filter(advance => {
       if (advance.status !== 'paid') return false;
       
       const paymentDate = new Date(advance.paymentDate || advance.date);
-      return paymentDate >= monthStart && paymentDate <= monthEnd;
+      const normalizedPaymentDate = new Date(
+        paymentDate.getFullYear(),
+        paymentDate.getMonth(),
+        paymentDate.getDate(),
+        0, 0, 0, 0
+      );
+      return normalizedPaymentDate >= monthStart && normalizedPaymentDate <= monthEnd;
     }) || [];
 
     realExpense += monthAdvances.reduce((sum, advance) => sum + (advance.amount || 0), 0);
@@ -446,7 +494,13 @@ const CashFlowProjection = ({
       if (invoice.status !== 'paid') return false;
       
       const paymentDate = new Date(invoice.paymentDate || invoice.date);
-      return paymentDate >= monthStart && paymentDate <= monthEnd;
+      const normalizedPaymentDate = new Date(
+        paymentDate.getFullYear(),
+        paymentDate.getMonth(),
+        paymentDate.getDate(),
+        0, 0, 0, 0
+      );
+      return normalizedPaymentDate >= monthStart && normalizedPaymentDate <= monthEnd;
     }) || [];
 
     realExpense += monthInvoices.reduce((sum, invoice) => sum + (invoice.amount || 0), 0);
