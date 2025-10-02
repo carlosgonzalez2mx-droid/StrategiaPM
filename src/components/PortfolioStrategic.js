@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import PortfolioDashboard from './PortfolioDashboard';
 import ResourceList from './ResourceList';
 import ProjectArchive from './ProjectArchive';
+import WeeklyPlanningTab from './WeeklyPlanningTab';
 
 // Componente helper para mostrar errores
 const ErrorMessage = ({ error }) => {
@@ -29,6 +30,8 @@ const PortfolioStrategic = ({
   deleteProject,
   duplicateProject,
   tasks,
+  tasksByProject,
+  minutasByProject,
   purchaseOrders,
   advances,
   invoices,
@@ -43,6 +46,14 @@ const PortfolioStrategic = ({
   const [archivedProjects, setArchivedProjects] = useState([]);
   const [selectedArchivedProject, setSelectedArchivedProject] = useState(null);
   const [showArchivedDetails, setShowArchivedDetails] = useState(false);
+  const [weeklyPlanningData, setWeeklyPlanningData] = useState({
+    dateRange: {
+      start: getStartOfWeek(new Date()),
+      end: getEndOfWeek(new Date())
+    },
+    previousWeekCompliance: null,
+    projectTasks: {}
+  });
 
   // Debug: mostrar errores en consola cuando cambien
   React.useEffect(() => {
@@ -505,6 +516,7 @@ const PortfolioStrategic = ({
               { id: 'overview', name: 'Vista General', icon: '📊' },
               { id: 'projects', name: 'Lista de Proyectos', icon: '📋' },
               { id: 'resources', name: 'Lista de Recursos', icon: '👥' },
+              { id: 'weekly-planning', name: 'Planificación Semanal', icon: '📅' },
               { id: 'archive', name: 'Archivado de Proyectos', icon: '📁' },
               { id: 'metrics', name: 'Métricas del Portfolio', icon: '📈' }
             ].map((tab) => (
@@ -626,6 +638,33 @@ const PortfolioStrategic = ({
               globalResources={globalResources}
               setGlobalResources={setGlobalResources}
             />
+          )}
+
+          {/* Tab: Planificación Semanal */}
+          {activeTab === 'weekly-planning' && (
+            <>
+              {(() => {
+                console.log('🔍 DEBUG - Datos que se pasan a WeeklyPlanningTab:');
+                console.log('  📊 projects:', projects);
+                console.log('  📊 tasksByProject:', tasksByProject);
+                console.log('  📊 minutasByProject:', minutasByProject);
+                console.log('  📊 Estructura minutasByProject:', Object.keys(minutasByProject || {}));
+
+                // Ver ejemplo de minutas de un proyecto
+                const firstProjectId = Object.keys(minutasByProject || {})[0];
+                if (firstProjectId) {
+                  console.log(`  📊 Ejemplo minutas proyecto ${firstProjectId}:`, minutasByProject[firstProjectId]);
+                }
+                return null;
+              })()}
+              <WeeklyPlanningTab 
+                projects={projects}
+                tasksByProject={tasksByProject}
+                minutasByProject={minutasByProject}
+                weeklyPlanningData={weeklyPlanningData}
+                setWeeklyPlanningData={setWeeklyPlanningData}
+              />
+            </>
           )}
 
           {/* Tab: Archivado de Proyectos */}
@@ -1594,6 +1633,25 @@ const PortfolioStrategic = ({
       )}
     </div>
   );
+};
+
+// Funciones auxiliares para fechas
+const getStartOfWeek = (date) => {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Ajustar para que lunes sea el primer día
+  d.setDate(diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+
+const getEndOfWeek = (date) => {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1) + 6; // Domingo de la misma semana
+  d.setDate(diff);
+  d.setHours(23, 59, 59, 999);
+  return d;
 };
 
 export default PortfolioStrategic;

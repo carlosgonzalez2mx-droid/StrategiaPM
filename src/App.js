@@ -654,9 +654,27 @@ function MainApp() {
     'demo-001': [] // Proyecto de demostración - sin riesgos iniciales
   });
 
+  // Minutas por proyecto - cada proyecto tiene sus propias minutas y tareas
+  const [minutasByProject, setMinutasByProject] = useState({
+    'demo-001': [] // Proyecto de demostración - sin minutas iniciales
+  });
+
   // Función para obtener riesgos del proyecto actual
   const getCurrentProjectRisks = () => {
     return risksByProject[currentProjectId] || [];
+  };
+
+  // Función para obtener minutas del proyecto actual
+  const getCurrentProjectMinutas = () => {
+    return minutasByProject[currentProjectId] || [];
+  };
+
+  // Función para actualizar minutas de un proyecto específico
+  const updateProjectMinutas = (projectId, newMinutas) => {
+    setMinutasByProject(prev => ({
+      ...prev,
+      [projectId]: newMinutas
+    }));
   };
 
   // Función para actualizar riesgos del proyecto actual
@@ -918,6 +936,9 @@ function MainApp() {
               if (savedData.tasksByProject) {
                 safeSetTasksByProject(savedData.tasksByProject);
               }
+              if (savedData.minutasByProject) {
+                setMinutasByProject(savedData.minutasByProject);
+              }
               if (savedData.risksByProject) {
                 setRisksByProject(savedData.risksByProject);
               }
@@ -975,6 +996,9 @@ function MainApp() {
           }
           if (savedData.tasksByProject) {
             safeSetTasksByProject(savedData.tasksByProject);
+          }
+          if (savedData.minutasByProject) {
+            setMinutasByProject(savedData.minutasByProject);
           }
           if (savedData.includeWeekendsByProject) {
             setIncludeWeekendsByProject(savedData.includeWeekendsByProject);
@@ -1228,7 +1252,7 @@ function MainApp() {
           field === 'globalResources' || field === 'purchaseOrdersByProject' || 
           field === 'advancesByProject' || field === 'invoicesByProject' || 
           field === 'contractsByProject' || field === 'resourceAssignmentsByProject' || 
-          field === 'auditLogsByProject') {
+          field === 'auditLogsByProject' || field === 'minutasByProject') {
         return JSON.stringify(newValue) !== JSON.stringify(oldValue);
       }
       
@@ -1368,6 +1392,7 @@ function MainApp() {
       projects,
       currentProjectId,
       tasksByProject,
+      minutasByProject,
       includeWeekendsByProject,
       risksByProject,
       purchaseOrdersByProject,
@@ -1382,7 +1407,7 @@ function MainApp() {
 
     // Usar función de guardado con throttling
     throttledSave(dataToSave);
-  }, [projects, currentProjectId, tasksByProject, includeWeekendsByProject, risksByProject, purchaseOrdersByProject, advancesByProject, invoicesByProject, contractsByProject, globalResources, resourceAssignmentsByProject, auditLogsByProject, dataLoaded]); // INCLUIDO tasksByProject en las dependencias para guardado automático
+  }, [projects, currentProjectId, tasksByProject, minutasByProject, includeWeekendsByProject, risksByProject, purchaseOrdersByProject, advancesByProject, invoicesByProject, contractsByProject, globalResources, resourceAssignmentsByProject, auditLogsByProject, dataLoaded]); // INCLUIDO tasksByProject y minutasByProject en las dependencias para guardado automático
 
   // Limpiar timeout al desmontar el componente
   useEffect(() => {
@@ -1760,6 +1785,8 @@ function MainApp() {
             updateProject={updateProject}
             deleteProject={deleteProject}
                 tasks={getCurrentProjectTasks()}
+                tasksByProject={tasksByProject}
+                minutasByProject={minutasByProject}
                 purchaseOrders={getCurrentProjectPurchaseOrders()}
                 advances={getCurrentProjectAdvances()}
                 invoices={getCurrentProjectInvoices()}
@@ -1805,6 +1832,7 @@ function MainApp() {
             setContracts={updateCurrentProjectContracts}
             resourceAssignments={getCurrentProjectResourceAssignments()}
             useSupabase={useSupabase}
+            updateProjectMinutas={updateProjectMinutas}
               />
             )}
 

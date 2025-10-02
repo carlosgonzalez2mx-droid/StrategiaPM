@@ -1324,17 +1324,7 @@ class SupabaseService {
           if (minutas && minutas.length > 0) {
             console.log(`📋 Guardando minutas para proyecto ${projectId}: ${minutas.length} minutas`);
 
-            // Eliminar minutas existentes del proyecto
-            const { error: deleteError } = await this.supabase
-              .from('minute_tasks')
-              .delete()
-              .eq('project_id', projectId);
-
-            if (deleteError) {
-              console.warn(`⚠️ Error eliminando minutas existentes para proyecto ${projectId}:`, deleteError);
-            }
-
-            // Insertar nuevas minutas
+            // Insertar nuevas minutas (sin eliminar las existentes)
             const result = await this.saveMinutas(projectId, minutas);
             if (!result.success) {
               console.warn(`⚠️ Error guardando minutas para proyecto ${projectId}:`, result.error);

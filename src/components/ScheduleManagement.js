@@ -776,7 +776,7 @@ const calculateProjectMetrics = (tasks, criticalTasks) => {
 
 // ===== Funciones de Control de Costos EVM - se definen después de tasksWithCPM =====
 
-const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onScheduleDataChange, includeWeekends, setIncludeWeekends, useSupabase = true }) => {
+const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onScheduleDataChange, includeWeekends, setIncludeWeekends, useSupabase = true, updateProjectMinutas }) => {
 
   // Estados principales - INDEPENDIENTES de Work Packages
   // NOTA: tasks y setTasks ahora vienen como props del componente padre
@@ -1711,6 +1711,12 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
           if (success) {
             console.log(`🔍 DEBUG: Minutas recibidas de Supabase:`, minutas);
             setMinutasTasks(minutas);
+            
+            // Actualizar el estado global minutasByProject
+            if (updateProjectMinutas) {
+              updateProjectMinutas(projectData.id, minutas);
+            }
+            
             console.log(`✅ Minutas cargadas desde Supabase: ${minutas.length}`);
           } else {
             console.warn('⚠️ Error cargando minutas desde Supabase');
@@ -4123,6 +4129,13 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
           // Actualizar el estado local con los datos de Supabase
           setMinutasTasks(prev => [...prev, ...minutaTasks]);
 
+          // Actualizar el estado global minutasByProject
+          if (updateProjectMinutas) {
+            const currentMinutas = minutasTasks || [];
+            const updatedMinutas = [...currentMinutas, ...minutaTasks];
+            updateProjectMinutas(projectData.id, updatedMinutas);
+          }
+
           // Registrar eventos de auditoría para cada minuta guardada
           minutaTasks.forEach(minuta => {
             logMinutaTaskCreated(minuta, projectData);
@@ -4186,6 +4199,13 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
           setMinutasTasks(prev =>
             prev.map(m => m.id === updatedMinuta.id ? updatedMinuta : m)
           );
+
+          // Actualizar el estado global minutasByProject
+          if (updateProjectMinutas) {
+            const currentMinutas = minutasTasks || [];
+            const updatedMinutas = currentMinutas.map(m => m.id === updatedMinuta.id ? updatedMinuta : m);
+            updateProjectMinutas(projectData.id, updatedMinutas);
+          }
 
           // Registrar evento de auditoría para la actualización
           const changes = {

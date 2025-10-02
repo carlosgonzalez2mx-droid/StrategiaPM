@@ -145,7 +145,8 @@ const ProjectManagementTabs = ({
   contracts,
   setContracts,
   resourceAssignments,
-  useSupabase = false
+  useSupabase = false,
+  updateProjectMinutas
 }) => {
   // Hook de permisos
   const { permissions, isReadOnly } = usePermissions();
@@ -1275,6 +1276,8 @@ const ProjectManagementTabs = ({
               onScheduleDataChange={setScheduleData} // Nuevo prop para pasar datos del cronograma
               includeWeekends={includeWeekends}
               setIncludeWeekends={setIncludeWeekends}
+              useSupabase={useSupabase}
+              updateProjectMinutas={updateProjectMinutas}
             />
           )}
 
