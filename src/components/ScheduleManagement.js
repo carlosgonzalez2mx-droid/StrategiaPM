@@ -5468,19 +5468,26 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
     });
 
     return tasksWithCPM.map((task) => {
-      // CORRECCIÓN: Usar siempre las fechas originales de la tabla, NO las calculadas por CPM
+      // ✅ CORRECCIÓN DEFINITIVA: Usar siempre las fechas originales de la tabla, NO las calculadas por CPM
       // Las fechas que rigen son las de la vista tabla (startDate y endDate)
       const tableStartDate = task.startDate; // Fecha original de la tabla
       const tableEndDate = task.endDate;     // Fecha original de la tabla
       
-      // CORRECCIÓN: Usar siempre días calendario para fechas de tareas, independientemente de includeWeekends
-      // Las fechas de las tareas en la tabla son días calendario, no días laborales
-      const leftDays = findColumnIndex(tableStartDate, pStart, true); // Siempre true para días calendario
-      const durDays = findColumnIndex(tableEndDate, tableStartDate, true) + 1; // +1 para incluir el día final
+      // ✅ CORRECCIÓN: Calcular posición usando diferencia directa en días calendario
+      // Esto asegura que las barras se alineen exactamente con las fechas de la tabla
+      const startDateObj = new Date(tableStartDate);
+      const endDateObj = new Date(tableEndDate);
+      const projectStartObj = new Date(pStart);
+      
+      // Calcular días desde el inicio del proyecto hasta el inicio de la tarea
+      const leftDays = Math.round((startDateObj.getTime() - projectStartObj.getTime()) / (1000 * 60 * 60 * 24));
+      
+      // Calcular duración en días (inclusivo)
+      const durDays = Math.round((endDateObj.getTime() - startDateObj.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
       // Debug temporal para verificar que el nuevo algoritmo funciona
       if (task.name.includes('Aprobación') || task.name.includes('Generación') || task.name.includes('Envío') || task.name.includes('Solución')) {
-        console.log('🆕 GANTT USANDO FECHAS DE TABLA (CORREGIDO):');
+        console.log('🆕 GANTT USANDO FECHAS DE TABLA (CORREGIDO DEFINITIVAMENTE):');
         console.log('   taskName:', task.name);
         console.log('   📋 FECHAS DE TABLA (las que rigen):');
         console.log('   - tableStartDate:', tableStartDate);
@@ -5488,20 +5495,21 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         console.log('   🧮 FECHAS CALCULADAS POR CPM (solo informativas):');
         console.log('   - earlyStart:', task.earlyStart);
         console.log('   - earlyFinish:', task.earlyFinish);
-        console.log('   📊 CÁLCULOS GANTT (usando días calendario):');
+        console.log('   📊 CÁLCULOS GANTT (usando diferencia directa en días calendario):');
         console.log('   - projectStart:', pStart);
-        console.log('   - leftDays (días calendario):', leftDays);
-        console.log('   - durDays (días calendario):', durDays);
+        console.log('   - startDateObj:', startDateObj.toISOString().split('T')[0]);
+        console.log('   - projectStartObj:', projectStartObj.toISOString().split('T')[0]);
+        console.log('   - leftDays (diferencia directa):', leftDays);
+        console.log('   - durDays (duración directa):', durDays);
         console.log('   - leftPx calculado:', leftDays * pxPerDay);
-        console.log('   - includeWeekends config:', includeWeekends, '(pero usando días calendario para fechas de tareas)');
+        console.log('   - widthPx calculado:', durDays * pxPerDay);
         
         // Debug específico para la primera tarea
         if (task.name.includes('Aprobación')) {
           console.log('🔍 DEBUG ESPECÍFICO TAREA 1:');
           console.log('   - Fecha inicio tabla:', tableStartDate);
           console.log('   - Fecha referencia proyecto:', pStart);
-          console.log('   - Diferencia en días:', Math.round((new Date(tableStartDate) - new Date(pStart)) / (1000 * 60 * 60 * 24)));
-          console.log('   - leftDays calculado:', leftDays);
+          console.log('   - Diferencia en días (directa):', leftDays);
           console.log('   - leftPx calculado:', leftDays * pxPerDay);
           console.log('   - ¿Debería ser 0?', tableStartDate === pStart ? 'SÍ' : 'NO');
         }
