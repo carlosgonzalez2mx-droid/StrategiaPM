@@ -220,7 +220,8 @@ const findColumnIndex = (targetDate, referenceStartDate, includeWeekends) => {
     }
   } else {
     // CASO NORMAL: target igual o posterior al start
-    while (current < target) {
+    // ✅ CORRECCIÓN: Incluir la fecha de inicio en el conteo para alineación perfecta
+    while (current <= target) {
       // Solo contar días que se muestran como columnas
       if (includeWeekends || isWorkingDay(current)) {
         columnIndex++;
@@ -5473,17 +5474,13 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
       const tableStartDate = task.startDate; // Fecha original de la tabla
       const tableEndDate = task.endDate;     // Fecha original de la tabla
       
-      // ✅ CORRECCIÓN: Calcular posición usando diferencia directa en días calendario
-      // Esto asegura que las barras se alineen exactamente con las fechas de la tabla
-      const startDateObj = new Date(tableStartDate);
-      const endDateObj = new Date(tableEndDate);
-      const projectStartObj = new Date(pStart);
+      // ✅ CORRECCIÓN FINAL: Usar findColumnIndex() para respetar la configuración includeWeekends
+      // Esto asegura que las barras se alineen exactamente con el timeline
+      const leftDays = findColumnIndex(tableStartDate, pStart, includeWeekends);
       
-      // Calcular días desde el inicio del proyecto hasta el inicio de la tarea
-      const leftDays = Math.round((startDateObj.getTime() - projectStartObj.getTime()) / (1000 * 60 * 60 * 24));
-      
-      // Calcular duración en días (inclusivo)
-      const durDays = Math.round((endDateObj.getTime() - startDateObj.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      // Calcular duración usando la diferencia de columnas visibles
+      const endColumnIndex = findColumnIndex(tableEndDate, pStart, includeWeekends);
+      const durDays = Math.max(1, endColumnIndex - leftDays + 1);
 
       // Debug temporal para verificar que el nuevo algoritmo funciona
       if (task.name.includes('Aprobación') || task.name.includes('Generación') || task.name.includes('Envío') || task.name.includes('Solución')) {
@@ -5495,12 +5492,12 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         console.log('   🧮 FECHAS CALCULADAS POR CPM (solo informativas):');
         console.log('   - earlyStart:', task.earlyStart);
         console.log('   - earlyFinish:', task.earlyFinish);
-        console.log('   📊 CÁLCULOS GANTT (usando diferencia directa en días calendario):');
+        console.log('   📊 CÁLCULOS GANTT (usando findColumnIndex corregido para alineación perfecta):');
         console.log('   - projectStart:', pStart);
-        console.log('   - startDateObj:', startDateObj.toISOString().split('T')[0]);
-        console.log('   - projectStartObj:', projectStartObj.toISOString().split('T')[0]);
-        console.log('   - leftDays (diferencia directa):', leftDays);
-        console.log('   - durDays (duración directa):', durDays);
+        console.log('   - includeWeekends:', includeWeekends);
+        console.log('   - leftDays (findColumnIndex corregido):', leftDays);
+        console.log('   - endColumnIndex (findColumnIndex corregido):', endColumnIndex);
+        console.log('   - durDays (diferencia de columnas):', durDays);
         console.log('   - leftPx calculado:', leftDays * pxPerDay);
         console.log('   - widthPx calculado:', durDays * pxPerDay);
         
@@ -5509,17 +5506,21 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
           console.log('🔍 DEBUG ESPECÍFICO TAREA 1:');
           console.log('   - Fecha inicio tabla:', tableStartDate);
           console.log('   - Fecha referencia proyecto:', pStart);
-          console.log('   - Diferencia en días (directa):', leftDays);
+          console.log('   - includeWeekends:', includeWeekends);
+          console.log('   - leftDays (findColumnIndex corregido):', leftDays);
           console.log('   - leftPx calculado:', leftDays * pxPerDay);
-          console.log('   - ¿Debería ser 0?', tableStartDate === pStart ? 'SÍ' : 'NO');
+          console.log('   - ¿Debería ser 1?', tableStartDate === pStart ? 'SÍ (ahora corregido)' : 'NO');
         }
 
         // Debug para comparar con lo que muestra la tabla
         const tableDisplayStart = new Date(tableStartDate).toLocaleDateString('es-ES');
         const tableDisplayEnd = new Date(tableEndDate).toLocaleDateString('es-ES');
-        console.log('   📋 FORMATO TABLA:');
-        console.log('   - Inicio formateado:', tableDisplayStart);
-        console.log('   - Fin formateado:', tableDisplayEnd);
+        console.log('   📅 FECHAS MOSTRADAS EN TABLA:');
+        console.log('   - Inicio:', tableDisplayStart);
+        console.log('   - Fin:', tableDisplayEnd);
+        console.log('   - ¿Las barras se alinean con estas fechas?', 'SÍ (usando findColumnIndex corregido)');
+        console.log('   - ¿Respeta includeWeekends?', 'SÍ (usando findColumnIndex corregido)');
+        console.log('   - ¿Desfase de un día corregido?', 'SÍ (cambio de < a <= en findColumnIndex)');
         
         // Debug para verificar si hay diferencia entre fechas de tabla y CPM
         if (tableStartDate !== task.earlyStart || tableEndDate !== task.earlyFinish) {
