@@ -19,6 +19,7 @@ const PortfolioDashboard = ({
   risks, // Nuevo prop para riesgos
   globalResources, // Nuevo prop para recursos globales
   setGlobalResources, // Nuevo prop para actualizar recursos
+  tasksByProject, // Nuevo prop para tareas por proyecto
   createProject,
   updateProject,
   deleteProject,
@@ -542,7 +543,7 @@ const PortfolioDashboard = ({
       <CorporateAlerts projects={projects} portfolioMetrics={portfolioMetrics} />
 
       {/* Gráficos y Análisis */}
-      <PortfolioCharts projects={projects} portfolioMetrics={portfolioMetrics} workPackages={workPackages} risks={risks} />
+      <PortfolioCharts projects={projects} portfolioMetrics={portfolioMetrics} workPackages={workPackages} risks={risks} tasksByProject={tasksByProject} />
 
       {/* Gestor de Archivos del Proyecto Seleccionado */}
       {showFileManager && selectedProjectForFiles && (

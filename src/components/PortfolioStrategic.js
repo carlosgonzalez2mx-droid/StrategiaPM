@@ -625,6 +625,7 @@ const PortfolioStrategic = ({
               risks={risks}
               globalResources={globalResources}
               setGlobalResources={setGlobalResources}
+              tasksByProject={tasksByProject}
               createProject={createProject}
               updateProject={updateProject}
               deleteProject={deleteProject}

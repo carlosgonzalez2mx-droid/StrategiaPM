@@ -1,6 +1,87 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 
-const PortfolioCharts = ({ projects, portfolioMetrics = {}, workPackages = [], risks = [] }) => {
+// ===== Utilidades de tiempo (importadas del Gantt) =====
+const DAY = 1000 * 60 * 60 * 24;
+
+// ===== Funciones auxiliares para el Gantt de proyectos =====
+const toISO = (date) => {
+  if (!date) return new Date().toISOString().split('T')[0];
+  if (typeof date === 'string') return date;
+  return date.toISOString().split('T')[0];
+};
+
+const isWorkingDay = (date) => {
+  const day = date.getDay();
+  return day !== 0 && day !== 6; // No es domingo (0) ni sábado (6)
+};
+
+const diffDaysExclusive = (start, end, includeWeekends = false) => {
+  if (!start || !end) return 0;
+  
+  const startDate = new Date(start);
+  const endDate = new Date(end);
+  
+  if (includeWeekends) {
+    return Math.ceil((endDate - startDate) / DAY);
+  } else {
+    let days = 0;
+    const current = new Date(startDate);
+    
+    while (current < endDate) {
+      if (isWorkingDay(current)) {
+        days++;
+      }
+      current.setDate(current.getDate() + 1);
+    }
+    
+    return days;
+  }
+};
+
+const addDays = (date, days, includeWeekends = false) => {
+  const result = new Date(date);
+  
+  if (includeWeekends) {
+    result.setDate(result.getDate() + days);
+    return toISO(result);
+  } else {
+    let addedDays = 0;
+    
+    while (addedDays < days) {
+      result.setDate(result.getDate() + 1);
+      if (isWorkingDay(result)) {
+        addedDays++;
+      }
+    }
+    
+    return toISO(result);
+  }
+};
+
+const findColumnIndex = (targetDate, referenceDate, includeWeekends = false) => {
+  if (!targetDate || !referenceDate) return 0;
+  
+  const target = new Date(targetDate);
+  const reference = new Date(referenceDate);
+  
+  if (includeWeekends) {
+    return Math.ceil((target - reference) / DAY);
+  } else {
+    let current = new Date(reference);
+    let index = 0;
+    
+    while (current <= target) {
+      if (isWorkingDay(current)) {
+        index++;
+      }
+      current.setDate(current.getDate() + 1);
+    }
+    
+    return index;
+  }
+};
+
+const PortfolioCharts = ({ projects, portfolioMetrics = {}, workPackages = [], risks = [], tasksByProject = {} }) => {
   
   // Datos para gráfico de distribución por estado
   const statusData = [
@@ -163,64 +244,330 @@ const PortfolioCharts = ({ projects, portfolioMetrics = {}, workPackages = [], r
     );
   };
 
-  // Timeline de proyectos
-  const ProjectTimeline = () => {
-    const sortedProjects = projects.slice().sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
-    const earliestStart = new Date(Math.min(...projects.map(p => new Date(p.startDate))));
-    const latestEnd = new Date(Math.max(...projects.map(p => new Date(p.endDate))));
-    const totalDays = (latestEnd - earliestStart) / (1000 * 60 * 60 * 24);
+  // Funciones auxiliares para el Timeline
+  const getStartOfWeek = (date) => {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Ajustar para que lunes sea el primer día
+    return new Date(d.setDate(diff));
+  };
+
+  const getWeekNumber = (date, startWeek) => {
+    const weekStart = getStartOfWeek(new Date(date));
+    const startWeekStart = getStartOfWeek(new Date(startWeek));
+    const diffTime = weekStart.getTime() - startWeekStart.getTime();
+    const diffWeeks = Math.floor(diffTime / (7 * 24 * 60 * 60 * 1000));
+    return Math.max(0, diffWeeks);
+  };
+
+  // NUEVAS FUNCIONES: Para obtener números reales de semana ISO
+  const getISOWeekNumber = (date) => {
+    const d = new Date(date);
+    const dayOfWeek = d.getDay() || 7; // Convertir domingo (0) a 7
+    d.setDate(d.getDate() + 4 - dayOfWeek); // Ir al jueves de esta semana
+    
+    const firstDayOfYear = new Date(d.getFullYear(), 0, 1);
+    const days = Math.floor((d - firstDayOfYear) / (24 * 60 * 60 * 1000)) + 1;
+    
+    return Math.ceil(days / 7);
+  };
+
+  const getWeekYear = (date) => {
+    const d = new Date(date);
+    const dayOfWeek = d.getDay() || 7;
+    d.setDate(d.getDate() + 4 - dayOfWeek);
+    return d.getFullYear();
+  };
+
+  const getWeekLabel = (date, previousYear = null) => {
+    const weekNum = getISOWeekNumber(date);
+    const year = getWeekYear(date);
+    
+    // Mostrar año solo cuando cambia
+    if (previousYear === null || year !== previousYear) {
+      return `Semana ${weekNum} (${year})`;
+    }
+    return `Semana ${weekNum}`;
+  };
+
+  const getProjectMilestones = (projectId) => {
+    const projectTasks = tasksByProject[projectId] || [];
+    return projectTasks
+      .filter(task => task.isMilestone)
+      .sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+  };
+
+  const calculateProjectProgress = (projectId, currentDate = new Date()) => {
+    const projectTasks = tasksByProject[projectId] || [];
+    const today = new Date(currentDate);
+    
+    // Tareas planificadas para completar hasta hoy
+    const plannedTasks = projectTasks.filter(task => 
+      new Date(task.endDate) <= today
+    );
+    
+    // Tareas completadas hasta hoy
+    const completedTasks = projectTasks.filter(task => 
+      task.progress === 100 && new Date(task.endDate) <= today
+    );
+    
+    if (plannedTasks.length === 0) return 100;
+    
+    return Math.round((completedTasks.length / plannedTasks.length) * 100);
+  };
+
+  const getProgressColor = (progressPercentage) => {
+    if (progressPercentage >= 100) return '#10B981'; // Verde
+    if (progressPercentage >= 80) return '#F59E0B';  // Amarillo
+    return '#EF4444'; // Rojo
+  };
+
+  // ===== FUNCIONES ESPECÍFICAS PARA EL GANTT DE PROYECTOS =====
+  
+  // Función para obtener hitos de un proyecto con posicionamiento en píxeles
+  const getProjectMilestonesForGantt = (projectId, referenceDate, pxPerDay, includeWeekends = false) => {
+    const projectTasks = tasksByProject[projectId] || [];
+    const milestones = projectTasks
+      .filter(task => task.isMilestone)
+      .sort((a, b) => new Date(a.startDate) - new Date(b.startDate))
+      .map((milestone, index) => {
+        const leftDays = findColumnIndex(milestone.startDate, referenceDate, includeWeekends);
+        return {
+          id: milestone.id,
+          name: milestone.name,
+          startDate: milestone.startDate,
+          leftPx: leftDays * pxPerDay,
+          number: index + 1
+        };
+      });
+    
+    return milestones;
+  };
+
+  // Función para generar barras del Gantt de proyectos
+  const generateProjectGanttBars = (projects, referenceDate, pxPerDay, includeWeekends = false) => {
+    return projects.map((project) => {
+      const projectStartDate = project.startDate;
+      const projectEndDate = project.endDate;
+      
+      // Calcular posición y duración usando findColumnIndex
+      const leftDays = findColumnIndex(projectStartDate, referenceDate, includeWeekends);
+      const endColumnIndex = findColumnIndex(projectEndDate, referenceDate, includeWeekends);
+      const durDays = Math.max(1, endColumnIndex - leftDays + 1);
+      
+      // Obtener hitos del proyecto
+      const milestones = getProjectMilestonesForGantt(project.id, referenceDate, pxPerDay, includeWeekends);
+      
+      // Calcular progreso del proyecto
+      const progressPercentage = calculateProjectProgress(project.id);
+      const progressColor = getProgressColor(progressPercentage);
+      
+      return {
+        id: project.id,
+        name: project.name,
+        startDate: projectStartDate,
+        endDate: projectEndDate,
+        leftPx: leftDays * pxPerDay,
+        widthPx: durDays * pxPerDay,
+        progressPercentage,
+        progressColor,
+        milestones,
+        totalDays: durDays
+      };
+    });
+  };
+
+  // Función para generar encabezados del timeline (reutilizada del Gantt original)
+  const generateProjectTimelineHeaders = (startDate, endDate, pxPerDay, includeWeekends = false) => {
+    const headers = [];
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    
+    // Usar escala de semanas para mejor visualización
+    const cur = new Date(start);
+    while (cur <= end) {
+      const labelStart = new Date(cur);
+      const labelEnd = new Date(cur);
+      labelEnd.setDate(labelEnd.getDate() + 6);
+      
+      const remaining = Math.min(7, diffDaysExclusive(labelStart, addDays(end, 1, includeWeekends), includeWeekends));
+      
+      headers.push({ 
+        label: `S ${labelStart.getDate()}—${labelEnd.getDate()}`, 
+        sub: labelStart.toLocaleDateString('es', { month: 'short' }), 
+        width: remaining * pxPerDay 
+      });
+      
+      cur.setDate(cur.getDate() + 7);
+    }
+    
+    return headers;
+  };
+
+  // Gantt de proyectos (basado en el Gantt del cronograma)
+  const ProjectGanttChart = () => {
+    // Configuración del Gantt (reutilizada del cronograma)
+    const ROW_H = 50;
+    const PADDING_TOP = 10;
+    const pxPerDay = 28; // Escala de semanas
+    const includeWeekends = false; // Por defecto sin fines de semana
+    
+    // Calcular fechas del proyecto
+    const projectDates = useMemo(() => {
+      if (projects.length === 0) return { start: new Date(), end: new Date() };
+      
+      const dates = projects.flatMap((p) => [new Date(p.startDate), new Date(p.endDate)]);
+      return {
+        start: new Date(Math.min(...dates.map((d) => d.getTime()))),
+        end: new Date(Math.max(...dates.map((d) => d.getTime())))
+      };
+    }, [projects]);
+    
+    // Calcular total de días y ancho del gráfico
+    const totalDays = useMemo(() => {
+      const pStart = toISO(projectDates.start);
+      const pEnd = toISO(projectDates.end);
+      return Math.max(1, diffDaysExclusive(pStart, addDays(pEnd, 1, includeWeekends), includeWeekends));
+    }, [projectDates, includeWeekends]);
+    
+    const chartWidthPx = useMemo(() => totalDays * pxPerDay, [totalDays, pxPerDay]);
+    
+    // Fecha de referencia para el timeline
+    const getTimelineReferenceDate = useMemo(() => {
+      return toISO(projectDates.start);
+    }, [projectDates.start]);
+    
+    // Línea "Hoy"
+    const todayLeftPx = useMemo(() => {
+      const todayISO = toISO(new Date());
+      const days = findColumnIndex(todayISO, getTimelineReferenceDate, includeWeekends);
+      return Math.min(Math.max(0, days * pxPerDay), chartWidthPx);
+    }, [getTimelineReferenceDate, pxPerDay, chartWidthPx, includeWeekends]);
+    
+    // Generar barras del Gantt de proyectos
+    const projectGanttBars = useMemo(() => {
+      return generateProjectGanttBars(projects, getTimelineReferenceDate, pxPerDay, includeWeekends);
+    }, [projects, getTimelineReferenceDate, pxPerDay, includeWeekends]);
+    
+    // Generar encabezados del timeline
+    const timelineHeaders = useMemo(() => {
+      return generateProjectTimelineHeaders(
+        projectDates.start, 
+        projectDates.end, 
+        pxPerDay, 
+        includeWeekends
+      );
+    }, [projectDates, pxPerDay, includeWeekends]);
 
     return (
       <div className="bg-white rounded-lg shadow-sm p-6">
         <h3 className="text-lg font-semibold mb-4">📅 Timeline de Proyectos</h3>
-        <div className="space-y-4">
-          {sortedProjects.map((project, index) => {
-            const startDays = (new Date(project.startDate) - earliestStart) / (1000 * 60 * 60 * 24);
-            const duration = (new Date(project.endDate) - new Date(project.startDate)) / (1000 * 60 * 60 * 24);
-            const leftPercent = (startDays / totalDays) * 100;
-            const widthPercent = (duration / totalDays) * 100;
-
-            const getStatusColor = (status) => {
-              switch(status) {
-                case 'active': return '#3B82F6';
-                case 'completed': return '#10B981';
-                case 'on-hold': return '#F59E0B';
-                case 'cancelled': return '#EF4444';
-                default: return '#6B7280';
-              }
-            };
-
-            return (
-              <div key={project.id} className="relative">
-                <div className="flex items-center mb-1">
-                  <div className="w-32 text-sm font-medium text-gray-700 truncate">
-                    {project.name}
-                  </div>
-                  <div className="flex-1 mx-4 relative h-6 bg-gray-100 rounded">
-                    <div
-                      className="absolute h-6 rounded flex items-center px-2 text-white text-xs font-medium"
-                      style={{
-                        backgroundColor: getStatusColor(project.status),
-                        left: `${leftPercent}%`,
-                        width: `${Math.max(widthPercent, 5)}%`
-                      }}
-                    >
-                      {duration > 30 && project.name.substring(0, 10)}
-                    </div>
-                  </div>
-                  <div className="w-24 text-xs text-gray-500">
-                    {Math.round(duration)} días
+        
+        {/* Encabezados del timeline - Scroll horizontal */}
+        <div className="flex items-center mb-4">
+          <div className="w-48 flex-shrink-0 text-sm font-medium text-gray-700">
+            Proyectos
+          </div>
+          <div 
+            className="flex overflow-x-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200"
+            style={{ 
+              width: Math.max(chartWidthPx + 100, 800),
+              minWidth: Math.max(chartWidthPx + 100, 800)
+            }}
+          >
+            {timelineHeaders.map((header, index) => (
+              <div
+                key={index}
+                className="text-xs text-gray-600 text-center border-r border-gray-200 flex-shrink-0"
+                style={{ width: header.width, minWidth: header.width }}
+              >
+                <div className="font-medium">{header.label}</div>
+                <div className="text-gray-400">{header.sub}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        {/* Contenido scrolleable del Gantt */}
+        <div 
+          className="flex-1 overflow-x-auto overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200"
+          style={{ height: '400px' }}
+        >
+          <div style={{ width: Math.max(chartWidthPx + 100, 800) }}>
+            {/* Barras del Gantt */}
+            <div className="relative">
+              {/* Línea "Hoy" */}
+              {todayLeftPx > 0 && todayLeftPx < chartWidthPx && (
+                <div
+                  className="absolute z-10 w-0.5 bg-red-500"
+                  style={{
+                    left: todayLeftPx,
+                    top: 0,
+                    height: `${projects.length * (ROW_H + 8) + PADDING_TOP}px`
+                  }}
+                >
+                  <div className="bg-red-500 text-white text-xs px-1 py-0.5 rounded -mt-2 -ml-6">
+                    HOY
                   </div>
                 </div>
-              </div>
-            );
-          })}
-          
-          {/* Leyenda de fechas */}
-          <div className="flex justify-between text-xs text-gray-500 mt-4 px-32">
-            <span>{earliestStart.toLocaleDateString()}</span>
-            <span>Hoy</span>
-            <span>{latestEnd.toLocaleDateString()}</span>
+              )}
+              
+              {/* Barras de proyectos */}
+              {projectGanttBars.map((project, index) => (
+                <div
+                  key={project.id}
+                  className="absolute flex items-center"
+                  style={{
+                    left: 0,
+                    top: PADDING_TOP + index * (ROW_H + 8),
+                    height: ROW_H
+                  }}
+                >
+                  {/* Nombre del proyecto */}
+                  <div className="w-48 flex-shrink-0 text-sm font-medium text-gray-700 truncate pr-2">
+                    {project.name}
+                  </div>
+                  
+                  {/* Barra del proyecto */}
+                  <div
+                    className="relative rounded flex items-center px-2 text-white text-xs font-medium"
+                    style={{
+                      left: project.leftPx,
+                      width: project.widthPx,
+                      height: ROW_H - 4,
+                      backgroundColor: project.progressColor
+                    }}
+                  >
+                    {/* Hitos del proyecto */}
+                    {project.milestones.map((milestone) => (
+                      <div
+                        key={milestone.id}
+                        className="absolute top-1/2 transform -translate-y-1/2 bg-white bg-opacity-20 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold"
+                        style={{
+                          left: milestone.leftPx - project.leftPx
+                        }}
+                      >
+                        {milestone.number}
+                      </div>
+                    ))}
+                    
+                    {/* Información del proyecto */}
+                    <div className="ml-auto text-right">
+                      <div className="text-xs font-bold">{project.progressPercentage}%</div>
+                      <div className="text-xs opacity-80">{project.totalDays} días</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+        
+        {/* Leyenda */}
+        <div className="mt-4 text-xs text-gray-500">
+          <div className="flex items-center justify-between">
+            <span>Inicio: {new Date(projectDates.start).toLocaleDateString('es')}</span>
+            <span>Fin: {new Date(projectDates.end).toLocaleDateString('es')}</span>
           </div>
         </div>
       </div>
@@ -342,7 +689,7 @@ const PortfolioCharts = ({ projects, portfolioMetrics = {}, workPackages = [], r
       )}
 
       {/* Timeline de proyectos */}
-      <ProjectTimeline />
+      <ProjectGanttChart />
 
       {/* Métricas financieras */}
       <FinancialMetrics />
