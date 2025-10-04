@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
 
 // ===== Utilidades de tiempo (importadas del Gantt) =====
 const DAY = 1000 * 60 * 60 * 24;
@@ -412,6 +412,11 @@ const PortfolioCharts = ({ projects, portfolioMetrics = {}, workPackages = [], r
     const pxPerDay = 28; // Escala de semanas
     const includeWeekends = false; // Por defecto sin fines de semana
     
+    // Refs para sincronización de scroll
+    const headerRef = useRef(null);
+    const contentRef = useRef(null);
+    const isScrolling = useRef(false);
+    
     // Calcular fechas del proyecto
     const projectDates = useMemo(() => {
       if (projects.length === 0) return { start: new Date(), end: new Date() };
@@ -458,17 +463,38 @@ const PortfolioCharts = ({ projects, portfolioMetrics = {}, workPackages = [], r
         includeWeekends
       );
     }, [projectDates, pxPerDay, includeWeekends]);
+    
+    // Funciones de sincronización de scroll (igual que en ScheduleManagement.js)
+    const onHeaderScroll = (e) => {
+      // Sincronizar scroll horizontal del contenido con los headers
+      if (contentRef.current && !isScrolling.current) {
+        isScrolling.current = true;
+        contentRef.current.scrollLeft = e.currentTarget.scrollLeft;
+        setTimeout(() => { isScrolling.current = false; }, 10);
+      }
+    };
+    
+    const onContentScroll = (e) => {
+      // Sincronizar scroll horizontal de los headers con el contenido
+      if (headerRef.current && !isScrolling.current) {
+        isScrolling.current = true;
+        headerRef.current.scrollLeft = e.currentTarget.scrollLeft;
+        setTimeout(() => { isScrolling.current = false; }, 10);
+      }
+    };
 
     return (
       <div className="bg-white rounded-lg shadow-sm p-6">
         <h3 className="text-lg font-semibold mb-4">📅 Timeline de Proyectos</h3>
         
-        {/* Encabezados del timeline - Scroll horizontal */}
+        {/* Encabezados del timeline - Scroll horizontal sincronizado */}
         <div className="flex items-center mb-4">
           <div className="w-48 flex-shrink-0 text-sm font-medium text-gray-700">
             Proyectos
           </div>
           <div 
+            ref={headerRef}
+            onScroll={onHeaderScroll}
             className="flex overflow-x-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200"
             style={{ 
               width: Math.max(chartWidthPx + 100, 800),
@@ -488,8 +514,10 @@ const PortfolioCharts = ({ projects, portfolioMetrics = {}, workPackages = [], r
           </div>
         </div>
         
-        {/* Contenido scrolleable del Gantt */}
+        {/* Contenido scrolleable del Gantt - Scroll sincronizado */}
         <div 
+          ref={contentRef}
+          onScroll={onContentScroll}
           className="flex-1 overflow-x-auto overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200"
           style={{ height: '400px' }}
         >
