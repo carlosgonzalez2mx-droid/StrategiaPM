@@ -529,32 +529,33 @@ const PortfolioCharts = ({ projects, portfolioMetrics = {}, workPackages = [], r
       <div className="bg-white rounded-lg shadow-sm p-6 max-w-full overflow-hidden">
         <h3 className="text-lg font-semibold mb-4">📅 Timeline de Proyectos</h3>
         
-        {/* Contenedor principal con scroll horizontal interno */}
-        <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200">
+        {/* Contenedor del Gantt con ancho máximo fijo */}
+        <div className="max-w-full">
           {/* Encabezados del timeline - Scroll horizontal sincronizado */}
-          <div className="flex items-center mb-4 min-w-max">
+          <div className="flex items-center mb-4">
             <div className="w-48 flex-shrink-0 text-sm font-medium text-gray-700">
               Proyectos
             </div>
             <div 
               ref={headerRef}
               onScroll={onHeaderScroll}
-              className="flex overflow-x-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200"
-              style={{ 
-                width: Math.max(chartWidthPx + 100, 800),
-                minWidth: Math.max(chartWidthPx + 100, 800)
-              }}
+              className="flex-1 overflow-x-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200"
             >
-              {timelineHeaders.map((header, index) => (
-                <div
-                  key={index}
-                  className="text-xs text-gray-600 text-center border-r border-gray-200 flex-shrink-0"
-                  style={{ width: header.width, minWidth: header.width }}
-                >
-                  <div className="font-medium">{header.label}</div>
-                  <div className="text-gray-400">{header.sub}</div>
-                </div>
-              ))}
+              <div 
+                className="flex"
+                style={{ width: Math.max(chartWidthPx + 100, 800) }}
+              >
+                {timelineHeaders.map((header, index) => (
+                  <div
+                    key={index}
+                    className="text-xs text-gray-600 text-center border-r border-gray-200 flex-shrink-0"
+                    style={{ width: header.width, minWidth: header.width }}
+                  >
+                    <div className="font-medium">{header.label}</div>
+                    <div className="text-gray-400">{header.sub}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
           
