@@ -422,30 +422,53 @@ const PortfolioCharts = ({ projects, portfolioMetrics = {}, workPackages = [], r
       if (projects.length === 0) return { start: new Date(), end: new Date() };
       
       const dates = projects.flatMap((p) => [new Date(p.startDate), new Date(p.endDate)]);
+      const today = new Date();
+      
       return {
         start: new Date(Math.min(...dates.map((d) => d.getTime()))),
-        end: new Date(Math.max(...dates.map((d) => d.getTime())))
+        end: new Date(Math.max(Math.max(...dates.map((d) => d.getTime())), today.getTime()))
       };
     }, [projects]);
     
-    // Calcular total de días y ancho del gráfico
+    // Función centralizada para obtener la fecha de referencia del timeline (igual que en ScheduleManagement.js)
+    const getTimelineReferenceDate = useMemo(() => {
+      const originalStart = toISO(projectDates.start);
+      
+      // CORRECCIÓN: Usar siempre la fecha original del proyecto, sin aplicar findFirstWorkingDay
+      // Esto asegura que las barras del Gantt se alineen exactamente con las fechas de la tabla
+      const referenceDate = originalStart;
+      
+      // Debug para verificar el desplazamiento de fechas
+      console.log('🎯 PROJECT TIMELINE REFERENCE DATE CALCULADO (CORREGIDO):', {
+        originalProjectStart: originalStart,
+        includeWeekends: includeWeekends,
+        referenceDate: referenceDate,
+        isShifted: originalStart !== referenceDate,
+        shiftDays: originalStart !== referenceDate ? 
+          Math.round((new Date(referenceDate) - new Date(originalStart)) / (1000 * 60 * 60 * 24)) : 0,
+        note: 'Usando fecha original sin aplicar findFirstWorkingDay para alineación perfecta con tabla'
+      });
+      
+      return referenceDate;
+    }, [projectDates.start, includeWeekends]);
+    
+    // Calcular total de días y ancho del gráfico usando la referencia centralizada
     const totalDays = useMemo(() => {
-      const pStart = toISO(projectDates.start);
+      const pStart = getTimelineReferenceDate;
       const pEnd = toISO(projectDates.end);
       return Math.max(1, diffDaysExclusive(pStart, addDays(pEnd, 1, includeWeekends), includeWeekends));
-    }, [projectDates, includeWeekends]);
+    }, [getTimelineReferenceDate, projectDates.end, includeWeekends]);
     
     const chartWidthPx = useMemo(() => totalDays * pxPerDay, [totalDays, pxPerDay]);
     
-    // Fecha de referencia para el timeline
-    const getTimelineReferenceDate = useMemo(() => {
-      return toISO(projectDates.start);
-    }, [projectDates.start]);
-    
-    // Línea "Hoy"
+    // Línea "Hoy" usando la función centralizada (igual que en ScheduleManagement.js)
     const todayLeftPx = useMemo(() => {
+      // Usar la función centralizada para obtener la fecha de referencia
       const todayISO = toISO(new Date());
+      // Para la línea "HOY" usar la misma configuración que las barras
+      // NUEVO ALGORITMO: Usar índice de columnas
       const days = findColumnIndex(todayISO, getTimelineReferenceDate, includeWeekends);
+      
       return Math.min(Math.max(0, days * pxPerDay), chartWidthPx);
     }, [getTimelineReferenceDate, pxPerDay, chartWidthPx, includeWeekends]);
     
@@ -454,15 +477,34 @@ const PortfolioCharts = ({ projects, portfolioMetrics = {}, workPackages = [], r
       return generateProjectGanttBars(projects, getTimelineReferenceDate, pxPerDay, includeWeekends);
     }, [projects, getTimelineReferenceDate, pxPerDay, includeWeekends]);
     
-    // Generar encabezados del timeline
+    // Generar encabezados del timeline usando la referencia centralizada
     const timelineHeaders = useMemo(() => {
-      return generateProjectTimelineHeaders(
-        projectDates.start, 
-        projectDates.end, 
-        pxPerDay, 
-        includeWeekends
-      );
-    }, [projectDates, pxPerDay, includeWeekends]);
+      const headers = [];
+      // Usar la función centralizada para obtener la fecha de referencia
+      const startReference = getTimelineReferenceDate;
+      const start = new Date(startReference);
+      const end = new Date(toISO(projectDates.end));
+      
+      // Usar escala de semanas para mejor visualización
+      const cur = new Date(start);
+      while (cur <= end) {
+        const labelStart = new Date(cur);
+        const labelEnd = new Date(cur);
+        labelEnd.setDate(labelEnd.getDate() + 6);
+        
+        const remaining = Math.min(7, diffDaysExclusive(labelStart, addDays(end, 1, includeWeekends), includeWeekends));
+        
+        headers.push({ 
+          label: `S ${labelStart.getDate()}—${labelEnd.getDate()}`, 
+          sub: labelStart.toLocaleDateString('es', { month: 'short' }), 
+          width: remaining * pxPerDay 
+        });
+        
+        cur.setDate(cur.getDate() + 7);
+      }
+      
+      return headers;
+    }, [getTimelineReferenceDate, projectDates.end, pxPerDay, includeWeekends]);
     
     // Funciones de sincronización de scroll (igual que en ScheduleManagement.js)
     const onHeaderScroll = (e) => {
