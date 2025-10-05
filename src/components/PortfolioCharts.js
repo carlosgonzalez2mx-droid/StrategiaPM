@@ -409,7 +409,7 @@ const PortfolioCharts = ({ projects, portfolioMetrics = {}, workPackages = [], r
     // Configuración del Gantt (reutilizada del cronograma)
     const ROW_H = 50;
     const PADDING_TOP = 10;
-    const pxPerDay = 28; // Escala de semanas
+    const pxPerDay = 20; // Escala más compacta
     const includeWeekends = false; // Por defecto sin fines de semana
     
     // Refs para sincronización de scroll
@@ -469,8 +469,8 @@ const PortfolioCharts = ({ projects, portfolioMetrics = {}, workPackages = [], r
     
     const chartWidthPx = useMemo(() => {
       const calculatedWidth = totalDays * pxPerDay;
-      // Limitar el ancho máximo a un valor razonable (ej: 1200px)
-      return Math.min(calculatedWidth, 1200);
+      // Limitar el ancho máximo a un valor más conservador (ej: 800px)
+      return Math.min(calculatedWidth, 800);
     }, [totalDays, pxPerDay]);
     
     // Línea "Hoy" usando la función centralizada (igual que en ScheduleManagement.js)
@@ -555,7 +555,7 @@ const PortfolioCharts = ({ projects, portfolioMetrics = {}, workPackages = [], r
             >
               <div 
                 className="flex"
-                style={{ width: Math.max(chartWidthPx + 100, 600) }}
+                style={{ width: Math.max(chartWidthPx + 50, 400) }}
               >
                 {timelineHeaders.map((header, index) => (
                   <div
@@ -578,7 +578,7 @@ const PortfolioCharts = ({ projects, portfolioMetrics = {}, workPackages = [], r
             className="overflow-x-auto overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200"
             style={{ height: '400px' }}
           >
-            <div style={{ width: Math.max(chartWidthPx + 100, 600) }}>
+            <div style={{ width: Math.max(chartWidthPx + 50, 400) }}>
               {/* Barras del Gantt */}
               <div className="relative">
                 {/* Línea "Hoy" */}
