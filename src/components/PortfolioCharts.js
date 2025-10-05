@@ -417,16 +417,24 @@ const PortfolioCharts = ({ projects, portfolioMetrics = {}, workPackages = [], r
     const contentRef = useRef(null);
     const isScrolling = useRef(false);
     
-    // Calcular fechas del proyecto
+    // Calcular fechas del proyecto (solo rango de proyectos, no incluir hoy si es muy lejano)
     const projectDates = useMemo(() => {
       if (projects.length === 0) return { start: new Date(), end: new Date() };
       
       const dates = projects.flatMap((p) => [new Date(p.startDate), new Date(p.endDate)]);
+      const projectStart = new Date(Math.min(...dates.map((d) => d.getTime())));
+      const projectEnd = new Date(Math.max(...dates.map((d) => d.getTime())));
       const today = new Date();
       
+      // Solo extender hasta hoy si está dentro del rango de los proyectos o cerca
+      // Si hoy está muy lejos del rango de proyectos, usar solo el rango de proyectos
+      const daysDiffFromProjectEnd = Math.abs(today.getTime() - projectEnd.getTime()) / (1000 * 60 * 60 * 24);
+      
       return {
-        start: new Date(Math.min(...dates.map((d) => d.getTime()))),
-        end: new Date(Math.max(Math.max(...dates.map((d) => d.getTime())), today.getTime()))
+        start: projectStart,
+        end: daysDiffFromProjectEnd <= 90 ? // Solo extender si hoy está dentro de 90 días del fin de proyectos
+          new Date(Math.max(projectEnd.getTime(), today.getTime())) : 
+          projectEnd
       };
     }, [projects]);
     
@@ -459,7 +467,11 @@ const PortfolioCharts = ({ projects, portfolioMetrics = {}, workPackages = [], r
       return Math.max(1, diffDaysExclusive(pStart, addDays(pEnd, 1, includeWeekends), includeWeekends));
     }, [getTimelineReferenceDate, projectDates.end, includeWeekends]);
     
-    const chartWidthPx = useMemo(() => totalDays * pxPerDay, [totalDays, pxPerDay]);
+    const chartWidthPx = useMemo(() => {
+      const calculatedWidth = totalDays * pxPerDay;
+      // Limitar el ancho máximo a un valor razonable (ej: 1200px)
+      return Math.min(calculatedWidth, 1200);
+    }, [totalDays, pxPerDay]);
     
     // Línea "Hoy" usando la función centralizada (igual que en ScheduleManagement.js)
     const todayLeftPx = useMemo(() => {
@@ -543,7 +555,7 @@ const PortfolioCharts = ({ projects, portfolioMetrics = {}, workPackages = [], r
             >
               <div 
                 className="flex"
-                style={{ width: Math.max(chartWidthPx + 100, 800) }}
+                style={{ width: Math.max(chartWidthPx + 100, 600) }}
               >
                 {timelineHeaders.map((header, index) => (
                   <div
@@ -566,7 +578,7 @@ const PortfolioCharts = ({ projects, portfolioMetrics = {}, workPackages = [], r
             className="overflow-x-auto overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200"
             style={{ height: '400px' }}
           >
-            <div style={{ width: Math.max(chartWidthPx + 100, 800) }}>
+            <div style={{ width: Math.max(chartWidthPx + 100, 600) }}>
               {/* Barras del Gantt */}
               <div className="relative">
                 {/* Línea "Hoy" */}
