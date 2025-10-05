@@ -488,7 +488,7 @@ const PortfolioStrategic = ({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-full overflow-hidden">
       {/* Header del Portfolio */}
       <div className="bg-gradient-to-r from-blue-50 to-indigo-100 rounded-2xl shadow-lg p-6 text-gray-800 relative overflow-hidden">
         {/* Elementos decorativos de fondo */}

@@ -303,7 +303,7 @@ const PortfolioDashboard = ({
   const metrics = portfolioMetrics || calculatedMetrics;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-full overflow-hidden">
 
       {/* Nota Informativa */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
