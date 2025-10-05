@@ -526,109 +526,112 @@ const PortfolioCharts = ({ projects, portfolioMetrics = {}, workPackages = [], r
     };
 
     return (
-      <div className="bg-white rounded-lg shadow-sm p-6">
+      <div className="bg-white rounded-lg shadow-sm p-6 max-w-full overflow-hidden">
         <h3 className="text-lg font-semibold mb-4">📅 Timeline de Proyectos</h3>
         
-        {/* Encabezados del timeline - Scroll horizontal sincronizado */}
-        <div className="flex items-center mb-4">
-          <div className="w-48 flex-shrink-0 text-sm font-medium text-gray-700">
-            Proyectos
-          </div>
-          <div 
-            ref={headerRef}
-            onScroll={onHeaderScroll}
-            className="flex overflow-x-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200"
-            style={{ 
-              width: Math.max(chartWidthPx + 100, 800),
-              minWidth: Math.max(chartWidthPx + 100, 800)
-            }}
-          >
-            {timelineHeaders.map((header, index) => (
-              <div
-                key={index}
-                className="text-xs text-gray-600 text-center border-r border-gray-200 flex-shrink-0"
-                style={{ width: header.width, minWidth: header.width }}
-              >
-                <div className="font-medium">{header.label}</div>
-                <div className="text-gray-400">{header.sub}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-        
-        {/* Contenido scrolleable del Gantt - Scroll sincronizado */}
-        <div 
-          ref={contentRef}
-          onScroll={onContentScroll}
-          className="flex-1 overflow-x-auto overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200"
-          style={{ height: '400px' }}
-        >
-          <div style={{ width: Math.max(chartWidthPx + 100, 800) }}>
-            {/* Barras del Gantt */}
-            <div className="relative">
-              {/* Línea "Hoy" */}
-              {todayLeftPx > 0 && todayLeftPx < chartWidthPx && (
+        {/* Contenedor principal con scroll horizontal interno */}
+        <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200">
+          {/* Encabezados del timeline - Scroll horizontal sincronizado */}
+          <div className="flex items-center mb-4 min-w-max">
+            <div className="w-48 flex-shrink-0 text-sm font-medium text-gray-700">
+              Proyectos
+            </div>
+            <div 
+              ref={headerRef}
+              onScroll={onHeaderScroll}
+              className="flex overflow-x-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200"
+              style={{ 
+                width: Math.max(chartWidthPx + 100, 800),
+                minWidth: Math.max(chartWidthPx + 100, 800)
+              }}
+            >
+              {timelineHeaders.map((header, index) => (
                 <div
-                  className="absolute z-10 w-0.5 bg-red-500"
-                  style={{
-                    left: todayLeftPx,
-                    top: 0,
-                    height: `${projects.length * (ROW_H + 8) + PADDING_TOP}px`
-                  }}
+                  key={index}
+                  className="text-xs text-gray-600 text-center border-r border-gray-200 flex-shrink-0"
+                  style={{ width: header.width, minWidth: header.width }}
                 >
-                  <div className="bg-red-500 text-white text-xs px-1 py-0.5 rounded -mt-2 -ml-6">
-                    HOY
-                  </div>
-                </div>
-              )}
-              
-              {/* Barras de proyectos */}
-              {projectGanttBars.map((project, index) => (
-                <div
-                  key={project.id}
-                  className="absolute flex items-center"
-                  style={{
-                    left: 0,
-                    top: PADDING_TOP + index * (ROW_H + 8),
-                    height: ROW_H
-                  }}
-                >
-                  {/* Nombre del proyecto */}
-                  <div className="w-48 flex-shrink-0 text-sm font-medium text-gray-700 truncate pr-2">
-                    {project.name}
-                  </div>
-                  
-                  {/* Barra del proyecto */}
-                  <div
-                    className="relative rounded flex items-center px-2 text-white text-xs font-medium"
-                    style={{
-                      left: project.leftPx,
-                      width: project.widthPx,
-                      height: ROW_H - 4,
-                      backgroundColor: project.progressColor
-                    }}
-                  >
-                    {/* Hitos del proyecto */}
-                    {project.milestones.map((milestone) => (
-                      <div
-                        key={milestone.id}
-                        className="absolute top-1/2 transform -translate-y-1/2 bg-white bg-opacity-20 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold"
-                        style={{
-                          left: milestone.leftPx - project.leftPx
-                        }}
-                      >
-                        {milestone.number}
-                      </div>
-                    ))}
-                    
-                    {/* Información del proyecto */}
-                    <div className="ml-auto text-right">
-                      <div className="text-xs font-bold">{project.progressPercentage}%</div>
-                      <div className="text-xs opacity-80">{project.totalDays} días</div>
-                    </div>
-                  </div>
+                  <div className="font-medium">{header.label}</div>
+                  <div className="text-gray-400">{header.sub}</div>
                 </div>
               ))}
+            </div>
+          </div>
+          
+          {/* Contenido scrolleable del Gantt - Scroll sincronizado */}
+          <div 
+            ref={contentRef}
+            onScroll={onContentScroll}
+            className="overflow-x-auto overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200"
+            style={{ height: '400px' }}
+          >
+            <div style={{ width: Math.max(chartWidthPx + 100, 800) }}>
+              {/* Barras del Gantt */}
+              <div className="relative">
+                {/* Línea "Hoy" */}
+                {todayLeftPx > 0 && todayLeftPx < chartWidthPx && (
+                  <div
+                    className="absolute z-10 w-0.5 bg-red-500"
+                    style={{
+                      left: todayLeftPx,
+                      top: 0,
+                      height: `${projects.length * (ROW_H + 8) + PADDING_TOP}px`
+                    }}
+                  >
+                    <div className="bg-red-500 text-white text-xs px-1 py-0.5 rounded -mt-2 -ml-6">
+                      HOY
+                    </div>
+                  </div>
+                )}
+                
+                {/* Barras de proyectos */}
+                {projectGanttBars.map((project, index) => (
+                  <div
+                    key={project.id}
+                    className="absolute flex items-center"
+                    style={{
+                      left: 0,
+                      top: PADDING_TOP + index * (ROW_H + 8),
+                      height: ROW_H
+                    }}
+                  >
+                    {/* Nombre del proyecto */}
+                    <div className="w-48 flex-shrink-0 text-sm font-medium text-gray-700 truncate pr-2">
+                      {project.name}
+                    </div>
+                    
+                    {/* Barra del proyecto */}
+                    <div
+                      className="relative rounded flex items-center px-2 text-white text-xs font-medium"
+                      style={{
+                        left: project.leftPx,
+                        width: project.widthPx,
+                        height: ROW_H - 4,
+                        backgroundColor: project.progressColor
+                      }}
+                    >
+                      {/* Hitos del proyecto */}
+                      {project.milestones.map((milestone) => (
+                        <div
+                          key={milestone.id}
+                          className="absolute top-1/2 transform -translate-y-1/2 bg-white bg-opacity-20 rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold"
+                          style={{
+                            left: milestone.leftPx - project.leftPx
+                          }}
+                        >
+                          {milestone.number}
+                        </div>
+                      ))}
+                      
+                      {/* Información del proyecto */}
+                      <div className="ml-auto text-right">
+                        <div className="text-xs font-bold">{project.progressPercentage}%</div>
+                        <div className="text-xs opacity-80">{project.totalDays} días</div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
