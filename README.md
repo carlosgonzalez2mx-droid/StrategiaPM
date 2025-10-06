@@ -38,6 +38,17 @@ Sistema integral de gestión de proyectos desarrollado en React con integración
 - **Importación de cronogramas** con reemplazo completo (no mezcla)
 - **Actualización en tiempo real** de hitos en el dashboard
 
+### 📊 Timeline de Proyectos (Portfolio)
+- **Vista Gantt de portfolio** con timeline de múltiples proyectos simultáneos
+- **Colores semánticos inteligentes**: Verde (cumplido), Rojo (atrasado), Gris Oxford (sin tareas)
+- **Hitos numerados consecutivamente** dentro de las barras de cada proyecto
+- **Línea "HOY" precisa** alineada correctamente con fechas semanales
+- **Cálculo automático de estado** basado en cumplimiento de tareas del cronograma
+- **Diseño limpio y profesional** sin bordes de colores distractores
+- **Ancho optimizado** para pantallas normales sin scroll horizontal
+- **Tooltips informativos** en hitos con nombre y número
+- **Posicionamiento preciso** de barras e hitos usando días calendario
+
 ### 💰 Gestión Financiera
 - Control de presupuesto del proyecto
 - Órdenes de compra y facturación
@@ -289,8 +300,35 @@ La aplicación está configurada para desplegarse fácilmente en:
 - ✅ **Cálculo de ruta crítica (CPM) con fechas automáticas**
 - ✅ **Actualización en tiempo real de hitos en dashboard**
 - ✅ **Preservación del orden Excel por columna "#"**
+- ✅ **Timeline de Proyectos con colores semánticos inteligentes**
+- ✅ **Hitos numerados consecutivamente en barras de Gantt**
+- ✅ **Línea "HOY" precisa con posicionamiento correcto**
+- ✅ **Diseño limpio sin bordes de colores distractores**
+- ✅ **Ancho optimizado para pantallas normales**
 
 ## 📝 Changelog
+
+### v2.5.0 (Enero 2025)
+#### 📊 Timeline de Proyectos (Portfolio)
+- **Vista Gantt de portfolio**: Timeline de múltiples proyectos simultáneos con barras de Gantt
+- **Colores semánticos inteligentes**: 
+  - 🟢 **Verde**: Proyectos con todas las tareas vencidas completadas
+  - 🔴 **Rojo**: Proyectos con tareas vencidas sin completar
+  - ⚫ **Gris Oxford**: Proyectos sin tareas que debían cumplirse antes de hoy
+- **Hitos numerados consecutivamente**: Cada proyecto tiene sus hitos numerados 1, 2, 3... dentro de las barras
+- **Línea "HOY" precisa**: Alineada correctamente con fechas semanales usando días calendario
+- **Cálculo automático de estado**: Basado en cumplimiento real de tareas del cronograma
+- **Diseño limpio y profesional**: Eliminación de todos los bordes de colores distractores
+- **Ancho optimizado**: Timeline se ajusta perfectamente a pantallas normales
+- **Tooltips informativos**: Hitos con información de nombre y número al hacer hover
+- **Posicionamiento preciso**: Barras e hitos usando días calendario para alineación perfecta
+
+#### 🔧 Mejoras Técnicas del Timeline
+- **Corrección de desfases**: Línea HOY, barras de Gantt e hitos alineados correctamente
+- **Cálculo de días calendario**: Consistencia entre headers semanales y posicionamiento de elementos
+- **Función de evaluación de estado**: `getProjectStatusColor()` para colores semánticos
+- **Numeración consecutiva**: Filtrado y ordenamiento de hitos por proyecto
+- **Estilo mejorado de hitos**: Círculos blancos con borde azul y números centrados
 
 ### v2.4.0 (Enero 2025)
 #### 🎯 Cronograma Estilo MS Project
@@ -376,5 +414,5 @@ Este proyecto es privado y propietario. Todos los derechos reservados.
 ---
 
 **Última actualización**: Enero 2025
-**Versión**: 2.4.0
+**Versión**: 2.5.0
 **Estado**: Producción
