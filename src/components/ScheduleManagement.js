@@ -4196,15 +4196,21 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         });
 
         if (updateResult.success) {
-          // Actualizar estado local
+          // Actualizar estado local preservando fechaCreacion
           setMinutasTasks(prev =>
-            prev.map(m => m.id === updatedMinuta.id ? updatedMinuta : m)
+            prev.map(m => m.id === updatedMinuta.id ? {
+              ...updatedMinuta,
+              fechaCreacion: m.fechaCreacion  // Preservar fecha de creación
+            } : m)
           );
 
-          // Actualizar el estado global minutasByProject
+          // Actualizar el estado global minutasByProject preservando fechaCreacion
           if (updateProjectMinutas) {
             const currentMinutas = minutasTasks || [];
-            const updatedMinutas = currentMinutas.map(m => m.id === updatedMinuta.id ? updatedMinuta : m);
+            const updatedMinutas = currentMinutas.map(m => m.id === updatedMinuta.id ? {
+              ...updatedMinuta,
+              fechaCreacion: m.fechaCreacion  // Preservar fecha de creación
+            } : m);
             updateProjectMinutas(projectData.id, updatedMinutas);
           }
 
@@ -4224,9 +4230,12 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
           alert(`❌ Error actualizando minuta: ${updateResult.error.message || 'Error desconocido'}`);
         }
       } else {
-        // Actualizar solo en estado local
+        // Actualizar solo en estado local preservando fechaCreacion
         setMinutasTasks(prev =>
-          prev.map(m => m.id === updatedMinuta.id ? updatedMinuta : m)
+          prev.map(m => m.id === updatedMinuta.id ? {
+            ...updatedMinuta,
+            fechaCreacion: m.fechaCreacion  // Preservar fecha de creación
+          } : m)
         );
         alert('✅ Minuta actualizada localmente');
       }
