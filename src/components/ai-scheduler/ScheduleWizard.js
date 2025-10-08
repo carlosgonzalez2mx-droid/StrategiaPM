@@ -2,17 +2,17 @@
  * ScheduleWizard - Componente principal del Asistente Inteligente de Cronogramas
  * StrategiaPM - MVP Implementation
  * 
- * Wizard de 5 pasos para generar cronogramas automáticamente con IA
+ * Wizard de 4 pasos para generar cronogramas automáticamente con IA
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
 import ProjectAnalysisStep from './ProjectAnalysisStep';
 import ResourceConfigStep from './ResourceConfigStep';
 import MilestoneDefinitionStep from './MilestoneDefinitionStep';
-import LearningStep from './LearningStep';
+// import LearningStep from './LearningStep'; // DEPRECATED - eliminado en v1.0
 import MachineryConfigStep from './MachineryConfigStep';
 import SchedulePreview from './SchedulePreview';
-import aiSchedulerService from '../../services/AISchedulerService';
+import smartSchedulerService from '../../services/AISchedulerService';
 
 const ScheduleWizard = ({ 
   isOpen, 
@@ -29,6 +29,7 @@ const ScheduleWizard = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState(null);
   const [availableTemplates, setAvailableTemplates] = useState([]);
+  const [showMachineryConfig, setShowMachineryConfig] = useState(false);
 
   // Inicializar wizard cuando se abre
   useEffect(() => {
@@ -36,6 +37,14 @@ const ScheduleWizard = ({
       initializeWizard();
     }
   }, [isOpen]);
+
+  // Generar cronograma automáticamente cuando se llega al paso 4 (Vista Previa)
+  useEffect(() => {
+    if (currentStep === 4 && (!needsMachineryStep() || !showMachineryConfig) && !generatedSchedule && !isGenerating) {
+      console.log('🤖 Generando cronograma automáticamente en paso 4...');
+      generateSchedule();
+    }
+  }, [currentStep, wizardData, generatedSchedule, isGenerating, showMachineryConfig]);
 
   // Inicializar datos del wizard
   const initializeWizard = async () => {
@@ -45,6 +54,7 @@ const ScheduleWizard = ({
       setGeneratedSchedule(null);
       setError(null);
       setIsGenerating(false);
+      setShowMachineryConfig(false);
 
       // Cargar templates disponibles
       await loadAvailableTemplates();
@@ -74,7 +84,7 @@ const ScheduleWizard = ({
   // Cargar templates disponibles
   const loadAvailableTemplates = async () => {
     try {
-      const templates = await aiSchedulerService.getAvailableTemplates();
+      const templates = await smartSchedulerService.getAvailableTemplates();
       setAvailableTemplates(templates);
       console.log('📋 Templates cargados:', templates.length);
     } catch (error) {
@@ -92,8 +102,14 @@ const ScheduleWizard = ({
 
   // Avanzar al siguiente paso
   const nextStep = () => {
-    if (currentStep < 5) {
+    if (currentStep < 4) {
       setCurrentStep(prev => prev + 1);
+    } else if (currentStep === 4 && needsMachineryStep() && !showMachineryConfig) {
+      // Para proyectos de maquinaria, después del paso 3, mostrar configuración de maquinaria
+      setShowMachineryConfig(true);
+    } else if (currentStep === 4 && needsMachineryStep() && showMachineryConfig) {
+      // Después de configurar maquinaria, ir a vista previa
+      setShowMachineryConfig(false);
     }
   };
 
@@ -119,7 +135,7 @@ const ScheduleWizard = ({
       }
 
       // Generar cronograma usando el servicio de IA
-      const schedule = await aiSchedulerService.generateSmartSchedule(wizardData);
+      const schedule = await smartSchedulerService.generateSmartSchedule(wizardData);
       
       if (!schedule) {
         throw new Error('No se pudo generar el cronograma');
@@ -165,7 +181,7 @@ const ScheduleWizard = ({
 
   // Obtener el número total de pasos
   const getTotalSteps = () => {
-    return 5; // Siempre 5 pasos (sin aprendizaje)
+    return 4; // Ahora son 4 pasos (sin aprendizaje)
   };
 
 
@@ -179,11 +195,10 @@ const ScheduleWizard = ({
       case 3:
         return wizardData.milestones && wizardData.milestones.length > 0;
       case 4:
-        if (needsMachineryStep()) {
+        if (needsMachineryStep() && showMachineryConfig) {
           return wizardData.deliveryTime && wizardData.advancePayments;
         }
-        return true; // Paso opcional para otros tipos de proyecto
-      case 5:
+        // Para el paso 4 (Vista Previa), validar que el cronograma esté generado
         return generatedSchedule !== null;
       default:
         return false;
@@ -270,30 +285,15 @@ const ScheduleWizard = ({
           )}
 
           {/* Step 4: Configuración de Maquinaria (solo para equipment_installation) */}
-          {currentStep === 4 && needsMachineryStep() && (
+          {currentStep === 4 && needsMachineryStep() && showMachineryConfig && (
             <MachineryConfigStep
               wizardData={wizardData}
               onUpdate={updateWizardData}
             />
           )}
 
-          {/* Step 4: Aprendizaje de Patrones (solo si no es equipment_installation) */}
-          {currentStep === 4 && !needsMachineryStep() && (
-            <LearningStep
-              wizardData={wizardData}
-              onUpdate={updateWizardData}
-              onComplete={(learningData) => {
-                updateWizardData(learningData);
-                nextStep();
-              }}
-              projectType={wizardData.projectType}
-              organizationId={organizationId}
-              userId={userId}
-            />
-          )}
-
-          {/* Step 5: Vista Previa del Cronograma */}
-          {currentStep === 5 && (
+          {/* Step 4: Vista Previa del Cronograma */}
+          {currentStep === 4 && (!needsMachineryStep() || !showMachineryConfig) && (
             <SchedulePreview
               wizardData={wizardData}
               generatedSchedule={generatedSchedule}
@@ -324,7 +324,7 @@ const ScheduleWizard = ({
               Cancelar
             </button>
 
-            {currentStep < 5 ? (
+            {currentStep < 4 || (currentStep === 4 && needsMachineryStep() && showMachineryConfig) ? (
               <button
                 onClick={nextStep}
                 disabled={!isCurrentStepValid()}

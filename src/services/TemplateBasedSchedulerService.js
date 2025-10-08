@@ -119,7 +119,7 @@ class TemplateBasedSchedulerService {
     data.slice(1).forEach((row, index) => {
       if (row && row.length > 0 && row[1] && row[1].trim() !== '') {
         const activity = {
-          id: `template-${row[0]}`,
+          id: row[0], // CORRECCIÓN: Usar número simple en lugar de template-X
           originalId: row[0],
           name: row[1].trim(),
           duration: this.parseDuration(row[2]),

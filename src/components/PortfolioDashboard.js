@@ -24,7 +24,10 @@ const PortfolioDashboard = ({
   updateProject,
   deleteProject,
   duplicateProject,
-  archiveProject
+  archiveProject,
+  includeWeekendsByProject,
+  setIncludeWeekendsByProject,
+  getCurrentProjectIncludeWeekends
 }) => {
   const [showFileManager, setShowFileManager] = useState(false);
   const [selectedProjectForFiles, setSelectedProjectForFiles] = useState(null);
@@ -543,7 +546,7 @@ const PortfolioDashboard = ({
       <CorporateAlerts projects={projects} portfolioMetrics={portfolioMetrics} />
 
       {/* Gráficos y Análisis */}
-      <PortfolioCharts projects={projects} portfolioMetrics={portfolioMetrics} workPackages={workPackages} risks={risks} tasksByProject={tasksByProject} />
+      <PortfolioCharts projects={projects} portfolioMetrics={portfolioMetrics} workPackages={workPackages} risks={risks} tasksByProject={tasksByProject} includeWeekendsByProject={includeWeekendsByProject} setIncludeWeekendsByProject={setIncludeWeekendsByProject} getCurrentProjectIncludeWeekends={getCurrentProjectIncludeWeekends} />
 
       {/* Gestor de Archivos del Proyecto Seleccionado */}
       {showFileManager && selectedProjectForFiles && (

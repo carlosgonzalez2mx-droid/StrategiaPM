@@ -1,6 +1,8 @@
 // =====================================================
+// DEPRECATED - no se usa en v1.0
 // AI LEARNING SERVICE
 // Servicio para análisis de patrones de cronogramas Excel
+// Este archivo será eliminado en futuras versiones
 // =====================================================
 
 import * as XLSX from 'xlsx';

@@ -36,7 +36,11 @@ const PortfolioStrategic = ({
   advances,
   invoices,
   contracts,
-  auditLogs
+  auditLogs,
+  includeWeekendsByProject,
+  setIncludeWeekendsByProject,
+  getCurrentProjectIncludeWeekends,
+  useSupabase
 }) => {
   const [showNewProjectModal, setShowNewProjectModal] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
@@ -630,6 +634,9 @@ const PortfolioStrategic = ({
               updateProject={updateProject}
               deleteProject={deleteProject}
               duplicateProject={handleDuplicateProject}
+              includeWeekendsByProject={includeWeekendsByProject}
+              setIncludeWeekendsByProject={setIncludeWeekendsByProject}
+              getCurrentProjectIncludeWeekends={getCurrentProjectIncludeWeekends}
             />
           )}
 
@@ -664,6 +671,7 @@ const PortfolioStrategic = ({
                 minutasByProject={minutasByProject}
                 weeklyPlanningData={weeklyPlanningData}
                 setWeeklyPlanningData={setWeeklyPlanningData}
+                useSupabase={useSupabase}
               />
             </>
           )}

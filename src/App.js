@@ -1792,6 +1792,10 @@ function MainApp() {
                 invoices={getCurrentProjectInvoices()}
                 contracts={getCurrentProjectContracts()}
                 auditLogs={getCurrentProjectAuditLogs()}
+                includeWeekendsByProject={includeWeekendsByProject}
+                setIncludeWeekendsByProject={setIncludeWeekendsByProject}
+                getCurrentProjectIncludeWeekends={getCurrentProjectIncludeWeekends}
+                useSupabase={useSupabase}
               />
             )}
 

@@ -1,6 +1,8 @@
 // =====================================================
+// DEPRECATED - no se usa en v1.0
 // LEARNING STEP COMPONENT
 // Paso del wizard para subir ejemplos de cronogramas
+// Este archivo será eliminado en futuras versiones
 // =====================================================
 
 import React, { useState, useCallback } from 'react';

@@ -1,15 +1,15 @@
 /**
- * AISchedulerService - Servicio para generación inteligente de cronogramas
- * StrategiaPM - MVP Implementation
+ * SmartSchedulerService - Servicio para generación inteligente de cronogramas
+ * StrategiaPM - v1.0 Implementation
  * 
- * Este servicio maneja la lógica de IA para generar cronogramas automáticamente
- * basándose en templates, patrones aprendidos y contexto del proyecto.
+ * Este servicio maneja la lógica de generación de cronogramas automáticamente
+ * basándose en templates y contexto del proyecto (sin aprendizaje).
  */
 
-import aiLearningEngine from './AILearningEngine';
+// import aiLearningEngine from './AILearningEngine'; // DEPRECATED - eliminado en v1.0
 import TemplateBasedSchedulerService from './TemplateBasedSchedulerService.js';
 
-class AISchedulerService {
+class SmartSchedulerService {
   constructor() {
     this.supabase = null;
     this.organizationId = null;
@@ -22,10 +22,10 @@ class AISchedulerService {
     this.organizationId = organizationId;
     this.currentUser = currentUser;
     
-    // Inicializar también el motor de aprendizaje
-    await aiLearningEngine.initialize(supabase, organizationId, currentUser?.id);
+    // DEPRECATED: Sin inicialización de motor de aprendizaje en v1.0
+    // await aiLearningEngine.initialize(supabase, organizationId, currentUser?.id);
     
-    console.log('🤖 AISchedulerService inicializado:', { organizationId, userId: currentUser?.id });
+    console.log('🤖 SmartSchedulerService inicializado:', { organizationId, userId: currentUser?.id });
   }
 
   /**
@@ -45,8 +45,8 @@ class AISchedulerService {
         return await TemplateBasedSchedulerService.generateTemplateBasedSchedule(wizardData);
       }
 
-      // 1. Seleccionar el mejor template basado en los inputs
-      const template = await this.selectBestTemplate(wizardData);
+      // 1. Obtener template base (sin lógica de aprendizaje)
+      const template = await this.getBaseTemplate(wizardData);
       console.log('📋 Template seleccionado:', template?.name);
       
       if (!template) {
@@ -115,38 +115,7 @@ class AISchedulerService {
     }
   }
 
-  /**
-   * Seleccionar el mejor template basado en los inputs del wizard
-   */
-  async selectBestTemplate(wizardData) {
-    try {
-      console.log('🔍 Seleccionando template para:', wizardData.projectType, wizardData.industry);
-
-      // Obtener template base
-      let baseTemplate = await this.getBaseTemplate(wizardData);
-      
-      if (!baseTemplate) {
-        console.warn('No se pudo obtener template base');
-        return null;
-      }
-
-      // Usar template base sin aprendizaje (Opción 3)
-      console.log('📋 Usando template base sin aprendizaje');
-      const finalTemplate = baseTemplate;
-      
-      console.log('📋 Template final seleccionado:', {
-        name: finalTemplate.name,
-        enhanced: false,
-        confidence: 0
-      });
-
-      return finalTemplate;
-
-    } catch (error) {
-      console.error('Error seleccionando template:', error);
-      return null;
-    }
-  }
+  // DEPRECATED: selectBestTemplate eliminado en v1.0 - usar getBaseTemplate directamente
 
   /**
    * Obtener template base (lógica original)
@@ -320,7 +289,7 @@ class AISchedulerService {
         adjustedDuration = Math.ceil(adjustedDuration * 0.8); // 20% menos tiempo
       }
 
-      // Crear actividad ajustada
+      // Crear actividad ajustada (sin dependencias por ahora)
       const adjustedActivity = {
         id: `ai-${activityId++}`,
         name: activity.name,
@@ -332,16 +301,27 @@ class AISchedulerService {
         activityIndex: activityIndex,
         isMilestone: activity.isMilestone || false,
         priority: this.determinePriority(activity, context),
-          assignedTo: this.suggestAssignee(activity, context),
-          dependencies: this.adjustDependencies(activity.dependencies, adjustedActivities),
-          estimatedCost: this.estimateCost(activity, context),
-          requiredSkills: activity.requiredSkills || [],
-          parallel: activity.parallel || false,
-          generatedBy: 'ai',
-          confidence: this.calculateConfidence(activity, context)
-        };
+        assignedTo: this.suggestAssignee(activity, context),
+        dependencies: activity.dependencies || [], // Temporalmente mantener las dependencias originales
+        estimatedCost: this.estimateCost(activity, context),
+        requiredSkills: activity.requiredSkills || [],
+        parallel: activity.parallel || false,
+        generatedBy: 'ai',
+        confidence: this.calculateConfidence(activity, context)
+      };
 
-        adjustedActivities.push(adjustedActivity);
+      adjustedActivities.push(adjustedActivity);
+    });
+
+    // CORRECCIÓN: Ajustar dependencias después de crear todas las actividades
+    adjustedActivities.forEach((activity, index) => {
+      if (activity.dependencies && activity.dependencies.length > 0) {
+        activity.dependencies = this.adjustDependencies(activity.dependencies, adjustedActivities);
+      } else if (index > 0) {
+        // Si no tiene dependencias y no es la primera actividad, crear dependencia secuencial
+        activity.dependencies = [adjustedActivities[index - 1].id];
+        console.log(`🔗 Agregando dependencia secuencial: ${activity.name} depende de ${adjustedActivities[index - 1].name}`);
+      }
     });
 
     return adjustedActivities;
@@ -563,13 +543,35 @@ class AISchedulerService {
    * Ajustar dependencias
    */
   adjustDependencies(dependencies, existingActivities) {
-    if (!dependencies || !Array.isArray(dependencies)) return [];
+    // CORRECCIÓN: Asegurar que siempre devuelva un array válido
+    if (!dependencies || !Array.isArray(dependencies)) {
+      console.log('🔗 Dependencias no definidas o inválidas, usando array vacío');
+      return [];
+    }
     
     // Convertir nombres de dependencias a IDs si es necesario
-    return dependencies.map(dep => {
+    const adjustedDeps = dependencies.map(dep => {
+      // Si es un ID (string o número), mantenerlo
+      if (typeof dep === 'string' && dep.startsWith('activity-')) {
+        return dep;
+      }
+      if (typeof dep === 'number') {
+        return dep;
+      }
+      
+      // Si es un nombre, buscar la actividad correspondiente
       const existingActivity = existingActivities.find(a => a.name === dep);
-      return existingActivity ? existingActivity.id : dep;
-    });
+      if (existingActivity) {
+        console.log(`🔗 Mapeando dependencia "${dep}" a ID "${existingActivity.id}"`);
+        return existingActivity.id;
+      }
+      
+      console.warn(`⚠️ Dependencia "${dep}" no encontrada en actividades existentes`);
+      return null;
+    }).filter(dep => dep !== null); // Filtrar dependencias nulas
+    
+    console.log(`🔗 Dependencias ajustadas: [${adjustedDeps.join(', ')}]`);
+    return adjustedDeps;
   }
 
   /**
@@ -899,7 +901,22 @@ class AISchedulerService {
       }
     });
 
+    // CORRECCIÓN: Generar dependencias secuenciales automáticas
+    activities.forEach((activity, index) => {
+      if (!activity.dependencies || activity.dependencies.length === 0) {
+        // Generar dependencias secuenciales lógicas
+        if (index === 0) {
+          // Primera actividad: sin predecesoras
+          activity.dependencies = [];
+        } else {
+          // Actividades subsecuentes: depender de la anterior
+          activity.dependencies = [activities[index - 1].id]; // ID de la actividad anterior
+        }
+      }
+    });
+
     console.log(`📋 Actividades extraídas de fases: ${activities.length}`);
+    console.log(`🔗 Dependencias generadas automáticamente para ${activities.length} actividades`);
     return activities;
   }
 
@@ -1337,5 +1354,5 @@ class AISchedulerService {
 }
 
 // Exportar como singleton
-const aiSchedulerService = new AISchedulerService();
-export default aiSchedulerService;
+const smartSchedulerService = new SmartSchedulerService();
+export default smartSchedulerService;

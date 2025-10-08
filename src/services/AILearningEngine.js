@@ -1,6 +1,8 @@
 // =====================================================
+// DEPRECATED - no se usa en v1.0
 // AI LEARNING ENGINE
 // Motor de aprendizaje que mejora templates basado en patrones
+// Este archivo será eliminado en futuras versiones
 // =====================================================
 
 import aiLearningService from './AILearningService';

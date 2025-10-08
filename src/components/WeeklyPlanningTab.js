@@ -1,43 +1,120 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Calendar, Clock, CheckCircle, AlertCircle, Users, FileText, TrendingUp, Download } from 'lucide-react';
+// ✅ OPCIONAL: Descomentar si quieres usar el indicador de carga
+// import { Calendar, Clock, CheckCircle, AlertCircle, Users, FileText, TrendingUp, Download, Loader2 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
+
+// ============================================================================
+// UTILIDADES - Movidas fuera del componente para mejor rendimiento
+// ============================================================================
+
+const DEBUG_MODE = false; // ✅ Control centralizado de logs
+
+const log = (...args) => {
+  if (DEBUG_MODE) console.log(...args);
+};
+
+const isValidDate = (dateString) => {
+  if (!dateString) return false;
+  const date = new Date(dateString);
+  return !isNaN(date.getTime()) && date.getFullYear() > 1900;
+};
+
+const normalizeDate = (dateString) => {
+  if (!isValidDate(dateString)) return null;
+  const date = new Date(dateString);
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
+
+const getStartOfWeek = (date) => {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  d.setDate(diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+
+const getEndOfWeek = (date) => {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1) + 6;
+  d.setDate(diff);
+  d.setHours(0, 0, 0, 0); // ✅ Normalizado a medianoche para consistencia
+  return d;
+};
+
+const formatDate = (date) => {
+  if (!date) return 'N/A';
+  return new Date(date).toLocaleDateString('es-ES', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  });
+};
+
+// ✅ Funciones centralizadas para estado de tareas
+const isTaskCompleted = (task, isMinuteTask = false) => {
+  if (isMinuteTask) {
+    const estatus = (task.estatus || '').toLowerCase().trim();
+    return estatus === 'completado' || estatus === 'completada';
+  }
+  return task.progress === 100;
+};
+
+const isTaskPending = (task, isMinuteTask = false) => {
+  return !isTaskCompleted(task, isMinuteTask);
+};
+
+// ============================================================================
+// COMPONENTE PRINCIPAL
+// ============================================================================
 
 const WeeklyPlanningTab = ({ 
   projects, 
   tasksByProject, 
   minutasByProject, 
   weeklyPlanningData, 
-  setWeeklyPlanningData 
+  setWeeklyPlanningData,
+  useSupabase = false // ✅ Nuevo prop para determinar fuente de datos
 }) => {
+  // Estado
   const [dateRange, setDateRange] = useState(weeklyPlanningData?.dateRange || {
     start: getStartOfWeek(new Date()),
     end: getEndOfWeek(new Date())
   });
   const [previousWeekData, setPreviousWeekData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  
+  // ✅ NUEVO: Estado local para minutas (independiente de props)
+  const [localMinutaTasks, setLocalMinutaTasks] = useState({});
+  const [loadingMinutas, setLoadingMinutas] = useState(false);
+  
+  // ⚠️ OPCIONAL: Descomenta si quieres manejo de errores en UI
+  // const [error, setError] = useState(null);
 
-  // ✅ NUEVA: Función utilitaria para validar fechas
-  const isValidDate = (dateString) => {
-    if (!dateString) return false;
-    const date = new Date(dateString);
-    return !isNaN(date.getTime()) && date.getFullYear() > 1900;
-  };
+  // ✅ Proyectos activos memoizados
+  const activeProjects = useMemo(() => {
+    const filtered = projects.filter(p => p.status === 'active');
+    
+    log('🏢 PROYECTOS ACTIVOS:', {
+      total: projects.length,
+      active: filtered.length,
+      projects: filtered.map(p => ({ id: p.id, name: p.name }))
+    });
+    
+    log('📊 ESTRUCTURA DE DATOS:', {
+      tasksByProjectKeys: Object.keys(tasksByProject || {}),
+      minutasByProjectKeys: Object.keys(localMinutaTasks || {}),
+      tasksByProject: tasksByProject,
+      localMinutaTasks: localMinutaTasks
+    });
+    
+    return filtered;
+  }, [projects, tasksByProject, localMinutaTasks]);
 
-  // ✅ NUEVA: Función utilitaria para normalizar fechas
-  const normalizeDate = (dateString) => {
-    if (!isValidDate(dateString)) return null;
-    const date = new Date(dateString);
-    date.setHours(0, 0, 0, 0);
-    return date;
-  };
-
-  // Filtrar solo proyectos activos
-  const activeProjects = useMemo(() => 
-    projects.filter(p => p.status === 'active'), 
-    [projects]
-  );
-
-  // Calcular fechas de la semana pasada
+  // ✅ Rango de semana anterior memoizado
   const previousWeekRange = useMemo(() => {
     const start = new Date(dateRange.start);
     start.setDate(start.getDate() - 7);
@@ -46,25 +123,126 @@ const WeeklyPlanningTab = ({
     return { start, end };
   }, [dateRange]);
 
-  // Cargar datos de la semana pasada al cambiar el rango de fechas
-  useEffect(() => {
-    loadPreviousWeekData();
-  }, [dateRange, activeProjects]);
+  // ✅ Fecha actual memoizada
+  const today = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
 
+  // ============================================================================
+  // FUNCIONES DE FILTRADO - Ahora con useCallback para evitar recreación
+  // ============================================================================
 
-  const loadPreviousWeekData = async () => {
-    setIsLoading(true);
-    try {
-      const complianceData = await calculatePreviousWeekCompliance();
-      setPreviousWeekData(complianceData);
-    } catch (error) {
-      console.error('Error cargando datos de la semana pasada:', error);
-    } finally {
-      setIsLoading(false);
+  // ✅ Función genérica para filtrar tareas por rango de fechas
+  const filterTasksByDateRange = useCallback((tasks, startDate, endDate, isMinuteTask = false) => {
+    return tasks.filter(task => {
+      const taskDate = normalizeDate(
+        isMinuteTask ? task.fecha : (task.endDate || task.startDate)
+      );
+      
+      if (!taskDate) {
+        log(`⚠️ Fecha inválida en tarea:`, task.name || task.tarea);
+        return false;
+      }
+      
+      return taskDate >= startDate && taskDate <= endDate;
+    });
+  }, []);
+
+  // ✅ Función genérica para filtrar tareas vencidas
+  const filterOverdueTasks = useCallback((tasks, isMinuteTask = false) => {
+    return tasks.filter(task => {
+      const dueDate = normalizeDate(
+        isMinuteTask ? task.fecha : (task.endDate || task.startDate)
+      );
+      
+      if (!dueDate) {
+        log(`⚠️ Fecha inválida en tarea vencida:`, task.name || task.tarea);
+        return false;
+      }
+      
+      const isPending = isTaskPending(task, isMinuteTask);
+      return dueDate < today && isPending;
+    });
+  }, [today]);
+
+  // ✅ Obtener tareas de la semana actual (memoizado por proyecto)
+  const getCurrentWeekTasks = useCallback((projectId) => {
+    const projectTasks = tasksByProject[projectId] || [];
+    const projectMinuteTasks = localMinutaTasks[projectId] || [];
+    
+    log('📅 getCurrentWeekTasks:', {
+      projectId,
+      totalScheduleTasks: projectTasks.length,
+      totalMinuteTasks: projectMinuteTasks.length,
+      dateRange: {
+        start: dateRange.start.toISOString().split('T')[0],
+        end: dateRange.end.toISOString().split('T')[0]
+      }
+    });
+    
+    // Debug detallado de tareas del proyecto
+    if (projectTasks.length > 0) {
+      log('📋 Tareas de cronograma del proyecto:', projectTasks.map(t => ({
+        id: t.id,
+        name: t.name,
+        endDate: t.endDate,
+        progress: t.progress
+      })));
     }
-  };
+    
+    if (projectMinuteTasks.length > 0) {
+      log('📋 Tareas de minutas del proyecto:', projectMinuteTasks.map(t => ({
+        id: t.id,
+        tarea: t.tarea,
+        fecha: t.fecha,
+        estatus: t.estatus
+      })));
+    }
+    
+    // Filtrar tareas pendientes de cronograma
+    const scheduleTasks = filterTasksByDateRange(projectTasks, dateRange.start, dateRange.end)
+      .filter(task => isTaskPending(task, false));
+    
+    // Filtrar tareas pendientes de minutas
+    const minuteTasks = filterTasksByDateRange(projectMinuteTasks, dateRange.start, dateRange.end, true)
+      .filter(task => isTaskPending(task, true));
 
-  const calculatePreviousWeekCompliance = async () => {
+    log('✅ Tareas de semana actual:', {
+      projectId,
+      scheduleTasks: scheduleTasks.length,
+      minuteTasks: minuteTasks.length,
+      totalFiltered: scheduleTasks.length + minuteTasks.length
+    });
+
+    return { scheduleTasks, minuteTasks };
+  }, [tasksByProject, localMinutaTasks, dateRange, filterTasksByDateRange]);
+
+  // ✅ Obtener tareas vencidas (memoizado por proyecto)
+  const getOverdueTasks = useCallback((projectId) => {
+    const projectTasks = tasksByProject[projectId] || [];
+    const projectMinuteTasks = localMinutaTasks[projectId] || [];
+    
+    log('🔍 getOverdueTasks:', { projectId, today: today.toISOString().split('T')[0] });
+    
+    const scheduleTasks = filterOverdueTasks(projectTasks, false);
+    const minuteTasks = filterOverdueTasks(projectMinuteTasks, true);
+
+    log('✅ Tareas vencidas:', {
+      projectId,
+      scheduleTasks: scheduleTasks.length,
+      minuteTasks: minuteTasks.length
+    });
+
+    return { scheduleTasks, minuteTasks };
+  }, [tasksByProject, localMinutaTasks, today, filterOverdueTasks]);
+
+  // ============================================================================
+  // CÁLCULO DE CUMPLIMIENTO SEMANA PASADA
+  // ============================================================================
+
+  const calculatePreviousWeekCompliance = useCallback(async () => {
     const compliance = {
       totalTasks: 0,
       completedTasks: 0,
@@ -75,49 +253,46 @@ const WeeklyPlanningTab = ({
 
     for (const project of activeProjects) {
       const projectTasks = tasksByProject[project.id] || [];
-      const projectMinuteTasks = minutasByProject[project.id] || [];
+      const projectMinuteTasks = localMinutaTasks[project.id] || [];
       
-      // ✅ CORREGIDO: Filtrar tareas que VENCÍAN en la semana pasada
-      const previousWeekTasks = projectTasks.filter(task => {
-        const taskDate = new Date(task.endDate || task.startDate);
-        taskDate.setHours(0, 0, 0, 0);
-        return taskDate >= previousWeekRange.start && taskDate <= previousWeekRange.end;
-      });
-
-      const previousWeekMinuteTasks = projectMinuteTasks.filter(task => {
-        const taskDate = new Date(task.fecha);
-        taskDate.setHours(0, 0, 0, 0);
-        return taskDate >= previousWeekRange.start && taskDate <= previousWeekRange.end;
-      });
-
-      const allPreviousTasks = [...previousWeekTasks, ...previousWeekMinuteTasks];
+      // Tareas que vencían en la semana pasada
+      const previousWeekScheduleTasks = filterTasksByDateRange(
+        projectTasks, 
+        previousWeekRange.start, 
+        previousWeekRange.end
+      );
       
-      // ✅ CORREGIDO: Calcular correctamente completadas y pendientes
-      const completed = allPreviousTasks.filter(t => 
-        t.progress === 100 || t.estatus === 'Completado'
+      const previousWeekMinuteTasks = filterTasksByDateRange(
+        projectMinuteTasks, 
+        previousWeekRange.start, 
+        previousWeekRange.end, 
+        true
+      );
+
+      const allPreviousTasks = [...previousWeekScheduleTasks, ...previousWeekMinuteTasks];
+      
+      // Contar por estado
+      const completed = allPreviousTasks.filter((task, idx) => 
+        isTaskCompleted(task, idx >= previousWeekScheduleTasks.length)
       ).length;
       
-      const pending = allPreviousTasks.filter(t => 
-        t.progress < 100 && t.estatus !== 'Completado'
+      const pending = allPreviousTasks.filter((task, idx) => 
+        isTaskPending(task, idx >= previousWeekScheduleTasks.length)
       ).length;
       
-      // ✅ CORREGIDO: Tareas que vencieron en semana pasada y siguen pendientes HOY
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      
-      const overdue = allPreviousTasks.filter(t => {
-        const dueDate = new Date(t.endDate || t.fecha);
-        dueDate.setHours(0, 0, 0, 0);
-        const isPending = t.progress < 100 || t.estatus !== 'Completado';
-        return dueDate < today && isPending;
+      // Tareas que vencieron la semana pasada y SIGUEN pendientes hoy
+      const overdue = allPreviousTasks.filter((task, idx) => {
+        const isMinute = idx >= previousWeekScheduleTasks.length;
+        const dueDate = normalizeDate(isMinute ? task.fecha : (task.endDate || task.startDate));
+        return dueDate < today && isTaskPending(task, isMinute);
       }).length;
       
       compliance.byProject[project.id] = {
         projectName: project.name,
         total: allPreviousTasks.length,
-        completed: completed,
-        pending: pending,
-        overdue: overdue
+        completed,
+        pending,
+        overdue
       };
 
       compliance.totalTasks += allPreviousTasks.length;
@@ -127,307 +302,257 @@ const WeeklyPlanningTab = ({
     }
 
     return compliance;
-  };
+  }, [activeProjects, tasksByProject, localMinutaTasks, previousWeekRange, today, filterTasksByDateRange]);
 
-  // ✅ CORREGIDO: Obtener tareas que vencen DENTRO del rango seleccionado
-  const getCurrentWeekTasks = (projectId) => {
-    const projectTasks = tasksByProject[projectId] || [];
-    const projectMinuteTasks = minutasByProject[projectId] || [];
+  // ✅ Cargar datos con manejo de errores mejorado
+  const loadPreviousWeekData = useCallback(async () => {
+    setIsLoading(true);
+    // if (setError) setError(null); // Descomentar si usas error state
     
-    console.log('🔍 getCurrentWeekTasks - Filtrando tareas de la semana:', {
-      projectId,
-      dateRange: {
-        start: dateRange.start.toISOString().split('T')[0],
-        end: dateRange.end.toISOString().split('T')[0]
-      },
-      totalScheduleTasks: projectTasks.length,
-      totalMinuteTasks: projectMinuteTasks.length
-    });
-    
-    // Filtrar tareas del cronograma que vencen en la semana actual Y están pendientes
-    const currentWeekTasks = projectTasks.filter(task => {
-      const taskDate = normalizeDate(task.endDate || task.startDate);
-      
-      // Validar que la fecha sea válida
-      if (!taskDate) {
-        console.warn('⚠️ Fecha inválida en tarea de cronograma (semana actual):', task.name, task.endDate);
-        return false;
-      }
-      
-      const isInRange = taskDate >= dateRange.start && taskDate <= dateRange.end;
-      const isPending = task.progress < 100;
-      
-      if (isInRange && isPending) {
-        console.log('📋 Tarea de semana actual encontrada (cronograma):', {
-          name: task.name,
-          dueDate: taskDate.toISOString().split('T')[0],
-          progress: task.progress
+    try {
+      const complianceData = await calculatePreviousWeekCompliance();
+      setPreviousWeekData(complianceData);
+    } catch (err) {
+      console.error('Error cargando datos de la semana pasada:', err);
+      // if (setError) setError('No se pudieron cargar los datos de la semana anterior'); // Descomentar si usas error state
+    } finally {
+      setIsLoading(false);
+    }
+  }, [calculatePreviousWeekCompliance]);
+
+  // Efecto para cargar datos
+  useEffect(() => {
+    loadPreviousWeekData();
+  }, [loadPreviousWeekData]);
+
+  // ✅ Sincronizar estado con componente padre (para persistencia o estado global)
+  useEffect(() => {
+    if (setWeeklyPlanningData) {
+      setWeeklyPlanningData({ dateRange, previousWeekData });
+    }
+  }, [dateRange, previousWeekData, setWeeklyPlanningData]);
+
+  // ✅ NUEVO: Cargar minutas independientemente (replicando lógica de ProjectManagementTabs.js)
+  useEffect(() => {
+    const loadMinutasForAllProjects = async () => {
+      if (!projects || projects.length === 0) return;
+
+      setLoadingMinutas(true);
+      try {
+        log('🔍 WeeklyPlanningTab - Iniciando carga independiente de minutas para todos los proyectos activos');
+        
+        const minutasByProjectLocal = {};
+        
+        for (const project of activeProjects) {
+          try {
+            if (useSupabase) {
+              // Cargar desde Supabase si está habilitado
+              log(`🔍 Cargando minutas desde Supabase para proyecto: ${project.id}`);
+              const { default: supabaseService } = await import('../services/SupabaseService');
+              const { success, minutas } = await supabaseService.loadMinutasByProject(project.id);
+              if (success) {
+                minutasByProjectLocal[project.id] = minutas || [];
+                log(`✅ Minutas cargadas desde Supabase para ${project.name}: ${minutas?.length || 0}`);
+              } else {
+                log(`⚠️ Error cargando minutas desde Supabase para ${project.name}`);
+                minutasByProjectLocal[project.id] = [];
+              }
+            } else {
+              // Cargar desde portfolioData si está en modo local
+              const portfolioData = JSON.parse(localStorage.getItem('portfolioData') || '{}');
+              const minutasFromStorage = portfolioData.minutasByProject?.[project.id] || [];
+              minutasByProjectLocal[project.id] = minutasFromStorage;
+              log(`✅ Minutas cargadas desde localStorage para ${project.name}: ${minutasFromStorage.length}`);
+            }
+          } catch (error) {
+            console.error(`❌ Error cargando minutas para proyecto ${project.name}:`, error);
+            minutasByProjectLocal[project.id] = [];
+          }
+        }
+        
+        setLocalMinutaTasks(minutasByProjectLocal);
+        log('✅ WeeklyPlanningTab - Carga independiente de minutas completada:', {
+          totalProjects: activeProjects.length,
+          minutasByProject: Object.keys(minutasByProjectLocal).reduce((acc, key) => {
+            acc[key] = minutasByProjectLocal[key].length;
+            return acc;
+          }, {})
         });
+        
+      } catch (error) {
+        console.error('❌ Error general cargando minutas en WeeklyPlanningTab:', error);
+        setLocalMinutaTasks({});
+      } finally {
+        setLoadingMinutas(false);
       }
-      
-      return isInRange && isPending;
-    });
-
-    // Filtrar tareas de minutas que vencen en la semana actual Y están pendientes
-    const currentWeekMinuteTasks = projectMinuteTasks.filter(task => {
-      const taskDate = normalizeDate(task.fecha);
-      
-      // Validar que la fecha sea válida
-      if (!taskDate) {
-        console.warn('⚠️ Fecha inválida en tarea de minuta (semana actual):', task.tarea, task.fecha);
-        return false;
-      }
-      
-      const isInRange = taskDate >= dateRange.start && taskDate <= dateRange.end;
-      const estatus = (task.estatus || '').toLowerCase().trim();
-      const isPending = estatus !== 'completado' && estatus !== 'completada';
-      
-      if (isInRange && isPending) {
-        console.log('📋 Tarea de semana actual encontrada (minuta):', {
-          name: task.tarea,
-          dueDate: taskDate.toISOString().split('T')[0],
-          estatus: task.estatus
-        });
-      }
-      
-      return isInRange && isPending;
-    });
-
-    console.log('✅ getCurrentWeekTasks - Resultado:', {
-      projectId,
-      currentWeekTasks: currentWeekTasks.length,
-      currentWeekMinuteTasks: currentWeekMinuteTasks.length,
-      totalCurrentWeek: currentWeekTasks.length + currentWeekMinuteTasks.length
-    });
-
-    return {
-      scheduleTasks: currentWeekTasks,
-      minuteTasks: currentWeekMinuteTasks
     };
-  };
 
-  const getOverdueTasks = (projectId) => {
-    const projectTasks = tasksByProject[projectId] || [];
-    const projectMinuteTasks = minutasByProject[projectId] || [];
-    
-    // ✅ CORREGIDO: Usar fecha actual en lugar del inicio del rango
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    console.log('🔍 getOverdueTasks - Filtrando tareas vencidas:', {
-      projectId,
-      today: today.toISOString().split('T')[0],
-      totalScheduleTasks: projectTasks.length,
-      totalMinuteTasks: projectMinuteTasks.length
-    });
-    
-    // Tareas del cronograma vencidas
-    const overdueScheduleTasks = projectTasks.filter(task => {
-      const dueDate = normalizeDate(task.endDate || task.startDate);
-      
-      // Validar que la fecha sea válida
-      if (!dueDate) {
-        console.warn('⚠️ Fecha inválida en tarea de cronograma:', task.name, task.endDate);
-        return false;
-      }
-      
-      const isOverdue = dueDate < today;
-      const isPending = task.progress < 100;
-      
-      if (isOverdue && isPending) {
-        console.log('📋 Tarea vencida encontrada (cronograma):', {
-          name: task.name,
-          dueDate: dueDate.toISOString().split('T')[0],
-          progress: task.progress
-        });
-      }
-      
-      return isOverdue && isPending;
-    });
+    loadMinutasForAllProjects();
+  }, [projects, activeProjects, useSupabase]); // ✅ Dependencias correctas
 
-    // Minutas vencidas
-    const overdueMinuteTasks = projectMinuteTasks.filter(task => {
-      const dueDate = normalizeDate(task.fecha);
-      
-      // Validar que la fecha sea válida
-      if (!dueDate) {
-        console.warn('⚠️ Fecha inválida en tarea de minuta:', task.tarea, task.fecha);
-        return false;
-      }
-      
-      // Verificar estatus de forma case-insensitive
-      const estatus = (task.estatus || '').toLowerCase().trim();
-      const isPending = estatus !== 'completado' && estatus !== 'completada';
-      const isOverdue = dueDate < today;
-      
-      if (isOverdue && isPending) {
-        console.log('📋 Tarea vencida encontrada (minuta):', {
-          name: task.tarea,
-          dueDate: dueDate.toISOString().split('T')[0],
-          estatus: task.estatus
-        });
-      }
-      
-      return isOverdue && isPending;
-    });
-
-    console.log('✅ getOverdueTasks - Resultado:', {
-      projectId,
-      overdueScheduleTasks: overdueScheduleTasks.length,
-      overdueMinuteTasks: overdueMinuteTasks.length,
-      totalOverdue: overdueScheduleTasks.length + overdueMinuteTasks.length
-    });
-
-    return {
-      scheduleTasks: overdueScheduleTasks,
-      minuteTasks: overdueMinuteTasks
-    };
-  };
-
-  const formatDate = (date) => {
-    return new Date(date).toLocaleDateString('es-ES', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
-  };
+  // ============================================================================
+  // FUNCIONES AUXILIARES
+  // ============================================================================
 
   const getCompletionPercentage = () => {
-    if (previousWeekData?.totalTasks === 0) return 0;
-    return Math.round((previousWeekData?.completedTasks / previousWeekData?.totalTasks) * 100);
+    if (!previousWeekData || previousWeekData.totalTasks === 0) return 0;
+    return Math.round((previousWeekData.completedTasks / previousWeekData.totalTasks) * 100);
   };
 
-  // Función para exportar a PDF
-  const exportToPDF = () => {
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    let yPosition = 20;
+  // ✅ Exportar PDF con manejo de errores
+  const exportToPDF = useCallback(() => {
+    try {
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      let yPosition = 20;
 
-    // Título del documento
-    doc.setFontSize(20);
-    doc.setFont(undefined, 'bold');
-    doc.text('Planificación Semanal', pageWidth / 2, yPosition, { align: 'center' });
-    yPosition += 10;
+      // Título
+      doc.setFontSize(20);
+      doc.setFont(undefined, 'bold');
+      doc.text('Planificación Semanal', pageWidth / 2, yPosition, { align: 'center' });
+      yPosition += 10;
 
-    // Fechas
-    doc.setFontSize(12);
-    doc.setFont(undefined, 'normal');
-    doc.text(`Período: ${formatDate(dateRange.start)} - ${formatDate(dateRange.end)}`, pageWidth / 2, yPosition, { align: 'center' });
-    yPosition += 20;
+      // Fechas
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'normal');
+      doc.text(`Período: ${formatDate(dateRange.start)} - ${formatDate(dateRange.end)}`, pageWidth / 2, yPosition, { align: 'center' });
+      yPosition += 20;
 
-    // Resumen de cumplimiento semana pasada
-    if (previousWeekData) {
+      // Resumen semana pasada
+      if (previousWeekData) {
+        doc.setFontSize(14);
+        doc.setFont(undefined, 'bold');
+        doc.text('Resumen Semana Pasada', 20, yPosition);
+        yPosition += 10;
+
+        doc.setFontSize(10);
+        doc.setFont(undefined, 'normal');
+        doc.text(`Tareas Completadas: ${previousWeekData.completedTasks}`, 20, yPosition);
+        yPosition += 5;
+        doc.text(`Tareas Pendientes: ${previousWeekData.pendingTasks}`, 20, yPosition);
+        yPosition += 5;
+        doc.text(`Tareas Vencidas: ${previousWeekData.overdueTasks}`, 20, yPosition);
+        yPosition += 5;
+        doc.text(`Cumplimiento: ${getCompletionPercentage()}%`, 20, yPosition);
+        yPosition += 15;
+      }
+
+      // Tareas por proyecto
       doc.setFontSize(14);
       doc.setFont(undefined, 'bold');
-      doc.text('Resumen Semana Pasada', 20, yPosition);
-      yPosition += 10;
-
-      doc.setFontSize(10);
-      doc.setFont(undefined, 'normal');
-      doc.text(`Tareas Completadas: ${previousWeekData.completedTasks}`, 20, yPosition);
-      yPosition += 5;
-      doc.text(`Tareas Pendientes: ${previousWeekData.pendingTasks}`, 20, yPosition);
-      yPosition += 5;
-      doc.text(`Tareas Vencidas: ${previousWeekData.overdueTasks}`, 20, yPosition);
-      yPosition += 5;
-      doc.text(`Cumplimiento: ${getCompletionPercentage()}%`, 20, yPosition);
+      doc.text('Tareas de la Semana Actual', 20, yPosition);
       yPosition += 15;
-    }
 
-    // Tareas por proyecto
-    doc.setFontSize(14);
-    doc.setFont(undefined, 'bold');
-    doc.text('Tareas de la Semana Actual', 20, yPosition);
-    yPosition += 15;
+      activeProjects.forEach((project) => {
+        const currentTasks = getCurrentWeekTasks(project.id);
+        const overdueTasks = getOverdueTasks(project.id);
+        
+        const allTasks = [
+          ...overdueTasks.scheduleTasks.map(t => ({ ...t, type: 'Cronograma', isOverdue: true })),
+          ...overdueTasks.minuteTasks.map(t => ({ 
+            ...t, 
+            type: 'Minuta', 
+            name: t.tarea, 
+            description: t.responsable, 
+            endDate: t.fecha, 
+            isOverdue: true 
+          })),
+          ...currentTasks.scheduleTasks.map(t => ({ ...t, type: 'Cronograma', isOverdue: false })),
+          ...currentTasks.minuteTasks.map(t => ({ 
+            ...t, 
+            type: 'Minuta', 
+            name: t.tarea, 
+            description: t.responsable, 
+            endDate: t.fecha, 
+            isOverdue: false 
+          }))
+        ];
 
-    activeProjects.forEach((project) => {
-      const currentTasks = getCurrentWeekTasks(project.id);
-      const overdueTasks = getOverdueTasks(project.id);
-      
-      const allTasks = [
-        ...currentTasks.scheduleTasks.map(t => ({ ...t, type: 'Cronograma' })),
-        ...currentTasks.minuteTasks.map(t => ({ ...t, type: 'Minuta', name: t.tarea, description: t.responsable, endDate: t.fecha })),
-        ...overdueTasks.scheduleTasks.map(t => ({ ...t, type: 'Cronograma', isOverdue: true })),
-        ...overdueTasks.minuteTasks.map(t => ({ ...t, type: 'Minuta', name: t.tarea, description: t.responsable, endDate: t.fecha, isOverdue: true }))
-      ];
+        if (allTasks.length === 0) return;
 
-      if (allTasks.length === 0) return;
+        // Nueva página si es necesario
+        if (yPosition > pageHeight - 60) {
+          doc.addPage();
+          yPosition = 20;
+        }
 
-      // Verificar si necesitamos una nueva página
-      if (yPosition > pageHeight - 60) {
-        doc.addPage();
-        yPosition = 20;
-      }
-
-      // Nombre del proyecto
-      doc.setFontSize(12);
-      doc.setFont(undefined, 'bold');
-      doc.text(`${project.name}`, 20, yPosition);
-      yPosition += 8;
-
-      // Tareas vencidas
-      const overdueTasksList = allTasks.filter(t => t.isOverdue);
-      if (overdueTasksList.length > 0) {
-        doc.setFontSize(10);
+        // Nombre del proyecto
+        doc.setFontSize(12);
         doc.setFont(undefined, 'bold');
-        doc.setTextColor(220, 38, 38); // Rojo
-        doc.text('Tareas Vencidas:', 25, yPosition);
-        yPosition += 6;
+        doc.text(`${project.name}`, 20, yPosition);
+        yPosition += 8;
 
-        overdueTasksList.forEach((task) => {
-          if (yPosition > pageHeight - 20) {
-            doc.addPage();
-            yPosition = 20;
-          }
-          
-          doc.setFontSize(9);
-          doc.setFont(undefined, 'normal');
-          doc.setTextColor(0, 0, 0); // Negro
-          doc.text(`• ${task.name} (${task.type})`, 30, yPosition);
-          yPosition += 4;
-          doc.text(`  Vence: ${formatDate(task.endDate)}`, 30, yPosition);
-          yPosition += 4;
-        });
-        yPosition += 5;
-      }
+        // Tareas vencidas
+        const overdueList = allTasks.filter(t => t.isOverdue);
+        if (overdueList.length > 0) {
+          doc.setFontSize(10);
+          doc.setFont(undefined, 'bold');
+          doc.setTextColor(220, 38, 38);
+          doc.text('Tareas Vencidas:', 25, yPosition);
+          yPosition += 6;
 
-      // Tareas de la semana
-      const currentWeekTasksList = allTasks.filter(t => !t.isOverdue);
-      if (currentWeekTasksList.length > 0) {
-        doc.setFontSize(10);
-        doc.setFont(undefined, 'bold');
-        doc.setTextColor(59, 130, 246); // Azul
-        doc.text('Tareas de la Semana:', 25, yPosition);
-        yPosition += 6;
-
-        currentWeekTasksList.forEach((task) => {
-          if (yPosition > pageHeight - 20) {
-            doc.addPage();
-            yPosition = 20;
-          }
-          
-          doc.setFontSize(9);
-          doc.setFont(undefined, 'normal');
-          doc.setTextColor(0, 0, 0); // Negro
-          doc.text(`• ${task.name} (${task.type})`, 30, yPosition);
-          yPosition += 4;
-          doc.text(`  Vence: ${formatDate(task.endDate)}`, 30, yPosition);
-          if (task.description) {
-            doc.text(`  Responsable: ${task.description}`, 30, yPosition);
+          overdueList.forEach((task) => {
+            if (yPosition > pageHeight - 20) {
+              doc.addPage();
+              yPosition = 20;
+            }
+            
+            doc.setFontSize(9);
+            doc.setFont(undefined, 'normal');
+            doc.setTextColor(0, 0, 0);
+            doc.text(`• ${task.name} (${task.type})`, 30, yPosition);
             yPosition += 4;
-          }
-          yPosition += 4;
-        });
-      }
+            doc.text(`  Vence: ${formatDate(task.endDate)}`, 30, yPosition);
+            yPosition += 4;
+          });
+          yPosition += 5;
+        }
 
-      yPosition += 10;
-    });
+        // Tareas de la semana
+        const currentList = allTasks.filter(t => !t.isOverdue);
+        if (currentList.length > 0) {
+          doc.setFontSize(10);
+          doc.setFont(undefined, 'bold');
+          doc.setTextColor(59, 130, 246);
+          doc.text('Tareas de la Semana:', 25, yPosition);
+          yPosition += 6;
 
-    // Guardar el PDF
-    const fileName = `Planificacion_Semanal_${formatDate(dateRange.start).replace(/\//g, '-')}_${formatDate(dateRange.end).replace(/\//g, '-')}.pdf`;
-    doc.save(fileName);
-  };
+          currentList.forEach((task) => {
+            if (yPosition > pageHeight - 20) {
+              doc.addPage();
+              yPosition = 20;
+            }
+            
+            doc.setFontSize(9);
+            doc.setFont(undefined, 'normal');
+            doc.setTextColor(0, 0, 0);
+            doc.text(`• ${task.name} (${task.type})`, 30, yPosition);
+            yPosition += 4;
+            doc.text(`  Vence: ${formatDate(task.endDate)}`, 30, yPosition);
+            if (task.description) {
+              yPosition += 4;
+              doc.text(`  Responsable: ${task.description}`, 30, yPosition);
+            }
+            yPosition += 4;
+          });
+        }
+
+        yPosition += 10;
+      });
+
+      // Guardar
+      const fileName = `Planificacion_Semanal_${formatDate(dateRange.start).replace(/\//g, '-')}_${formatDate(dateRange.end).replace(/\//g, '-')}.pdf`;
+      doc.save(fileName);
+    } catch (err) {
+      console.error('Error al exportar PDF:', err);
+      alert('Error al generar el PDF. Por favor intenta de nuevo.');
+    }
+  }, [dateRange, previousWeekData, activeProjects, getCurrentWeekTasks, getOverdueTasks]);
+
+  // ============================================================================
+  // RENDER
+  // ============================================================================
 
   return (
     <div className="weekly-planning-tab bg-gray-50 min-h-screen p-6">
@@ -459,7 +584,8 @@ const WeeklyPlanningTab = ({
             </div>
             <button
               onClick={exportToPDF}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              // disabled={isLoading} // ✅ OPCIONAL: Descomentar para deshabilitar durante carga
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Download className="w-4 h-4" />
               Exportar PDF
@@ -468,8 +594,24 @@ const WeeklyPlanningTab = ({
         </div>
       </div>
 
+      {/* ✅ OPCIONAL: Indicador de carga - Descomenta si quieres mostrar loading */}
+      {/* {isLoading && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 flex items-center gap-3">
+          <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+          <span className="text-blue-800">Cargando datos de la semana...</span>
+        </div>
+      )} */}
+
+      {/* ✅ OPCIONAL: Manejo de errores - Descomenta si agregas el estado 'error' */}
+      {/* {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 flex items-center gap-3">
+          <AlertCircle className="w-5 h-5 text-red-600" />
+          <span className="text-red-800">{error}</span>
+        </div>
+      )} */}
+
       {/* Resumen de Cumplimiento Semana Pasada */}
-      {previousWeekData && (
+      {previousWeekData && !isLoading && (
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
             <TrendingUp className="mr-2 h-5 w-5 text-green-600" />
@@ -538,7 +680,6 @@ const WeeklyPlanningTab = ({
         </div>
       )}
 
-
       {/* Lista de Tareas por Proyecto */}
       <div className="space-y-6">
         <div className="bg-white rounded-lg shadow-sm p-6">
@@ -557,7 +698,6 @@ const WeeklyPlanningTab = ({
               const totalTasks = currentTasks.scheduleTasks.length + currentTasks.minuteTasks.length + 
                                overdueTasks.scheduleTasks.length + overdueTasks.minuteTasks.length;
               
-              // Mostrar el proyecto si tiene tareas vencidas O tareas de la semana actual
               if (totalTasks === 0) return null;
               
               return (
@@ -576,24 +716,31 @@ const WeeklyPlanningTab = ({
   );
 };
 
-// Componente para mostrar las tareas del proyecto en formato de lista
-const ProjectTasksList = ({ project, currentTasks, overdueTasks: overdueTasksParam }) => {
-  // Función para formatear fechas
-  const formatDate = (date) => {
-    if (!date) return 'N/A';
-    return new Date(date).toLocaleDateString('es-ES', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
-  };
-  
-  const allTasks = [
-    ...overdueTasksParam.scheduleTasks.map(t => ({ ...t, type: 'Cronograma', isOverdue: true })),
-    ...overdueTasksParam.minuteTasks.map(t => ({ ...t, type: 'Minuta', name: t.tarea, description: t.responsable, endDate: t.fecha, isOverdue: true })),
+// ============================================================================
+// COMPONENTE DE LISTA DE TAREAS DEL PROYECTO
+// ============================================================================
+
+const ProjectTasksList = React.memo(({ project, currentTasks, overdueTasks }) => {
+  const allTasks = useMemo(() => [
+    ...overdueTasks.scheduleTasks.map(t => ({ ...t, type: 'Cronograma', isOverdue: true })),
+    ...overdueTasks.minuteTasks.map(t => ({ 
+      ...t, 
+      type: 'Minuta', 
+      name: t.tarea, 
+      description: t.responsable, 
+      endDate: t.fecha, 
+      isOverdue: true 
+    })),
     ...currentTasks.scheduleTasks.map(t => ({ ...t, type: 'Cronograma', isOverdue: false })),
-    ...currentTasks.minuteTasks.map(t => ({ ...t, type: 'Minuta', name: t.tarea, description: t.responsable, endDate: t.fecha, isOverdue: false }))
-  ];
+    ...currentTasks.minuteTasks.map(t => ({ 
+      ...t, 
+      type: 'Minuta', 
+      name: t.tarea, 
+      description: t.responsable, 
+      endDate: t.fecha, 
+      isOverdue: false 
+    }))
+  ], [currentTasks, overdueTasks]);
 
   if (allTasks.length === 0) {
     return (
@@ -604,7 +751,7 @@ const ProjectTasksList = ({ project, currentTasks, overdueTasks: overdueTasksPar
     );
   }
 
-  const overdueTasks = allTasks.filter(t => t.isOverdue);
+  const overdueList = allTasks.filter(t => t.isOverdue);
   const currentWeekTasks = allTasks.filter(t => !t.isOverdue);
 
   return (
@@ -622,39 +769,15 @@ const ProjectTasksList = ({ project, currentTasks, overdueTasks: overdueTasksPar
 
       <div className="divide-y divide-gray-200">
         {/* Tareas vencidas */}
-        {overdueTasks.length > 0 && (
+        {overdueList.length > 0 && (
           <div className="p-6 bg-red-50">
             <h5 className="text-md font-semibold text-red-800 mb-4 flex items-center">
               <AlertCircle className="w-4 h-4 mr-2" />
-              Tareas Vencidas ({overdueTasks.length})
+              Tareas Vencidas ({overdueList.length})
             </h5>
             <div className="space-y-3">
-              {overdueTasks.map((task, index) => (
-                <div key={index} className="bg-white p-4 rounded-lg border border-red-200">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h6 className="font-medium text-gray-900 mb-1">{task.name}</h6>
-                      <p className="text-sm text-gray-600 mb-2">{task.description}</p>
-                      <div className="flex items-center space-x-4 text-xs text-gray-500">
-                        <span className="flex items-center">
-                          <Calendar className="w-3 h-3 mr-1" />
-                          Vence: {formatDate(task.endDate)}
-                        </span>
-                        <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs">
-                          {task.type}
-                        </span>
-                        {task.priority && (
-                          <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs">
-                            {task.priority}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <span className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full font-medium">
-                      Vencida
-                    </span>
-                  </div>
-                </div>
+              {overdueList.map((task, index) => (
+                <TaskCard key={`overdue-${index}`} task={task} isOverdue={true} />
               ))}
             </div>
           </div>
@@ -669,31 +792,7 @@ const ProjectTasksList = ({ project, currentTasks, overdueTasks: overdueTasksPar
             </h5>
             <div className="space-y-3">
               {currentWeekTasks.map((task, index) => (
-                <div key={index} className="bg-white p-4 rounded-lg border border-gray-200 hover:border-blue-300 transition-colors">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h6 className="font-medium text-gray-900 mb-1">{task.name}</h6>
-                      <p className="text-sm text-gray-600 mb-2">{task.description}</p>
-                      <div className="flex items-center space-x-4 text-xs text-gray-500">
-                        <span className="flex items-center">
-                          <Calendar className="w-3 h-3 mr-1" />
-                          Vence: {formatDate(task.endDate)}
-                        </span>
-                        <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
-                          {task.type}
-                        </span>
-                        {task.priority && (
-                          <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs">
-                            {task.priority}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-full font-medium">
-                      Pendiente
-                    </span>
-                  </div>
-                </div>
+                <TaskCard key={`current-${index}`} task={task} isOverdue={false} />
               ))}
             </div>
           </div>
@@ -701,25 +800,50 @@ const ProjectTasksList = ({ project, currentTasks, overdueTasks: overdueTasksPar
       </div>
     </div>
   );
-};
+});
 
-// Funciones auxiliares
-const getStartOfWeek = (date) => {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Ajustar para que lunes sea el primer día
-  d.setDate(diff);
-  d.setHours(0, 0, 0, 0);
-  return d;
-};
+// ✅ Componente reutilizable para tarjetas de tareas
+const TaskCard = React.memo(({ task, isOverdue }) => (
+  <div className={`bg-white p-4 rounded-lg border ${
+    isOverdue ? 'border-red-200' : 'border-gray-200 hover:border-blue-300'
+  } transition-colors`}>
+    <div className="flex items-start justify-between">
+      <div className="flex-1">
+        <h6 className="font-medium text-gray-900 mb-1">{task.name}</h6>
+        {task.description && (
+          <p className="text-sm text-gray-600 mb-2">{task.description}</p>
+        )}
+        <div className="flex items-center space-x-4 text-xs text-gray-500">
+          <span className="flex items-center">
+            <Calendar className="w-3 h-3 mr-1" />
+            Vence: {formatDate(task.endDate)}
+          </span>
+          <span className={`px-2 py-1 rounded-full text-xs ${
+            task.type === 'Cronograma' 
+              ? 'bg-blue-100 text-blue-800' 
+              : 'bg-purple-100 text-purple-800'
+          }`}>
+            {task.type}
+          </span>
+          {task.priority && (
+            <span className="px-2 py-1 bg-orange-100 text-orange-800 rounded-full text-xs">
+              {task.priority}
+            </span>
+          )}
+        </div>
+      </div>
+      <span className={`px-2 py-1 text-xs rounded-full font-medium ${
+        isOverdue 
+          ? 'bg-red-100 text-red-800' 
+          : 'bg-green-100 text-green-800'
+      }`}>
+        {isOverdue ? 'Vencida' : 'Pendiente'}
+      </span>
+    </div>
+  </div>
+));
 
-const getEndOfWeek = (date) => {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1) + 6; // Domingo de la misma semana
-  d.setDate(diff);
-  d.setHours(23, 59, 59, 999);
-  return d;
-};
+ProjectTasksList.displayName = 'ProjectTasksList';
+TaskCard.displayName = 'TaskCard';
 
 export default WeeklyPlanningTab;

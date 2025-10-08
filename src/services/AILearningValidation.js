@@ -1,6 +1,8 @@
 // =====================================================
+// DEPRECATED - no se usa en v1.0
 // AI LEARNING VALIDATION SERVICE
 // Servicio para validaciones y fallbacks de seguridad
+// Este archivo será eliminado en futuras versiones
 // =====================================================
 
 class AILearningValidation {

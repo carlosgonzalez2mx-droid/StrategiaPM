@@ -232,6 +232,12 @@ const ProjectManagementTabs = ({
           const portfolioData = JSON.parse(localStorage.getItem('portfolioData') || '{}');
           const minutasFromStorage = portfolioData.minutasByProject?.[currentProjectId] || [];
           setMinutaTasks(minutasFromStorage);
+          
+          // ✅ CORRECCIÓN: Actualizar el estado global minutasByProject
+          if (updateProjectMinutas) {
+            updateProjectMinutas(currentProjectId, minutasFromStorage);
+          }
+          
           console.log(`✅ Minutas cargadas desde localStorage: ${minutasFromStorage.length}`);
         }
       } catch (error) {
