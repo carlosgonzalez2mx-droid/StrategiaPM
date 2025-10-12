@@ -1698,13 +1698,9 @@ function MainApp() {
   const [showHelp, setShowHelp] = useState(false);
   // Función para determinar la sección inicial basada en permisos
   const getInitialSection = () => {
-    // Si es usuario de solo lectura, iniciar en 'executive' (Dashboard Ejecutivo)
-    if (isReadOnly()) {
-      console.log('🔍 Usuario de solo lectura detectado, iniciando en Dashboard Ejecutivo');
-      return 'executive';
-    }
-    // Si es usuario normal, iniciar en 'portfolio' (comportamiento actual)
-    console.log('🔍 Usuario con permisos completos, iniciando en Portafolio');
+    // Usuarios de solo lectura: iniciar en 'executive' (Dashboard Ejecutivo)
+    // Usuarios normales: iniciar en 'portfolio' (comportamiento por defecto)
+    // La redirección automática se maneja en el useEffect
     return 'portfolio';
   };
 
@@ -1731,16 +1727,12 @@ function MainApp() {
         permissionsLoading
       });
       
-      // Si es usuario de solo lectura y está en una sección restringida, redirigir
+      // Solo redirigir usuarios de solo lectura desde secciones restringidas
       if (isReadOnlyUser && (currentSection === 'portfolio' || currentSection === 'user-management')) {
         console.log('🔄 Redirigiendo usuario de solo lectura de', currentSection, 'a Dashboard Ejecutivo');
         setActiveSection('executive');
       }
-      // Si es usuario normal y está en 'executive' (caso edge), redirigir a 'portfolio'
-      else if (!isReadOnlyUser && currentSection === 'executive' && userRole !== 'organization_member_read') {
-        console.log('🔄 Redirigiendo usuario con permisos completos de executive a Portafolio');
-        setActiveSection('portfolio');
-      }
+      // NOTA: Usuarios con permisos completos tienen navegación libre - NO redirigir
     }
   }, [permissionsLoading, userRole, isReadOnly, activeSection]);
 
