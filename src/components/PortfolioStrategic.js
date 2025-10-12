@@ -3,6 +3,7 @@ import PortfolioDashboard from './PortfolioDashboard';
 import ResourceList from './ResourceList';
 import ProjectArchive from './ProjectArchive';
 import WeeklyPlanningTab from './WeeklyPlanningTab';
+import NotificationBadge from './notifications/NotificationBadge';
 
 // Componente helper para mostrar errores
 const ErrorMessage = ({ error }) => {
@@ -500,13 +501,18 @@ const PortfolioStrategic = ({
         <div className="absolute bottom-0 left-0 w-24 h-24 bg-indigo-100/30 rounded-full translate-y-12 -translate-x-12"></div>
         
         <div className="relative z-10">
-          <div className="flex items-center">
-            <div className="bg-white/60 backdrop-blur rounded-2xl p-3 mr-4 shadow-sm">
-              <span className="text-3xl">🏢</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <div className="bg-white/60 backdrop-blur rounded-2xl p-3 mr-4 shadow-sm">
+                <span className="text-3xl">🏢</span>
+              </div>
+              <div>
+                <h1 className="text-4xl font-bold mb-2 text-gray-800">Portafolio de Proyectos</h1>
+                <p className="text-gray-600 text-lg">Gestión estratégica y configuración de proyectos</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-4xl font-bold mb-2 text-gray-800">Portafolio de Proyectos</h1>
-              <p className="text-gray-600 text-lg">Gestión estratégica y configuración de proyectos</p>
+            <div className="flex items-center">
+              <NotificationBadge />
             </div>
           </div>
         </div>

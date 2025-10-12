@@ -924,8 +924,18 @@ function MainApp() {
             const savedData = await supabaseService.loadPortfolioData();
             console.log('🔍 Resultado de loadPortfolioData():', savedData);
             
-            if (savedData) {
+            if (!savedData || !savedData.organization) {
+              console.warn('⚠️ No se pudieron cargar datos desde Supabase');
+              console.warn('⚠️ Continuando con datos locales...');
+              // Usar fallback a IndexedDB/localStorage
+              setUseSupabase(false);
+            } else {
               console.log('📂 Datos encontrados en Supabase, cargando...');
+              
+              // Usar datos de Supabase
+              if (savedData.organization) {
+                console.log('✅ Datos sincronizados desde Supabase');
+              }
               if (savedData.projects && Array.isArray(savedData.projects) && savedData.projects.length > 0) {
                 console.log('📂 Cargando proyectos desde Supabase:', savedData.projects.length);
                 setProjects(savedData.projects);

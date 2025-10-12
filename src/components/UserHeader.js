@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { ROLE_PERMISSIONS } from '../contexts/AuthContext';
+import NotificationBadge from './notifications/NotificationBadge';
 
 const UserHeader = () => {
   const { user, logout, clearAuthState, getUserRoleInfo } = useAuth();
@@ -30,14 +31,7 @@ const UserHeader = () => {
         {/* Información del Usuario */}
         <div className="flex items-center space-x-4">
           {/* Notificaciones */}
-          <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors">
-            <div className="relative">
-              <span className="text-xl">🔔</span>
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
-                3
-              </span>
-            </div>
-          </button>
+          <NotificationBadge />
 
           {/* Perfil del Usuario */}
           <div className="relative">

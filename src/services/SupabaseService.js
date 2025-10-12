@@ -63,7 +63,7 @@ class SupabaseService {
     try {
       console.log('🔍 Detectando organización para:', emailToUse);
       
-      // Query optimizado que usa las nuevas políticas RLS
+      // Query que aprovecha las políticas RLS corregidas
       const { data: membership, error } = await this.supabase
         .from('organization_members')
         .select(`
@@ -71,7 +71,7 @@ class SupabaseService {
           organization_id,
           role,
           status,
-          organizations!inner (
+          organizations (
             id,
             name,
             owner_id,
@@ -84,11 +84,8 @@ class SupabaseService {
       
       if (error) {
         console.error('❌ Error buscando membresía:', error);
-        console.error('Detalles del error:', {
-          code: error.code,
-          message: error.message,
-          details: error.details
-        });
+        console.error('Código de error:', error.code);
+        console.error('Mensaje:', error.message);
         return null;
       }
       
@@ -448,7 +445,7 @@ class SupabaseService {
       
       if (!organization) {
         console.error('❌ No se pudo detectar organización para el usuario:', user.email);
-        console.error('💡 Verifica que el usuario tenga una membresía activa');
+        console.error('💡 El usuario debe tener una membresía activa en una organización');
         return null;
       }
 

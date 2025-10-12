@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import OrganizationMembers from './OrganizationMembers';
+import ChangeFlowDiagram from './change-management/ChangeFlowDiagram';
 
 const UserManagement = ({ 
   currentProject, 
@@ -27,7 +28,8 @@ const UserManagement = ({
   const tabs = [
     { id: 'members', name: 'Miembros', icon: '👥', description: 'Gestionar usuarios y roles' },
     { id: 'roles', name: 'Roles', icon: '🔐', description: 'Configurar permisos y accesos' },
-    { id: 'invitations', name: 'Invitaciones', icon: '📧', description: 'Ver invitaciones pendientes' }
+    { id: 'invitations', name: 'Invitaciones', icon: '📧', description: 'Ver invitaciones pendientes' },
+    { id: 'process', name: 'Proceso de Cambios', icon: '🔄', description: 'Flujo del control de cambios' }
   ];
 
   const getRoleDescription = (role) => {
@@ -270,6 +272,38 @@ const UserManagement = ({
                       ⚠️ En desarrollo local - Usa el enlace de producción para compartir
                     </p>
                   )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Tab: Proceso de Cambios */}
+          {activeTab === 'process' && (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                  🔄 Proceso de Control de Cambios
+                </h3>
+                <p className="text-gray-600 mb-6">
+                  Este diagrama muestra cómo participan los roles funcionales en el proceso de gestión de cambios. 
+                  Úsalo como referencia al asignar roles a los miembros de tu organización.
+                </p>
+              </div>
+              
+              <ChangeFlowDiagram />
+              
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-6">
+                <div className="flex items-start">
+                  <span className="text-yellow-600 text-xl mr-3">💡</span>
+                  <div>
+                    <h4 className="font-semibold text-yellow-800 mb-2">
+                      Tip: Asigna Roles Estratégicamente
+                    </h4>
+                    <p className="text-sm text-yellow-700">
+                      Al asignar roles funcionales a tus miembros, considera el nivel de autoridad que necesitan en el control de cambios. 
+                      Por ejemplo, un Project Manager puede aprobar cambios hasta $25K, mientras que un Sponsor puede aprobar hasta $100K.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>

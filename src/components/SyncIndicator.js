@@ -53,7 +53,7 @@ const SyncIndicator = ({ useSupabase, supabaseInitialized, isAuthenticated }) =>
   if (!showIndicator && !isSyncing && !isSaving && !showSupabaseStatus) return null;
 
   return (
-    <div className="fixed top-4 right-4 z-50 space-y-2">
+    <div className="fixed bottom-4 left-4 z-50 space-y-2">
       {/* Indicador de Guardado */}
       {isSaving && (
         <div className="flex items-center space-x-2 px-4 py-2 rounded-lg shadow-lg bg-orange-500 text-white transition-all duration-300">

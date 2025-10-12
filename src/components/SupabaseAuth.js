@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import supabaseService from '../services/SupabaseService';
+import { useAuth } from '../contexts/AuthContext';
 
 const SupabaseAuth = ({ onAuthSuccess, onAuthCancel }) => {
+  const { login, register, loading: authLoading } = useAuth();
+  
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -26,62 +28,70 @@ const SupabaseAuth = ({ onAuthSuccess, onAuthCancel }) => {
       let result;
       
       if (isLogin) {
-        // Iniciar sesión
-        result = await supabaseService.signIn(email, password);
-        if (result.success) {
-          // Verificar si se activaron invitaciones durante el login
-          const activationResult = result.invitationActivation;
+        // 🔐 INICIAR SESIÓN
+        console.log('🔐 Iniciando sesión con AuthContext...');
+        
+        try {
+          result = await login(email, password);
           
-          if (activationResult && activationResult.activated > 0) {
-            const orgNames = activationResult.organizations.map(org => org.name).join(', ');
-            setSuccess(`¡Sesión iniciada exitosamente! 🎉
-
-¡Nuevas invitaciones activadas!
-Ahora tienes acceso a: ${orgNames}`);
-            setTimeout(() => {
-              onAuthSuccess && onAuthSuccess(result.user);
-            }, 3000);
-          } else {
-            setSuccess('¡Sesión iniciada exitosamente!');
+          if (result && result.success) {
+            setSuccess('¡Sesión iniciada exitosamente! 🎉');
+            
+            // Esperar un momento para mostrar el mensaje
             setTimeout(() => {
               onAuthSuccess && onAuthSuccess(result.user);
             }, 1000);
+          } else {
+            setError('Error al iniciar sesión. Verifica tus credenciales.');
           }
-        } else {
-          setError(result.error || 'Error al iniciar sesión');
+        } catch (err) {
+          console.error('❌ Error en login:', err);
+          setError(err.message || 'Error al iniciar sesión');
         }
       } else {
-        // Registrarse
+        // 📝 REGISTRARSE
+        console.log('📝 Registrando usuario con AuthContext...');
+        
         if (!name.trim()) {
           setError('El nombre es requerido');
           setLoading(false);
           return;
         }
         
-        result = await supabaseService.signUp(email, password, name);
-        if (result.success) {
-          // Verificar si se activaron invitaciones
-          const activationResult = result.invitationActivation;
+        try {
+          result = await register(email, password, name);
           
-          if (activationResult && activationResult.activated > 0) {
-            const orgNames = activationResult.organizations.map(org => org.name).join(', ');
-            setSuccess(`¡Cuenta creada exitosamente! 🎉
+          if (result && result.success) {
+            // Verificar si se activaron invitaciones
+            const activationResult = result.invitationActivation;
             
+            if (activationResult && activationResult.activated > 0) {
+              const orgNames = activationResult.organizations.map(org => org.name).join(', ');
+              setSuccess(`¡Cuenta creada exitosamente! 🎉
+
 Has sido agregado automáticamente a: ${orgNames}
-            
+
 Ya puedes acceder a los proyectos de tu organización.`);
+            } else {
+              setSuccess(`¡Cuenta creada exitosamente! 🎉
+
+Tu cuenta ha sido configurada y está lista para usar.`);
+            }
+            
+            // Esperar un poco más para que lean el mensaje
+            setTimeout(() => {
+              onAuthSuccess && onAuthSuccess(result.user);
+            }, 2500);
           } else {
-            setSuccess('¡Cuenta creada exitosamente! Revisa tu correo para confirmar.');
+            setError('Error al crear la cuenta. Intenta nuevamente.');
           }
-          
-          setTimeout(() => {
-            onAuthSuccess && onAuthSuccess(result.user);
-          }, 3000);
-        } else {
-          setError(result.error || 'Error al crear la cuenta');
+        } catch (err) {
+          console.error('❌ Error en registro:', err);
+          setError(err.message || 'Error al crear la cuenta');
         }
       }
     } catch (error) {
+      console.error('❌ Error inesperado:', error);
       setError('Error inesperado: ' + error.message);
     } finally {
       setLoading(false);
@@ -89,13 +99,30 @@ Ya puedes acceder a los proyectos de tu organización.`);
   };
 
   const handleCancel = () => {
+    console.log('❌ Autenticación cancelada por usuario');
     onAuthCancel && onAuthCancel();
   };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+        {/* Header */}
         <div className="text-center mb-6">
+          <div className="mx-auto w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mb-4">
+            <svg 
+              className="w-8 h-8 text-white" 
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              {isLogin ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+              )}
+            </svg>
+          </div>
+          
           <h2 className="text-2xl font-bold text-gray-900 mb-2">
             {isLogin ? 'Iniciar Sesión' : 'Crear Cuenta'}
           </h2>
@@ -107,6 +134,7 @@ Ya puedes acceder a los proyectos de tu organización.`);
           </p>
         </div>
 
+        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           {!isLogin && (
             <div>
@@ -117,9 +145,10 @@ Ya puedes acceder a los proyectos de tu organización.`);
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="Tu nombre completo"
                 required={!isLogin}
+                disabled={loading || authLoading}
               />
             </div>
           )}
@@ -132,9 +161,10 @@ Ya puedes acceder a los proyectos de tu organización.`);
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="tu@email.com"
               required
+              disabled={loading || authLoading}
             />
           </div>
 
@@ -146,55 +176,75 @@ Ya puedes acceder a los proyectos de tu organización.`);
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="••••••••"
               required
               minLength={6}
+              disabled={loading || authLoading}
             />
+            {!isLogin && (
+              <p className="mt-1 text-xs text-gray-500">
+                Mínimo 6 caracteres
+              </p>
+            )}
           </div>
 
+          {/* Error Message */}
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
-              {error}
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md flex items-start">
+              <svg className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+              <span className="text-sm">{error}</span>
             </div>
           )}
 
+          {/* Success Message */}
           {success && (
-            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md">
-              {success}
+            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md flex items-start">
+              <svg className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+              <span className="text-sm whitespace-pre-line">{success}</span>
             </div>
           )}
 
-          <div className="flex space-x-3">
+          {/* Buttons */}
+          <div className="flex space-x-3 pt-2">
             <button
               type="submit"
-              disabled={loading}
-              className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={loading || authLoading}
+              className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-2.5 px-4 rounded-md hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 font-medium"
             >
-              {loading ? (
+              {loading || authLoading ? (
                 <div className="flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-2"></div>
                   {isLogin ? 'Iniciando...' : 'Creando...'}
                 </div>
               ) : (
-                isLogin ? 'Iniciar Sesión' : 'Crear Cuenta'
+                <span>
+                  {isLogin ? 'Iniciar Sesión' : 'Crear Cuenta'}
+                </span>
               )}
             </button>
 
             <button
               type="button"
               onClick={handleCancel}
-              className="px-4 py-2 text-gray-600 hover:text-gray-800 focus:outline-none"
+              disabled={loading || authLoading}
+              className="px-6 py-2.5 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50 transition-colors duration-200"
             >
               Cancelar
             </button>
           </div>
         </form>
 
+        {/* Toggle Login/Register */}
         <div className="mt-6 text-center">
           <button
             onClick={() => setIsLogin(!isLogin)}
-            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+            disabled={loading || authLoading}
+            className="text-blue-600 hover:text-blue-800 text-sm font-medium hover:underline transition-colors duration-200 disabled:opacity-50"
           >
             {isLogin 
               ? '¿No tienes cuenta? Crear una' 
@@ -203,13 +253,22 @@ Ya puedes acceder a los proyectos de tu organización.`);
           </button>
         </div>
 
+        {/* Continue without account */}
         <div className="mt-4 text-center">
           <button
             onClick={handleCancel}
-            className="text-gray-500 hover:text-gray-700 text-sm"
+            disabled={loading || authLoading}
+            className="text-gray-500 hover:text-gray-700 text-sm hover:underline transition-colors duration-200 disabled:opacity-50"
           >
             Continuar sin cuenta (modo local)
           </button>
+        </div>
+
+        {/* Footer info */}
+        <div className="mt-6 pt-4 border-t border-gray-200">
+          <p className="text-xs text-center text-gray-500">
+            Al crear una cuenta, aceptas sincronizar tus datos de forma segura con Supabase
+          </p>
         </div>
       </div>
     </div>

@@ -2,6 +2,7 @@ import React from 'react';
 import PortfolioCharts from './PortfolioCharts';
 import CorporateAlerts from './CorporateAlerts';
 import ConsolidatedCashFlow from './ConsolidatedCashFlow';
+import CashFlowChart from './dashboard/CashFlowChart';
 
 const ConsolidatedDashboard = ({ 
   projects, 
@@ -713,6 +714,13 @@ const ConsolidatedDashboard = ({
           </div>
         </div>
       </div>
+
+      {/* 6.5. Gráfica de Flujo de Caja */}
+      <CashFlowChart 
+        totalPurchaseOrders={totalPurchaseOrders}
+        totalAdvances={totalAdvances}
+        totalInvoices={totalInvoices}
+      />
 
       {/* 7. Flujo de Caja Consolidado */}
       <ConsolidatedCashFlow 

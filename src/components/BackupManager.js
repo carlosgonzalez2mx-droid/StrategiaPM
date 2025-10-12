@@ -179,15 +179,16 @@ const BackupManager = ({ projects, workPackagesByProject, risksByProject, tasksB
   };
 
   if (!showBackupManager) {
-    return (
-      <button
-        onClick={() => setShowBackupManager(true)}
-        className="fixed bottom-4 left-4 bg-purple-600 text-white px-4 py-2 rounded-lg shadow-lg hover:bg-purple-700 transition-colors z-40"
-        title="Gestionar Backups"
-      >
-        💾 Backups ({backups.length})
-      </button>
-    );
+    return null; // Botón de backups removido - ahora se usa el indicador de nube en su lugar
+    // return (
+    //   <button
+    //     onClick={() => setShowBackupManager(true)}
+    //     className="fixed bottom-4 left-4 bg-purple-600 text-white px-4 py-2 rounded-lg shadow-lg hover:bg-purple-700 transition-colors z-40"
+    //     title="Gestionar Backups"
+    //   >
+    //     💾 Backups ({backups.length})
+    //   </button>
+    // );
   }
 
   return (
