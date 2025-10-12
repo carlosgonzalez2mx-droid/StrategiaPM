@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import useAuditLog from '../hooks/useAuditLog';
 import supabaseService from '../services/SupabaseService';
+import { FUNCTIONAL_ROLES, FUNCTIONAL_ROLE_LABELS } from '../constants/unifiedRoles';
+import useOrganizationId from '../hooks/useOrganizationId';
+import useCurrentUserPermissions from '../hooks/useCurrentUserPermissions';
+import useInviteModal from '../hooks/useInviteModal';
+import { debugLog, debugError, debugSuccess } from '../utils/debugLog';
 
 const OrganizationMembers = ({ 
   currentProject, 
@@ -9,9 +14,24 @@ const OrganizationMembers = ({
 }) => {
   const [members, setMembers] = useState([]);
   const [invitations, setInvitations] = useState([]);
-  const [showInviteModal, setShowInviteModal] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState('organization_member_write');
+  
+  // Hook del modal de invitación - consolida 4 useState en un reducer
+  const { 
+    state: inviteModalState, 
+    actions: inviteModalActions 
+  } = useInviteModal();
+  
+  // Extraer valores para compatibilidad con código existente
+  const showInviteModal = inviteModalState.showModal;
+  const inviteEmail = inviteModalState.email;
+  const inviteRole = inviteModalState.role;
+  const inviteFunctionalRole = inviteModalState.functionalRole;
+  
+  // Extraer acciones para usar en lugar de setters
+  const setShowInviteModal = (show) => show ? inviteModalActions.openModal() : inviteModalActions.closeModal();
+  const setInviteEmail = inviteModalActions.setEmail;
+  const setInviteRole = inviteModalActions.setRole;
+  const setInviteFunctionalRole = inviteModalActions.setFunctionalRole;
   
   // Estados para editar roles
   const [showEditRoleModal, setShowEditRoleModal] = useState(false);
@@ -20,28 +40,36 @@ const OrganizationMembers = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Estados para roles funcionales
+  const [editingMemberRole, setEditingMemberRole] = useState(null);
+  const [selectedFunctionalRole, setSelectedFunctionalRole] = useState('');
+
   // Hook de auditoría
   const { addAuditEvent } = useAuditLog(currentProject?.id, useSupabase);
 
-  // DETECCIÓN AUTOMÁTICA: Usar organization_id del servicio o fallback
-  const [organizationId, setOrganizationId] = useState(
-    currentProject?.organization_id || '73bf164f-f3e8-4207-95a6-e3e3d385148d'
-  );
+  // DETECCIÓN AUTOMÁTICA: Usar hook sin hardcodeo
+  const { 
+    organizationId, 
+    loading: orgLoading, 
+    error: orgError 
+  } = useOrganizationId({ 
+    fallbackFromProject: currentProject?.organization_id,
+    required: true 
+  });
 
-  // Detectar organización automáticamente cuando se use Supabase
-  useEffect(() => {
-    if (useSupabase && supabaseService?.getCurrentOrganization()) {
-      const detectedOrgId = supabaseService.getCurrentOrganization();
-      if (detectedOrgId && detectedOrgId !== organizationId) {
-        console.log('🔄 Actualizando organization ID detectado:', detectedOrgId);
-        setOrganizationId(detectedOrgId);
-      }
-    }
-  }, [useSupabase, organizationId]);
+  // Hook de permisos - elimina 6 verificaciones duplicadas
+  const { 
+    isOwnerOrAdmin, 
+    canInvite, 
+    canEditRoles, 
+    canRemoveMembers,
+    canEditMember,
+    canRemoveMember 
+  } = useCurrentUserPermissions(members);
 
   // Cargar miembros de la organización
   const loadOrganizationMembers = async () => {
-    console.log('🔍 DEBUG - loadOrganizationMembers ejecutándose', { useSupabase, organizationId });
+    debugLog('OrganizationMembers', 'loadOrganizationMembers ejecutándose', { useSupabase, organizationId });
     if (!useSupabase || !organizationId) return;
 
     try {
@@ -49,14 +77,14 @@ const OrganizationMembers = ({
       const { default: supabaseService } = await import('../services/SupabaseService');
       
       if (supabaseService.isAuthenticated()) {
-        console.log('🔍 DEBUG - Usuario autenticado:', supabaseService.getCurrentUser());
-        console.log('🔍 DEBUG - Organization ID:', organizationId);
+        debugLog('OrganizationMembers', 'Usuario autenticado', supabaseService.getCurrentUser());
+        debugLog('OrganizationMembers', 'Organization ID', organizationId);
         
         // Probar consulta directa sin filtros para ver si es problema de RLS
         const { data: allMembers, error: allError } = await supabaseService.supabase
           .from('organization_members')
           .select('*');
-        console.log('🔍 DEBUG - Todos los miembros (sin filtro):', { allMembers, allError });
+        debugLog('OrganizationMembers', 'Todos los miembros (sin filtro)', { allMembers, allError });
         
         const { data: membersData, error: membersError } = await supabaseService.supabase
           .from('organization_members')
@@ -65,10 +93,10 @@ const OrganizationMembers = ({
           .order('joined_at', { ascending: false });
 
         if (membersError) {
-          console.error('❌ Error cargando miembros:', membersError);
+          debugError('OrganizationMembers', 'Error cargando miembros', membersError);
           setError('Error cargando miembros de la organización');
         } else {
-          console.log('🔍 DEBUG - Datos cargados:', membersData);
+          debugLog('OrganizationMembers', 'Datos cargados', membersData);
           
           // Filtrar solo miembros activos para mostrar
           const activeMembers = (membersData || []).filter(member => member.status === 'active');
@@ -78,12 +106,12 @@ const OrganizationMembers = ({
           const pendingInvitations = (membersData || []).filter(member => member.status === 'pending');
           setInvitations(pendingInvitations);
           
-          console.log('🔍 DEBUG - Miembros activos:', activeMembers);
-          console.log('🔍 DEBUG - Invitaciones pendientes:', pendingInvitations);
+          debugLog('OrganizationMembers', 'Miembros activos', activeMembers);
+          debugLog('OrganizationMembers', 'Invitaciones pendientes', pendingInvitations);
         }
       }
     } catch (error) {
-      console.error('Error cargando miembros:', error);
+      debugError('OrganizationMembers', 'Error cargando miembros', error);
       setError('Error cargando miembros de la organización');
     } finally {
       setIsLoading(false);
@@ -95,11 +123,8 @@ const OrganizationMembers = ({
     e.preventDefault();
     if (!inviteEmail || !organizationId) return;
     
-    // VERIFICAR PERMISOS: Solo owners y admins pueden invitar miembros
-    const currentUserMembership = members.find(m => m.user_email === supabaseService.getCurrentUser()?.email);
-    const isOwnerOrAdmin = currentUserMembership?.role === 'owner' || currentUserMembership?.role === 'admin';
-    
-    if (!isOwnerOrAdmin) {
+    // VERIFICAR PERMISOS: Usar hook de permisos
+    if (!canInvite) {
       alert('❌ No tienes permisos para invitar miembros. Solo owners y administradores pueden realizar esta acción.');
       return;
     }
@@ -111,15 +136,15 @@ const OrganizationMembers = ({
       const { default: supabaseService } = await import('../services/SupabaseService');
       
       if (supabaseService.isAuthenticated()) {
-        console.log('🔍 DEBUG - Usuario autenticado:', supabaseService.getCurrentUser());
-        console.log('🔍 DEBUG - Organization ID:', organizationId);
+        debugLog('inviteMember', 'Usuario autenticado', supabaseService.getCurrentUser());
+        debugLog('inviteMember', 'Organization ID', organizationId);
         
         // Verificar contexto de RLS
         const { data: rlsTest, error: rlsError } = await supabaseService.supabase
           .from('user_organization_roles')
           .select('role, organization_id')
           .eq('user_id', supabaseService.getCurrentUser()?.id);
-        console.log('🔍 DEBUG - RLS Context:', { rlsTest, rlsError });
+        debugLog('inviteMember', 'RLS Context', { rlsTest, rlsError });
         
         // Verificar si el usuario ya está en la organización
         const { data: existingMember, error: memberError } = await supabaseService.supabase
@@ -135,7 +160,7 @@ const OrganizationMembers = ({
         }
 
         // Crear invitación usando función personalizada
-        console.log('🔍 DEBUG - Datos de inserción:', {
+        debugLog('inviteMember', 'Datos de inserción', {
           organization_id: organizationId,
           user_id: null,
           user_email: inviteEmail,
@@ -147,7 +172,8 @@ const OrganizationMembers = ({
           .rpc('invite_member', {
             p_organization_id: organizationId,
             p_user_email: inviteEmail,
-            p_role: inviteRole
+            p_role: inviteRole,
+            p_functional_role: inviteFunctionalRole || null
           });
 
         if (insertError) {
@@ -191,10 +217,9 @@ ${registrationUrl}`);
         // Recargar miembros
         await loadOrganizationMembers();
         
-        // Limpiar formulario
-        setInviteEmail('');
-        setInviteRole('organization_member_write');
-        setShowInviteModal(false);
+        // Limpiar formulario usando reducer
+        inviteModalActions.resetForm();
+        inviteModalActions.closeModal();
 
         // Notificar al componente padre
         if (onMemberAdded) {
@@ -211,19 +236,15 @@ ${registrationUrl}`);
 
   // Eliminar miembro COMPLETAMENTE de todas las tablas relacionadas
   const removeMember = async (memberId, memberEmail) => {
-    // VERIFICAR PERMISOS: Solo owners y admins pueden eliminar miembros
-    const currentUserMembership = members.find(m => m.user_email === supabaseService.getCurrentUser()?.email);
-    const isOwnerOrAdmin = currentUserMembership?.role === 'owner' || currentUserMembership?.role === 'admin';
-    
-    if (!isOwnerOrAdmin) {
-      alert('❌ No tienes permisos para eliminar miembros. Solo owners y administradores pueden realizar esta acción.');
-      return;
-    }
-    
-    // No permitir eliminar al owner de la organización
     const memberToDelete = members.find(m => m.id === memberId);
-    if (memberToDelete?.role === 'owner') {
-      alert('❌ No se puede eliminar al propietario de la organización.');
+    
+    // VERIFICAR PERMISOS: Usar hook de permisos
+    if (!canRemoveMember(memberToDelete)) {
+      if (memberToDelete?.role === 'owner') {
+        alert('❌ No se puede eliminar al propietario de la organización.');
+      } else {
+        alert('❌ No tienes permisos para eliminar este miembro.');
+      }
       return;
     }
     
@@ -236,22 +257,22 @@ ${registrationUrl}`);
       const { default: supabaseService } = await import('../services/SupabaseService');
       
       if (supabaseService.isAuthenticated()) {
-        console.log('🗑️ Iniciando eliminación completa de usuario:', memberEmail);
+        debugLog('removeMember', 'Iniciando eliminación completa de usuario', memberEmail);
         
         // PASO 1: Eliminar de organization_members
-        console.log('🗑️ Eliminando de organization_members...');
+        debugLog('removeMember', 'Eliminando de organization_members');
         const { error: membersError } = await supabaseService.supabase
           .from('organization_members')
           .delete()
           .eq('id', memberId);
 
         if (membersError) {
-          console.error('❌ Error eliminando de organization_members:', membersError);
+          debugError('removeMember', 'Error eliminando de organization_members', membersError);
           throw new Error(`Error eliminando membresía: ${membersError.message}`);
         }
 
         // PASO 2: Eliminar de user_organization_roles (si existe)
-        console.log('🗑️ Eliminando de user_organization_roles...');
+        debugLog('removeMember', 'Eliminando de user_organization_roles');
         const { error: rolesError } = await supabaseService.supabase
           .from('user_organization_roles')
           .delete()
@@ -264,7 +285,7 @@ ${registrationUrl}`);
         }
 
         // PASO 3: Buscar y eliminar referencias en otras tablas relacionadas
-        console.log('🗑️ Buscando referencias adicionales...');
+        debugLog('removeMember', 'Buscando referencias adicionales');
         
         // Eliminar tareas asignadas al usuario (si las hay)
         const { error: tasksError } = await supabaseService.supabase
@@ -287,7 +308,7 @@ ${registrationUrl}`);
         }
 
         // PASO 4: Limpiar caché local del usuario eliminado
-        console.log('🗑️ Limpiando caché local del usuario eliminado...');
+        debugLog('removeMember', 'Limpiando caché local del usuario eliminado');
         try {
           // Limpiar localStorage del usuario eliminado
           const localStorageKeys = [
@@ -331,9 +352,9 @@ ${registrationUrl}`);
             }
           });
           
-          console.log('✅ Caché local limpiado para usuario eliminado');
+          debugSuccess('removeMember', 'Caché local limpiado para usuario eliminado');
         } catch (cacheError) {
-          console.warn('⚠️ Error limpiando caché local:', cacheError);
+          debugError('removeMember', 'Error limpiando caché local', cacheError);
         }
 
         // PASO 5: Registrar evento de auditoría
@@ -353,7 +374,7 @@ ${registrationUrl}`);
           });
         }
 
-        console.log('✅ Usuario eliminado completamente de todas las tablas y caché local');
+        debugSuccess('removeMember', 'Usuario eliminado completamente de todas las tablas y caché local');
         
         // Mostrar mensaje detallado con instrucciones
         const detailedMessage = `✅ Usuario ${memberEmail} eliminado COMPLETAMENTE de la organización
@@ -390,18 +411,13 @@ Solo así verá que ya no tiene acceso a la organización.`;
   const editMemberRole = async () => {
     if (!editingMember || !newRole) return;
     
-    // VERIFICAR PERMISOS: Solo owners y admins pueden cambiar roles
-    const currentUserMembership = members.find(m => m.user_email === supabaseService.getCurrentUser()?.email);
-    const isOwnerOrAdmin = currentUserMembership?.role === 'owner' || currentUserMembership?.role === 'admin';
-    
-    if (!isOwnerOrAdmin) {
-      alert('❌ No tienes permisos para cambiar roles. Solo owners y administradores pueden realizar esta acción.');
-      return;
-    }
-    
-    // No permitir cambiar el rol del owner
-    if (editingMember.role === 'owner') {
-      alert('❌ No se puede cambiar el rol del propietario de la organización.');
+    // VERIFICAR PERMISOS: Usar hook de permisos
+    if (!canEditMember(editingMember)) {
+      if (editingMember.role === 'owner') {
+        alert('❌ No se puede cambiar el rol del propietario de la organización.');
+      } else {
+        alert('❌ No tienes permisos para cambiar el rol de este miembro.');
+      }
       return;
     }
 
@@ -454,6 +470,208 @@ Solo así verá que ya no tiene acceso a la organización.`;
     }
   };
 
+  // Actualizar rol funcional de miembro
+  const handleUpdateFunctionalRole = async (memberId, newFunctionalRole) => {
+    try {
+      setIsLoading(true);
+      
+      const { error } = await supabaseService.supabase
+        .from('organization_members')
+        .update({ 
+          functional_role: newFunctionalRole || null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', memberId)
+        .eq('organization_id', organizationId);
+
+      if (error) {
+        console.error('Error actualizando rol funcional:', error);
+        alert('Error actualizando rol funcional: ' + error.message);
+        return;
+      }
+
+      // Recargar miembros
+      await loadOrganizationMembers();
+      
+      // Limpiar estado de edición
+      setEditingMemberRole(null);
+      setSelectedFunctionalRole('');
+      
+      alert('Rol funcional actualizado exitosamente');
+    } catch (error) {
+      console.error('Error actualizando rol funcional:', error);
+      alert('Error actualizando rol funcional');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Componente selector de rol funcional
+  const FunctionalRoleSelector = ({ member, isInviteForm = false, value, onChange }) => {
+    const currentUserRole = members.find(m => m.user_email === supabaseService.getCurrentUser()?.email)?.role;
+    const canEdit = currentUserRole === 'owner' || currentUserRole === 'admin';
+    
+    if (isInviteForm) {
+      // Selector en formulario de invitación
+      return (
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Rol Funcional (Opcional)
+          </label>
+          <select
+            value={value || ''}
+            onChange={(e) => onChange(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">Sin rol específico</option>
+            <optgroup label="Roles de Gestión">
+              <option value={FUNCTIONAL_ROLES.EXECUTIVE}>
+                {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.EXECUTIVE].icon} {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.EXECUTIVE].label}
+              </option>
+              <option value={FUNCTIONAL_ROLES.SPONSOR}>
+                {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.SPONSOR].icon} {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.SPONSOR].label}
+              </option>
+              <option value={FUNCTIONAL_ROLES.PROJECT_MANAGER}>
+                {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.PROJECT_MANAGER].icon} {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.PROJECT_MANAGER].label}
+              </option>
+            </optgroup>
+            <optgroup label="Roles Especializados">
+              <option value={FUNCTIONAL_ROLES.FINANCE_MANAGER}>
+                {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.FINANCE_MANAGER].icon} {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.FINANCE_MANAGER].label}
+              </option>
+              <option value={FUNCTIONAL_ROLES.QUALITY_MANAGER}>
+                {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.QUALITY_MANAGER].icon} {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.QUALITY_MANAGER].label}
+              </option>
+              <option value={FUNCTIONAL_ROLES.TECHNICAL_LEAD}>
+                {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.TECHNICAL_LEAD].icon} {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.TECHNICAL_LEAD].label}
+              </option>
+            </optgroup>
+            <optgroup label="Roles Operativos">
+              <option value={FUNCTIONAL_ROLES.PMO_ASSISTANT}>
+                {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.PMO_ASSISTANT].icon} {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.PMO_ASSISTANT].label}
+              </option>
+              <option value={FUNCTIONAL_ROLES.PROJECT_COORDINATOR}>
+                {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.PROJECT_COORDINATOR].icon} {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.PROJECT_COORDINATOR].label}
+              </option>
+              <option value={FUNCTIONAL_ROLES.TEAM_MEMBER}>
+                {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.TEAM_MEMBER].icon} {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.TEAM_MEMBER].label}
+              </option>
+            </optgroup>
+            <optgroup label="Roles de Supervisión">
+              <option value={FUNCTIONAL_ROLES.AUDITOR}>
+                {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.AUDITOR].icon} {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.AUDITOR].label}
+              </option>
+            </optgroup>
+          </select>
+          <p className="text-xs text-gray-500 mt-1">
+            {value && FUNCTIONAL_ROLE_LABELS[value] 
+              ? FUNCTIONAL_ROLE_LABELS[value].description 
+              : 'El rol funcional determina los permisos en control de cambios'}
+          </p>
+        </div>
+      );
+    }
+    
+    // Visualización en la lista de miembros
+    if (editingMemberRole === member.id) {
+      return (
+        <div className="flex items-center space-x-2">
+          <select
+            value={selectedFunctionalRole}
+            onChange={(e) => setSelectedFunctionalRole(e.target.value)}
+            className="px-2 py-1 border border-gray-300 rounded text-sm"
+          >
+            <option value="">Sin rol específico</option>
+            <optgroup label="Gestión">
+              <option value={FUNCTIONAL_ROLES.EXECUTIVE}>
+                {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.EXECUTIVE].icon} {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.EXECUTIVE].label}
+              </option>
+              <option value={FUNCTIONAL_ROLES.SPONSOR}>
+                {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.SPONSOR].icon} {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.SPONSOR].label}
+              </option>
+              <option value={FUNCTIONAL_ROLES.PROJECT_MANAGER}>
+                {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.PROJECT_MANAGER].icon} {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.PROJECT_MANAGER].label}
+              </option>
+            </optgroup>
+            <optgroup label="Especializados">
+              <option value={FUNCTIONAL_ROLES.FINANCE_MANAGER}>
+                {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.FINANCE_MANAGER].icon} {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.FINANCE_MANAGER].label}
+              </option>
+              <option value={FUNCTIONAL_ROLES.QUALITY_MANAGER}>
+                {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.QUALITY_MANAGER].icon} {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.QUALITY_MANAGER].label}
+              </option>
+              <option value={FUNCTIONAL_ROLES.TECHNICAL_LEAD}>
+                {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.TECHNICAL_LEAD].icon} {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.TECHNICAL_LEAD].label}
+              </option>
+            </optgroup>
+            <optgroup label="Operativos">
+              <option value={FUNCTIONAL_ROLES.PMO_ASSISTANT}>
+                {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.PMO_ASSISTANT].icon} {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.PMO_ASSISTANT].label}
+              </option>
+              <option value={FUNCTIONAL_ROLES.PROJECT_COORDINATOR}>
+                {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.PROJECT_COORDINATOR].icon} {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.PROJECT_COORDINATOR].label}
+              </option>
+              <option value={FUNCTIONAL_ROLES.TEAM_MEMBER}>
+                {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.TEAM_MEMBER].icon} {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.TEAM_MEMBER].label}
+              </option>
+            </optgroup>
+            <optgroup label="Supervisión">
+              <option value={FUNCTIONAL_ROLES.AUDITOR}>
+                {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.AUDITOR].icon} {FUNCTIONAL_ROLE_LABELS[FUNCTIONAL_ROLES.AUDITOR].label}
+              </option>
+            </optgroup>
+          </select>
+          <button
+            onClick={() => handleUpdateFunctionalRole(member.id, selectedFunctionalRole)}
+            className="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+          >
+            ✓
+          </button>
+          <button
+            onClick={() => {
+              setEditingMemberRole(null);
+              setSelectedFunctionalRole('');
+            }}
+            className="px-3 py-1 bg-gray-300 text-gray-700 rounded text-sm hover:bg-gray-400"
+          >
+            ✕
+          </button>
+        </div>
+      );
+    }
+    
+    // Mostrar rol funcional actual
+    const roleInfo = member.functional_role 
+      ? FUNCTIONAL_ROLE_LABELS[member.functional_role]
+      : null;
+    
+    return (
+      <div className="flex items-center justify-between">
+        <div>
+          {roleInfo ? (
+            <span className={`px-3 py-1 rounded-full text-xs font-medium ${roleInfo.badge}`}>
+              {roleInfo.icon} {roleInfo.label}
+            </span>
+          ) : (
+            <span className="text-gray-400 text-sm italic">Sin rol específico</span>
+          )}
+        </div>
+        {canEdit && member.status === 'active' && (
+          <button
+            onClick={() => {
+              setEditingMemberRole(member.id);
+              setSelectedFunctionalRole(member.functional_role || '');
+            }}
+            className="ml-2 text-blue-600 hover:text-blue-800 text-sm"
+            title="Editar rol funcional"
+          >
+            ✏️
+          </button>
+        )}
+      </div>
+    );
+  };
+
   // Abrir modal de edición de rol
   const openEditRoleModal = (member) => {
     setEditingMember(member);
@@ -463,7 +681,7 @@ Solo así verá que ya no tiene acceso a la organización.`;
 
   // Cargar miembros al montar el componente
   useEffect(() => {
-    console.log('🔍 DEBUG - OrganizationMembers useEffect ejecutándose');
+    debugLog('OrganizationMembers', 'useEffect ejecutándose');
     loadOrganizationMembers();
   }, [organizationId, useSupabase]);
 
@@ -481,14 +699,29 @@ Solo así verá que ya no tiene acceso a la organización.`;
     );
   }
   
-  if (!organizationId) {
+  // Mostrar loading mientras detecta organización
+  if (orgLoading) {
+    return (
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="flex items-center">
+          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 mr-3"></div>
+          <p className="text-blue-700">Detectando organización...</p>
+        </div>
+      </div>
+    );
+  }
+  
+  // Mostrar error si no se pudo detectar organización
+  if (!organizationId || orgError) {
     return (
       <div className="bg-red-50 border border-red-200 rounded-lg p-4">
         <div className="flex items-center">
           <span className="text-red-600 text-xl mr-3">❌</span>
           <div>
-            <h3 className="text-red-800 font-medium">Proyecto sin organización</h3>
-            <p className="text-red-700 text-sm">Este proyecto no está asociado a una organización. No se puede compartir.</p>
+            <h3 className="text-red-800 font-medium">No se detectó organización</h3>
+            <p className="text-red-700 text-sm">
+              {orgError || 'Este usuario no pertenece a ninguna organización. Por favor, solicita una invitación.'}
+            </p>
           </div>
         </div>
       </div>
@@ -525,24 +758,19 @@ Solo así verá que ya no tiene acceso a la organización.`;
           <p className="text-gray-600">Gestiona quién puede ver y editar los proyectos de tu organización</p>
         </div>
         {/* Solo mostrar botón invitar si es owner o admin */}
-        {(() => {
-          const currentUserMembership = members.find(m => m.user_email === supabaseService.getCurrentUser()?.email);
-          const isOwnerOrAdmin = currentUserMembership?.role === 'owner' || currentUserMembership?.role === 'admin';
-          
-          return isOwnerOrAdmin ? (
-            <button
-              onClick={() => setShowInviteModal(true)}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center space-x-2"
-            >
-              <span>+</span>
-              <span>Invitar Miembro</span>
-            </button>
-          ) : (
-            <div className="text-sm text-gray-500 italic bg-gray-50 px-3 py-2 rounded-lg border">
-              <span>🔒</span> Solo administradores pueden invitar miembros
-            </div>
-          );
-        })()}
+        {canInvite ? (
+          <button
+            onClick={() => setShowInviteModal(true)}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center space-x-2"
+          >
+            <span>+</span>
+            <span>Invitar Miembro</span>
+          </button>
+        ) : (
+          <div className="text-sm text-gray-500 italic bg-gray-50 px-3 py-2 rounded-lg border">
+            <span>🔒</span> Solo administradores pueden invitar miembros
+          </div>
+        )}
       </div>
 
       {/* Error Message */}
@@ -557,6 +785,28 @@ Solo así verá que ya no tiene acceso a la organización.`;
           </div>
         </div>
       )}
+
+      {/* Panel informativo sobre roles funcionales */}
+      <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="flex items-start">
+          <span className="text-blue-500 text-xl mr-3">ℹ️</span>
+          <div>
+            <h4 className="font-semibold text-blue-800 mb-2">
+              Roles Funcionales en Control de Cambios
+            </h4>
+            <p className="text-sm text-blue-700 mb-2">
+              Los roles funcionales determinan los permisos específicos en el módulo de Control de Cambios:
+            </p>
+            <ul className="text-sm text-blue-700 space-y-1">
+              <li><strong>Ejecutivo/Sponsor:</strong> Aprueban cambios mayores sin límite</li>
+              <li><strong>Project Manager:</strong> Aprueban cambios hasta $25K / 15 días</li>
+              <li><strong>Gerente Financiero:</strong> Validan impacto financiero</li>
+              <li><strong>Miembro de Equipo:</strong> Solo pueden solicitar cambios</li>
+              <li><strong>Sin rol específico:</strong> Permisos básicos según rol organizacional</li>
+            </ul>
+          </div>
+        </div>
+      </div>
 
       {/* Invitaciones Pendientes */}
       {invitations.length > 0 && (
@@ -588,20 +838,15 @@ Solo así verá que ya no tiene acceso a la organización.`;
                   </span>
                   
                   {/* Solo mostrar botón eliminar si es owner o admin */}
-                  {(() => {
-                    const currentUserMembership = members.find(m => m.user_email === supabaseService.getCurrentUser()?.email);
-                    const isOwnerOrAdmin = currentUserMembership?.role === 'owner' || currentUserMembership?.role === 'admin';
-                    
-                    return isOwnerOrAdmin ? (
-                      <button
-                        onClick={() => removeMember(invitation.id, invitation.user_email)}
-                        className="text-red-600 hover:text-red-800 text-sm"
-                        title="Cancelar invitación"
-                      >
-                        🗑️
-                      </button>
-                    ) : null;
-                  })()}
+                  {canRemoveMembers && (
+                    <button
+                      onClick={() => removeMember(invitation.id, invitation.user_email)}
+                      className="text-red-600 hover:text-red-800 text-sm"
+                      title="Cancelar invitación"
+                    >
+                      🗑️
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -651,37 +896,33 @@ Solo así verá que ya no tiene acceso a la organización.`;
                     {getRoleLabel(member.role)}
                   </span>
                   
+                  {/* Rol Funcional */}
+                  <FunctionalRoleSelector member={member} />
+                  
                   {/* Botones de acción para owners y admins */}
-                  {(() => {
-                    const currentUserMembership = members.find(m => m.user_email === supabaseService.getCurrentUser()?.email);
-                    const isOwnerOrAdmin = currentUserMembership?.role === 'owner' || currentUserMembership?.role === 'admin';
+                  <div className="flex items-center space-x-2">
+                    {/* Botón editar rol */}
+                    {canEditMember(member) && (
+                      <button
+                        onClick={() => openEditRoleModal(member)}
+                        className="text-blue-600 hover:text-blue-800 text-sm"
+                        title="Cambiar rol"
+                      >
+                        ✏️
+                      </button>
+                    )}
                     
-                    return isOwnerOrAdmin ? (
-                      <div className="flex items-center space-x-2">
-                        {/* Botón editar rol (no para owners) */}
-                        {member.role !== 'owner' && (
-                          <button
-                            onClick={() => openEditRoleModal(member)}
-                            className="text-blue-600 hover:text-blue-800 text-sm"
-                            title="Cambiar rol"
-                          >
-                            ✏️
-                          </button>
-                        )}
-                        
-                        {/* Botón eliminar (no para owners) */}
-                        {member.role !== 'owner' && (
-                          <button
-                            onClick={() => removeMember(member.id, member.user_email)}
-                            className="text-red-600 hover:text-red-800 text-sm"
-                            title="Eliminar miembro"
-                          >
-                            🗑️
-                          </button>
-                        )}
-                      </div>
-                    ) : null;
-                  })()}
+                    {/* Botón eliminar */}
+                    {canRemoveMember(member) && (
+                      <button
+                        onClick={() => removeMember(member.id, member.user_email)}
+                        className="text-red-600 hover:text-red-800 text-sm"
+                        title="Eliminar miembro"
+                      >
+                        🗑️
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))
@@ -735,6 +976,13 @@ Solo así verá que ya no tiene acceso a la organización.`;
                     </select>
                   </div>
                 </div>
+
+                {/* Selector de Rol Funcional */}
+                <FunctionalRoleSelector 
+                  isInviteForm={true}
+                  value={inviteFunctionalRole}
+                  onChange={(value) => setInviteFunctionalRole(value)}
+                />
                 
                 <div className="flex justify-end space-x-3 mt-6">
                   <button
