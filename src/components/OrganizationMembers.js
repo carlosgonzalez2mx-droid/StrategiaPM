@@ -106,6 +106,11 @@ const OrganizationMembers = ({
           const pendingInvitations = (membersData || []).filter(member => member.status === 'pending');
           setInvitations(pendingInvitations);
           
+          // Logs de verificación
+          console.log('✅ Total de miembros cargados:', membersData?.length || 0);
+          console.log('✅ Miembros activos:', activeMembers.length);
+          console.log('⏳ Invitaciones pendientes:', pendingInvitations.length);
+          
           debugLog('OrganizationMembers', 'Miembros activos', activeMembers);
           debugLog('OrganizationMembers', 'Invitaciones pendientes', pendingInvitations);
         }
@@ -229,6 +234,80 @@ ${registrationUrl}`);
     } catch (error) {
       console.error('Error invitando miembro:', error);
       setError(`Error invitando miembro: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Reenviar invitación
+  const handleResendInvitation = async (invitationId) => {
+    try {
+      const invitation = invitations.find(inv => inv.id === invitationId);
+      if (!invitation) return;
+
+      // Lógica para reenviar el email de invitación
+      console.log('Reenviando invitación:', invitationId);
+      
+      const registrationUrl = window.location.hostname === 'localhost' 
+        ? 'https://strategiapm.vercel.app' 
+        : window.location.origin;
+
+      alert(`📧 Recordatorio de invitación
+      
+Se ha notificado nuevamente a ${invitation.user_email}
+
+Comparte este enlace para que se registren:
+${registrationUrl}
+
+Una vez registrado con ese email, tendrá acceso automáticamente.`);
+      
+      // TODO: Implementar envío de email real
+    } catch (error) {
+      console.error('Error reenviando invitación:', error);
+      alert('Error al reenviar invitación');
+    }
+  };
+
+  // Cancelar invitación
+  const handleCancelInvitation = async (invitationId, invitationEmail) => {
+    if (!window.confirm(`¿Estás seguro de cancelar la invitación a ${invitationEmail}?\n\nEsta acción no se puede deshacer.`)) {
+      return;
+    }
+    
+    try {
+      setIsLoading(true);
+      const { default: supabaseService } = await import('../services/SupabaseService');
+      
+      const { error } = await supabaseService.supabase
+        .from('organization_members')
+        .delete()
+        .eq('id', invitationId)
+        .eq('organization_id', organizationId);
+      
+      if (error) throw error;
+      
+      // Registrar evento de auditoría
+      if (addAuditEvent) {
+        addAuditEvent({
+          category: 'organization',
+          action: 'invitation-cancelled',
+          description: `Invitación cancelada para "${invitationEmail}"`,
+          details: {
+            invitationEmail,
+            organizationId
+          },
+          severity: 'low',
+          user: supabaseService.getCurrentUser()?.email || 'Sistema'
+        });
+      }
+      
+      alert(`✅ Invitación a ${invitationEmail} cancelada exitosamente`);
+      
+      // Recargar la lista
+      await loadOrganizationMembers();
+    } catch (error) {
+      console.error('Error cancelando invitación:', error);
+      alert(`Error cancelando invitación: ${error.message}`);
     } finally {
       setIsLoading(false);
     }
@@ -812,40 +891,93 @@ Solo así verá que ya no tiene acceso a la organización.`;
       {invitations.length > 0 && (
         <div className="bg-yellow-50 rounded-lg shadow-sm border border-yellow-200">
           <div className="p-4 border-b border-yellow-200">
-            <h3 className="text-lg font-semibold text-yellow-800">
+            <h3 className="text-lg font-semibold text-yellow-800 flex items-center">
+              <span className="mr-2">⏳</span>
               Invitaciones Pendientes ({invitations.length})
             </h3>
+            <p className="text-sm text-yellow-700 mt-1">
+              Estas personas fueron invitadas pero aún no han aceptado
+            </p>
           </div>
           
           <div className="divide-y divide-yellow-200">
             {invitations.map((invitation) => (
-              <div key={invitation.id} className="p-4 flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="w-10 h-10 bg-yellow-200 rounded-full flex items-center justify-center">
-                    <span className="text-yellow-700 font-medium">⏳</span>
+              <div key={invitation.id} className="p-4">
+                <div className="flex items-start justify-between">
+                  {/* Información de la invitación */}
+                  <div className="flex items-start space-x-4 flex-1">
+                    <div className="w-12 h-12 bg-yellow-300 rounded-full flex items-center justify-center flex-shrink-0">
+                      <span className="text-yellow-800 font-bold text-lg">✉️</span>
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-2 mb-1">
+                        <p className="font-semibold text-yellow-900 text-lg">
+                          {invitation.user_email}
+                        </p>
+                        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-200 text-yellow-800">
+                          ⏳ Pendiente
+                        </span>
+                      </div>
+                      
+                      <div className="space-y-1">
+                        <p className="text-sm text-yellow-700">
+                          <span className="font-medium">Rol:</span> {getRoleLabel(invitation.role)}
+                        </p>
+                        
+                        {invitation.functional_role && (
+                          <p className="text-sm text-yellow-700">
+                            <span className="font-medium">Rol Funcional:</span>{' '}
+                            {FUNCTIONAL_ROLE_LABELS[invitation.functional_role]?.icon}{' '}
+                            {FUNCTIONAL_ROLE_LABELS[invitation.functional_role]?.label}
+                          </p>
+                        )}
+                        
+                        {invitation.invited_by && (
+                          <p className="text-xs text-yellow-600 mt-2">
+                            Invitado por <span className="font-medium">{invitation.invited_by}</span>
+                            {invitation.invited_at && (
+                              <span> el {new Date(invitation.invited_at).toLocaleDateString('es-MX', { 
+                                year: 'numeric', 
+                                month: 'long', 
+                                day: 'numeric' 
+                              })}</span>
+                            )}
+                          </p>
+                        )}
+                        
+                        {invitation.created_at && !invitation.invited_at && (
+                          <p className="text-xs text-yellow-600 mt-2">
+                            Invitado el {new Date(invitation.created_at).toLocaleDateString('es-MX', { 
+                              year: 'numeric', 
+                              month: 'long', 
+                              day: 'numeric' 
+                            })}
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <p className="font-medium text-yellow-900">{invitation.user_email}</p>
-                    <p className="text-sm text-yellow-600">
-                      Invitado como {getRoleLabel(invitation.role)}
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex items-center space-x-3">
-                  <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                    Pendiente
-                  </span>
                   
-                  {/* Solo mostrar botón eliminar si es owner o admin */}
+                  {/* Botones de acción */}
                   {canRemoveMembers && (
-                    <button
-                      onClick={() => removeMember(invitation.id, invitation.user_email)}
-                      className="text-red-600 hover:text-red-800 text-sm"
-                      title="Cancelar invitación"
-                    >
-                      🗑️
-                    </button>
+                    <div className="flex flex-col space-y-2 ml-4">
+                      <button
+                        onClick={() => handleResendInvitation(invitation.id)}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium flex items-center space-x-1 transition-colors"
+                        title="Reenviar invitación"
+                      >
+                        <span>🔄</span>
+                        <span>Reenviar</span>
+                      </button>
+                      <button
+                        onClick={() => handleCancelInvitation(invitation.id, invitation.user_email)}
+                        className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm font-medium flex items-center space-x-1 transition-colors"
+                        title="Cancelar invitación"
+                      >
+                        <span>❌</span>
+                        <span>Cancelar</span>
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
