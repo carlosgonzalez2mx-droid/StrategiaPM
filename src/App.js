@@ -35,6 +35,9 @@ import supabaseService from './services/SupabaseService';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProjectProvider } from './contexts/ProjectContext';
 
+// Hooks
+import usePermissions from './hooks/usePermissions';
+
 // Función de ordenamiento de tareas por wbsCode (importada desde ScheduleManagement)
 const sortTasksByWbsCode = (tasks) => {
   return [...tasks].sort((a, b) => {
@@ -72,6 +75,9 @@ const sortTasksByWbsCode = (tasks) => {
 // Componente principal de la aplicación (requiere autenticación)
 function MainApp() {
   const { user, showSplash, completeSplash } = useAuth();
+  
+  // Hook de permisos para detectar usuarios de solo lectura
+  const { isReadOnly, userRole, isLoading: permissionsLoading } = usePermissions();
   
   // Cargar script de diagnóstico solo en desarrollo
   useEffect(() => {
@@ -1690,7 +1696,19 @@ function MainApp() {
   const [showSettings, setShowSettings] = useState(false);
   const [reportingDate, setReportingDate] = useState(new Date().toISOString().split('T')[0]);
   const [showHelp, setShowHelp] = useState(false);
-  const [activeSection, setActiveSection] = useState('portfolio');
+  // Función para determinar la sección inicial basada en permisos
+  const getInitialSection = () => {
+    // Si es usuario de solo lectura, iniciar en 'executive' (Dashboard Ejecutivo)
+    if (isReadOnly()) {
+      console.log('🔍 Usuario de solo lectura detectado, iniciando en Dashboard Ejecutivo');
+      return 'executive';
+    }
+    // Si es usuario normal, iniciar en 'portfolio' (comportamiento actual)
+    console.log('🔍 Usuario con permisos completos, iniciando en Portafolio');
+    return 'portfolio';
+  };
+
+  const [activeSection, setActiveSection] = useState('portfolio'); // Se actualizará cuando se carguen los permisos
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // Iniciar expandido
 
   // Función para cambiar sección y colapsar sidebar automáticamente
@@ -1698,6 +1716,33 @@ function MainApp() {
     setActiveSection(sectionId);
     setIsSidebarCollapsed(true); // Colapsar sidebar automáticamente
   };
+
+  // Redirección automática para usuarios de solo lectura
+  useEffect(() => {
+    // Solo ejecutar cuando los permisos ya se cargaron
+    if (!permissionsLoading && userRole) {
+      const currentSection = activeSection;
+      const isReadOnlyUser = isReadOnly();
+      
+      console.log('🔍 Verificando redirección automática:', {
+        userRole,
+        isReadOnlyUser,
+        currentSection,
+        permissionsLoading
+      });
+      
+      // Si es usuario de solo lectura y está en una sección restringida, redirigir
+      if (isReadOnlyUser && (currentSection === 'portfolio' || currentSection === 'user-management')) {
+        console.log('🔄 Redirigiendo usuario de solo lectura de', currentSection, 'a Dashboard Ejecutivo');
+        setActiveSection('executive');
+      }
+      // Si es usuario normal y está en 'executive' (caso edge), redirigir a 'portfolio'
+      else if (!isReadOnlyUser && currentSection === 'executive' && userRole !== 'organization_member_read') {
+        console.log('🔄 Redirigiendo usuario con permisos completos de executive a Portafolio');
+        setActiveSection('portfolio');
+      }
+    }
+  }, [permissionsLoading, userRole, isReadOnly, activeSection]);
 
   // Estados de modales
   const [showPOModal, setShowPOModal] = useState(false);
