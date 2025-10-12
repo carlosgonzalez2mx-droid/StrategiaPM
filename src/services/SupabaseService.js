@@ -27,9 +27,9 @@ class SupabaseService {
         try {
           // USAR DETECCIÓN AUTOMÁTICA
           console.log('🚀 Iniciando detección de organización...');
-          const detectedOrgId = await this.detectUserOrganization();
-          if (detectedOrgId) {
-            this.organizationId = detectedOrgId;
+          const orgData = await this.detectUserOrganization();
+          if (orgData && orgData.id) {
+            this.organizationId = orgData.id;
             console.log('✅ Detección de organización completada. OrganizationId:', this.organizationId);
           } else {
             console.log('⚠️ No se pudo detectar organización automáticamente');
@@ -52,64 +52,70 @@ class SupabaseService {
   }
 
   // Detectar organización del usuario automáticamente
-  async detectUserOrganization() {
-    if (!this.currentUser) {
+  async detectUserOrganization(userEmail) {
+    const emailToUse = userEmail || this.currentUser?.email;
+    
+    if (!emailToUse) {
       console.log('❌ No hay usuario para detectar organización');
       return null;
     }
 
     try {
-      console.log('🔍 Detectando organización para:', this.currentUser.email);
-
-      // Buscar memberships activos del usuario por email
-      const { data: memberships, error } = await this.supabase
+      console.log('🔍 Detectando organización para:', emailToUse);
+      
+      // Query optimizado que usa las nuevas políticas RLS
+      const { data: membership, error } = await this.supabase
         .from('organization_members')
-        .select('organization_id, role, status, organizations(id, name, owner_id)')
-        .eq('user_email', this.currentUser.email)
+        .select(`
+          id,
+          organization_id,
+          role,
+          status,
+          organizations!inner (
+            id,
+            name,
+            owner_id,
+            created_at
+          )
+        `)
+        .eq('user_email', emailToUse)
         .eq('status', 'active')
-        .order('created_at', { ascending: false }); // Más reciente primero
-
+        .single();
+      
       if (error) {
-        console.error('❌ Error buscando memberships:', error);
-        return null;
-      }
-
-      if (!memberships || memberships.length === 0) {
-        console.log('❌ No se encontraron memberships activos para:', this.currentUser.email);
-        this.organizationId = null;
-        return null;
-      }
-
-      console.log('✅ Memberships encontrados:', memberships.length);
-
-      // PRIORIDAD: Buscar donde es owner primero
-      const ownerMembership = memberships.find(m => 
-        m.organizations && m.organizations.owner_id === this.currentUser.id
-      );
-
-      if (ownerMembership) {
-        this.organizationId = ownerMembership.organization_id;
-        console.log('✅ Organización detectada como OWNER:', {
-          id: this.organizationId,
-          name: ownerMembership.organizations.name
+        console.error('❌ Error buscando membresía:', error);
+        console.error('Detalles del error:', {
+          code: error.code,
+          message: error.message,
+          details: error.details
         });
-        return this.organizationId;
+        return null;
       }
-
-      // Si no es owner, usar la primera organización activa
-      const firstMembership = memberships[0];
-      this.organizationId = firstMembership.organization_id;
-      console.log('✅ Organización detectada como MIEMBRO:', {
-        id: this.organizationId,
-        name: firstMembership.organizations?.name || 'Sin nombre',
-        role: firstMembership.role
-      });
-
-      return this.organizationId;
-
+      
+      if (!membership || !membership.organizations) {
+        console.warn('⚠️ No se encontró organización activa para el usuario');
+        return null;
+      }
+      
+      const orgData = {
+        id: membership.organizations.id,
+        name: membership.organizations.name,
+        role: membership.role,
+        owner_id: membership.organizations.owner_id,
+        membership_id: membership.id
+      };
+      
+      console.log('✅ Organización detectada:', orgData.name);
+      console.log('👤 Rol del usuario:', orgData.role);
+      console.log('🆔 Organization ID:', orgData.id);
+      
+      // Guardar en la instancia
+      this.organizationId = orgData.id;
+      
+      return orgData;
+      
     } catch (error) {
-      console.error('❌ Error en detectUserOrganization:', error);
-      this.organizationId = null;
+      console.error('❌ Error inesperado detectando organización:', error);
       return null;
     }
   }
@@ -426,43 +432,46 @@ class SupabaseService {
 
   // Cargar datos del portafolio
   async loadPortfolioData() {
-    if (!this.currentUser) {
-      console.warn('⚠️ No hay usuario autenticado');
-      return null;
-    }
-
     try {
       console.log('📊 Cargando datos del portafolio desde Supabase...');
-
-      // Verificar si existe organización, si no, intentar detectarla
-      if (!this.organizationId) {
-        console.log('🏢 EJECUTANDO DETECCIÓN AUTOMÁTICA DE ORGANIZACIÓN...');
-        
-        // USAR EL MÉTODO DE DETECCIÓN AUTOMÁTICA
-        const detectedOrgId = await this.detectUserOrganization();
-        
-        if (detectedOrgId) {
-          this.organizationId = detectedOrgId;
-          console.log('✅ Organización detectada automáticamente:', this.organizationId);
-        } else {
-          console.error('❌ No se pudo detectar organización para el usuario:', this.currentUser.email);
-          console.error('❌ El usuario podría no tener membresía en ninguna organización');
-          return null;
-        }
-      }
-
-      // Cargar proyectos de la organización del usuario
-      const { data: projects, error: projectsError } = await this.supabase
-        .from('projects')
-        .select('*')
-        .eq('organization_id', this.organizationId);
-
-      if (projectsError) {
-        console.error('❌ Error cargando proyectos:', projectsError);
+      
+      // Obtener usuario autenticado
+      const { data: { user }, error: userError } = await this.supabase.auth.getUser();
+      
+      if (userError || !user?.email) {
+        console.error('❌ Error obteniendo usuario:', userError);
         return null;
       }
 
-      console.log(`✅ Proyectos encontrados: ${projects?.length || 0}`);
+      console.log('🏢 EJECUTANDO DETECCIÓN AUTOMÁTICA DE ORGANIZACIÓN...');
+      const organization = await this.detectUserOrganization(user.email);
+      
+      if (!organization) {
+        console.error('❌ No se pudo detectar organización para el usuario:', user.email);
+        console.error('💡 Verifica que el usuario tenga una membresía activa');
+        return null;
+      }
+
+      console.log('✅ Organización detectada exitosamente:', {
+        id: organization.id,
+        name: organization.name,
+        role: organization.role
+      });
+
+      // Cargar proyectos de la organización
+      console.log('📁 Cargando proyectos de la organización...');
+      const { data: projects, error: projectsError } = await this.supabase
+        .from('projects')
+        .select('*')
+        .eq('organization_id', organization.id)
+        .order('created_at', { ascending: false });
+
+      if (projectsError) {
+        console.error('❌ Error cargando proyectos:', projectsError);
+        // No retornar null, continuar con array vacío
+      }
+
+      console.log(`✅ Proyectos cargados: ${projects?.length || 0}`);
 
       // Convertir nombres de columnas de snake_case a camelCase para compatibilidad con el frontend
       const convertedProjects = (projects || []).map(project => ({
@@ -515,10 +524,10 @@ class SupabaseService {
           start_date: new Date().toISOString().split('T')[0],
           end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
           budget: 100000,
-          manager: this.currentUser.email,
+          manager: user.email,
           sponsor: 'Sistema',
-          organization_id: this.organizationId,
-          owner_id: this.currentUser.id,
+          organization_id: organization.id,
+          owner_id: user.id,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
@@ -613,7 +622,7 @@ class SupabaseService {
       const { data: globalResources, error: resourcesError } = await this.supabase
         .from('resources')
         .select('*')
-        .eq('organization_id', this.organizationId);
+        .eq('organization_id', organization.id);
 
       if (resourcesError) {
         console.warn('⚠️ Error cargando recursos:', resourcesError);
@@ -623,7 +632,7 @@ class SupabaseService {
       const { data: corporateAlerts, error: alertsError } = await this.supabase
         .from('corporate_alerts')
         .select('*')
-        .eq('organization_id', this.organizationId);
+        .eq('organization_id', organization.id);
 
       if (alertsError) {
         console.warn('⚠️ Error cargando alertas:', alertsError);
@@ -762,12 +771,17 @@ class SupabaseService {
       }
 
       const portfolioData = {
+        organization,
         projects: convertedProjects || [],
         tasksByProject: tasksByProject,
         risksByProject: risksByProject,
         globalResources: globalResources || [],
         corporateAlerts: corporateAlerts || [],
         purchaseOrdersByProject: purchaseOrdersByProject,
+        user: {
+          id: user.id,
+          email: user.email
+        },
         advancesByProject: advancesByProject,
         invoicesByProject: invoicesByProject,
         contractsByProject: contractsByProject,
