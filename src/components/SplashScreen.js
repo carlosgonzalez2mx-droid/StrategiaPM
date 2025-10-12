@@ -4,14 +4,14 @@ const SplashScreen = ({ onComplete }) => {
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
-    // Mostrar splash screen por 4 segundos
+    // Mostrar splash screen por 6 segundos (2 segundos más como solicitado)
     const timer = setTimeout(() => {
       setIsVisible(false);
       // Llamar callback después de la animación de salida
       setTimeout(() => {
         onComplete();
       }, 500);
-    }, 4000);
+    }, 6000);
 
     return () => clearTimeout(timer);
   }, [onComplete]);
@@ -31,54 +31,54 @@ const SplashScreen = ({ onComplete }) => {
         <div className="absolute bottom-[15%] right-[10%] w-12 h-8 bg-purple-500 rounded-full opacity-10 animate-float" style={{ animationDelay: '3s' }}></div>
       </div>
 
-      {/* Main content */}
-      <div className="relative z-10 w-full max-w-4xl h-[600px] bg-white/95 backdrop-blur-lg rounded-3xl shadow-2xl flex flex-col items-center justify-center text-center p-10">
+      {/* Main content - Compacto como Excel/Office */}
+      <div className="relative z-10 w-full max-w-md h-[400px] bg-white/95 backdrop-blur-lg rounded-2xl shadow-xl flex flex-col items-center justify-center text-center p-8">
         {/* PMBOK Badge */}
         <div className="absolute top-5 right-5 bg-slate-800 text-white px-4 py-2 rounded-full text-sm font-bold tracking-wider">
           PMBOK BASED
         </div>
 
         {/* Logo */}
-        <div className="text-6xl font-bold bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent mb-3 tracking-tight">
+        <div className="text-4xl font-bold bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent mb-2 tracking-tight">
           StrategiaPM
         </div>
         
         {/* Tagline */}
-        <div className="text-xl text-gray-600 mb-8 font-light">
+        <div className="text-lg text-gray-600 mb-6 font-light">
           Donde la estrategia se convierte en resultados
         </div>
         
-        {/* Features */}
-        <div className="flex justify-around w-full mt-10">
+        {/* Features - Versión compacta */}
+        <div className="flex justify-around w-full mt-6">
           <div className="flex flex-col items-center opacity-80">
-            <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center text-white text-2xl mb-2 shadow-lg shadow-indigo-500/30">
+            <div className="w-10 h-10 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center text-white text-lg mb-1 shadow-md shadow-indigo-500/30">
               📊
             </div>
-            <div className="text-sm text-gray-600 font-medium text-center">
+            <div className="text-xs text-gray-600 font-medium text-center">
               Planificación<br />Estratégica
             </div>
           </div>
           <div className="flex flex-col items-center opacity-80">
-            <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center text-white text-2xl mb-2 shadow-lg shadow-indigo-500/30">
+            <div className="w-10 h-10 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center text-white text-lg mb-1 shadow-md shadow-indigo-500/30">
               ⚡
             </div>
-            <div className="text-sm text-gray-600 font-medium text-center">
+            <div className="text-xs text-gray-600 font-medium text-center">
               Ejecución<br />Eficiente
             </div>
           </div>
           <div className="flex flex-col items-center opacity-80">
-            <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center text-white text-2xl mb-2 shadow-lg shadow-indigo-500/30">
+            <div className="w-10 h-10 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center text-white text-lg mb-1 shadow-md shadow-indigo-500/30">
               🎯
             </div>
-            <div className="text-sm text-gray-600 font-medium text-center">
+            <div className="text-xs text-gray-600 font-medium text-center">
               Resultados<br />Medibles
             </div>
           </div>
           <div className="flex flex-col items-center opacity-80">
-            <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center text-white text-2xl mb-2 shadow-lg shadow-indigo-500/30">
+            <div className="w-10 h-10 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center text-white text-lg mb-1 shadow-md shadow-indigo-500/30">
               👥
             </div>
-            <div className="text-sm text-gray-600 font-medium text-center">
+            <div className="text-xs text-gray-600 font-medium text-center">
               Colaboración<br />en Equipo
             </div>
           </div>
