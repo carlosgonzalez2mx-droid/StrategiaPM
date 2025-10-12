@@ -29,6 +29,7 @@ const useOrganizationId = (options = {}) => {
   useEffect(() => {
     const detectOrganization = async () => {
       try {
+        console.log('🔍 useOrganizationId - Iniciando detección', { fallbackFromProject, required });
         setLoading(true);
         setError(null);
 
@@ -39,6 +40,8 @@ const useOrganizationId = (options = {}) => {
           setLoading(false);
           return;
         }
+        
+        console.log('⏭️ No hay fallbackFromProject, intentando desde servicio...');
 
         // PRIORIDAD 2: Organization ID del servicio Supabase
         const detectedOrgId = supabaseService.getCurrentOrganization();
@@ -52,11 +55,13 @@ const useOrganizationId = (options = {}) => {
 
         // PRIORIDAD 3: Forzar detección automática
         console.log('🔍 Intentando detectar organización automáticamente...');
-        const autoDetectedOrgId = await supabaseService.detectUserOrganization();
+        const autoDetectedOrg = await supabaseService.detectUserOrganization();
         
-        if (autoDetectedOrgId) {
-          console.log('✅ Organization ID auto-detectado:', autoDetectedOrgId);
-          setOrganizationId(autoDetectedOrgId);
+        if (autoDetectedOrg && autoDetectedOrg.id) {
+          console.log('✅ Organization ID auto-detectado:', autoDetectedOrg.id);
+          console.log('✅ Nombre de organización:', autoDetectedOrg.name);
+          console.log('✅ Rol del usuario:', autoDetectedOrg.role);
+          setOrganizationId(autoDetectedOrg.id);
           setLoading(false);
           return;
         }

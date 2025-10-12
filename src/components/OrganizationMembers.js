@@ -57,6 +57,18 @@ const OrganizationMembers = ({
     required: true 
   });
 
+  // 🔍 LOGS DE DEBUG PARA DIAGNOSTICAR
+  useEffect(() => {
+    console.log('🔍 OrganizationMembers - Estado actual:', {
+      hasCurrentProject: !!currentProject,
+      currentProjectOrgId: currentProject?.organization_id,
+      organizationId: organizationId,
+      orgLoading: orgLoading,
+      orgError: orgError,
+      useSupabase: useSupabase
+    });
+  }, [currentProject, organizationId, orgLoading, orgError, useSupabase]);
+
   // Hook de permisos - elimina 6 verificaciones duplicadas
   const { 
     isOwnerOrAdmin, 
@@ -69,8 +81,24 @@ const OrganizationMembers = ({
 
   // Cargar miembros de la organización
   const loadOrganizationMembers = async () => {
-    debugLog('OrganizationMembers', 'loadOrganizationMembers ejecutándose', { useSupabase, organizationId });
-    if (!useSupabase || !organizationId) return;
+    console.log('🔄 loadOrganizationMembers ejecutándose', { useSupabase, organizationId });
+    
+    if (!useSupabase) {
+      console.warn('⚠️ Supabase no está habilitado, no se cargarán miembros');
+      return;
+    }
+    
+    if (!organizationId) {
+      console.warn('⚠️ organizationId es null/undefined, esperando detección...');
+      console.warn('⚠️ Estado actual:', { 
+        orgLoading, 
+        orgError,
+        currentProjectOrgId: currentProject?.organization_id 
+      });
+      return;
+    }
+    
+    console.log('✅ Iniciando carga de miembros para organization_id:', organizationId);
 
     try {
       setIsLoading(true);
