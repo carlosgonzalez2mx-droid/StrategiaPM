@@ -1,0 +1,258 @@
+.invitation-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.invitation-modal {
+  background: white;
+  border-radius: 12px;
+  max-width: 600px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(50px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.invitation-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.invitation-modal-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: #059669;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  font-size: 2rem;
+  color: #6b7280;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.close-button:hover {
+  background-color: #f3f4f6;
+}
+
+.invitation-modal-body {
+  padding: 1.5rem;
+}
+
+.invitation-info {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.invited-email {
+  font-size: 1.1rem;
+  margin: 0 0 0.5rem 0;
+  color: #065f46;
+}
+
+.invited-role {
+  margin: 0;
+  color: #059669;
+}
+
+.role-badge {
+  background: #059669;
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.invitation-instructions {
+  background: #eff6ff;
+  border-left: 4px solid #3b82f6;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  border-radius: 4px;
+}
+
+.invitation-instructions h3 {
+  margin: 0 0 0.75rem 0;
+  color: #1e40af;
+  font-size: 1rem;
+}
+
+.invitation-instructions ol {
+  margin: 0;
+  padding-left: 1.5rem;
+  color: #1e40af;
+}
+
+.invitation-instructions li {
+  margin-bottom: 0.5rem;
+}
+
+.invitation-link-section {
+  margin-bottom: 1.5rem;
+}
+
+.invitation-link-section label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: #374151;
+}
+
+.link-container {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.invitation-link-input {
+  flex: 1;
+  padding: 0.75rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-family: monospace;
+  background: #f9fafb;
+}
+
+.copy-button {
+  padding: 0.75rem 1.5rem;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.copy-button:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+}
+
+.copy-button.copied {
+  background: #059669;
+}
+
+.share-options {
+  margin-bottom: 1.5rem;
+}
+
+.share-options h4 {
+  margin: 0 0 0.75rem 0;
+  color: #374151;
+  font-size: 0.95rem;
+}
+
+.share-buttons {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.share-btn {
+  flex: 1;
+  padding: 0.75rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: white;
+}
+
+.share-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.share-btn.whatsapp {
+  color: #25d366;
+  border-color: #25d366;
+}
+
+.share-btn.whatsapp:hover {
+  background: #25d366;
+  color: white;
+}
+
+.share-btn.email {
+  color: #3b82f6;
+  border-color: #3b82f6;
+}
+
+.share-btn.email:hover {
+  background: #3b82f6;
+  color: white;
+}
+
+.invitation-note {
+  background: #fef3c7;
+  border: 1px solid #fbbf24;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.invitation-note p {
+  margin: 0;
+  color: #92400e;
+  font-size: 0.95rem;
+}
+
+.invitation-modal-footer {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn-primary {
+  padding: 0.75rem 2rem;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-primary:hover {
+  background: #2563eb;
+}

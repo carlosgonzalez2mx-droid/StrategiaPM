@@ -6,6 +6,7 @@ import useOrganizationId from '../hooks/useOrganizationId';
 import useCurrentUserPermissions from '../hooks/useCurrentUserPermissions';
 import useInviteModal from '../hooks/useInviteModal';
 import { debugLog, debugError, debugSuccess } from '../utils/debugLog';
+import InvitationModal from './InvitationModal';
 
 const OrganizationMembers = ({ 
   currentProject, 
@@ -43,6 +44,10 @@ const OrganizationMembers = ({
   // Estados para roles funcionales
   const [editingMemberRole, setEditingMemberRole] = useState(null);
   const [selectedFunctionalRole, setSelectedFunctionalRole] = useState('');
+  
+  // Estados para el modal de invitación mejorado
+  const [showInvitationModal, setShowInvitationModal] = useState(false);
+  const [lastInvitation, setLastInvitation] = useState(null);
 
   // Hook de auditoría
   const { addAuditEvent } = useAuditLog(currentProject?.id, useSupabase);
@@ -234,18 +239,13 @@ const OrganizationMembers = ({
           });
         }
 
-        const registrationUrl = window.location.hostname === 'localhost' 
-          ? 'https://strategiapm.vercel.app' 
-          : window.location.origin;
-
-        alert(`✅ Invitación enviada a ${inviteEmail} con rol ${inviteRole}
-
-📧 El usuario recibirá acceso cuando:
-1. Se registre en la aplicación con este email
-2. O cuando acepte la invitación si ya está registrado
-
-Puedes compartir este enlace para que se registren:
-${registrationUrl}`);
+        // Guardar datos de la invitación y mostrar modal mejorado
+        setLastInvitation({
+          user_email: inviteEmail,
+          role: inviteRole,
+          organization_id: organizationId
+        });
+        setShowInvitationModal(true);
 
         // Recargar miembros
         await loadOrganizationMembers();
@@ -297,47 +297,38 @@ Una vez registrado con ese email, tendrá acceso automáticamente.`);
   };
 
   // Cancelar invitación
-  const handleCancelInvitation = async (invitationId, invitationEmail) => {
-    if (!window.confirm(`¿Estás seguro de cancelar la invitación a ${invitationEmail}?\n\nEsta acción no se puede deshacer.`)) {
-      return;
-    }
-    
+  const handleCancelInvitation = async (invitationId, userEmail) => {
     try {
-      setIsLoading(true);
-      const { default: supabaseService } = await import('../services/SupabaseService');
+      // Confirmar con el usuario
+      const confirmed = window.confirm(
+        `¿Estás seguro de cancelar la invitación para ${userEmail}?`
+      );
       
+      if (!confirmed) return;
+      
+      console.log('🗑️ Cancelando invitación:', invitationId);
+      
+      // Eliminar la invitación
       const { error } = await supabaseService.supabase
         .from('organization_members')
         .delete()
-        .eq('id', invitationId)
-        .eq('organization_id', organizationId);
+        .eq('id', invitationId);
       
-      if (error) throw error;
-      
-      // Registrar evento de auditoría
-      if (addAuditEvent) {
-        addAuditEvent({
-          category: 'organization',
-          action: 'invitation-cancelled',
-          description: `Invitación cancelada para "${invitationEmail}"`,
-          details: {
-            invitationEmail,
-            organizationId
-          },
-          severity: 'low',
-          user: supabaseService.getCurrentUser()?.email || 'Sistema'
-        });
+      if (error) {
+        console.error('❌ Error cancelando invitación:', error);
+        alert(`Error al cancelar invitación: ${error.message}`);
+        return;
       }
       
-      alert(`✅ Invitación a ${invitationEmail} cancelada exitosamente`);
+      console.log('✅ Invitación cancelada exitosamente');
+      alert('✅ Invitación cancelada');
       
-      // Recargar la lista
-      await loadOrganizationMembers();
-    } catch (error) {
-      console.error('Error cancelando invitación:', error);
-      alert(`Error cancelando invitación: ${error.message}`);
-    } finally {
-      setIsLoading(false);
+      // Recargar la lista de miembros
+      loadOrganizationMembers();
+      
+    } catch (err) {
+      console.error('❌ Error inesperado:', err);
+      alert(`Error: ${err.message}`);
     }
   };
 
@@ -1240,6 +1231,13 @@ Solo así verá que ya no tiene acceso a la organización.`;
           </div>
         </div>
       )}
+      
+      {/* Modal de invitación mejorado */}
+      <InvitationModal
+        isOpen={showInvitationModal}
+        onClose={() => setShowInvitationModal(false)}
+        invitation={lastInvitation}
+      />
     </div>
   );
 };

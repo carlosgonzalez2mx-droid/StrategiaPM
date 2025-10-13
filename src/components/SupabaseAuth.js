@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useSearchParams } from 'react-router-dom';
+import supabaseService from '../services/SupabaseService';
+import './InvitationBanner.css';
 
 const SupabaseAuth = ({ onAuthSuccess, onAuthCancel }) => {
   const { login, register, loading: authLoading } = useAuth();
+  const [searchParams] = useSearchParams();
   
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
@@ -11,12 +15,55 @@ const SupabaseAuth = ({ onAuthSuccess, onAuthCancel }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  
+  // Estados para manejo de invitaciones
+  const [isInvited, setIsInvited] = useState(false);
+  const [invitationInfo, setInvitationInfo] = useState(null);
 
   // Limpiar mensajes al cambiar entre login/registro
   useEffect(() => {
     setError('');
     setSuccess('');
   }, [isLogin]);
+
+  // Detectar invitaciones al cargar el componente
+  useEffect(() => {
+    const invitedEmail = searchParams.get('email');
+    const invited = searchParams.get('invited') === 'true';
+    const orgId = searchParams.get('org');
+    
+    if (invited && invitedEmail) {
+      setIsInvited(true);
+      setEmail(invitedEmail);
+      setIsLogin(false); // Forzar modo registro si viene invitado
+      
+      // Cargar información de la invitación
+      loadInvitationInfo(invitedEmail, orgId);
+    }
+  }, [searchParams]);
+
+  const loadInvitationInfo = async (userEmail, orgId) => {
+    try {
+      const { data, error } = await supabaseService.supabase
+        .from('organization_members')
+        .select(`
+          role,
+          status,
+          organizations (
+            name
+          )
+        `)
+        .eq('user_email', userEmail)
+        .eq('status', 'pending')
+        .maybeSingle();
+      
+      if (data) {
+        setInvitationInfo(data);
+      }
+    } catch (err) {
+      console.error('Error cargando invitación:', err);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -124,15 +171,31 @@ Tu cuenta ha sido configurada y está lista para usar.`);
           </div>
           
           <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            {isLogin ? 'Iniciar Sesión' : 'Crear Cuenta'}
+            {isInvited ? 'Completa tu Registro' : (isLogin ? 'Iniciar Sesión' : 'Crear Cuenta')}
           </h2>
           <p className="text-gray-600">
-            {isLogin 
-              ? 'Accede a tu cuenta de StrategiaPM' 
-              : 'Crea tu cuenta para sincronizar en la nube'
+            {isInvited 
+              ? 'Has sido invitado a unirte a nuestra organización'
+              : (isLogin 
+                ? 'Accede a tu cuenta de StrategiaPM' 
+                : 'Crea tu cuenta para sincronizar en la nube')
             }
           </p>
         </div>
+
+        {/* Banner de invitación */}
+        {isInvited && invitationInfo && (
+          <div className="invitation-banner">
+            <h3>🎉 ¡Has sido invitado!</h3>
+            <p>
+              Has sido invitado a unirte a{' '}
+              <strong>{invitationInfo.organizations?.name}</strong>
+            </p>
+            <p className="invitation-note">
+              Completa tu registro con el email <strong>{email}</strong> para obtener acceso automático.
+            </p>
+          </div>
+        )}
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -161,11 +224,19 @@ Tu cuenta ha sido configurada y está lista para usar.`);
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                isInvited ? 'bg-gray-100 cursor-not-allowed' : ''
+              }`}
               placeholder="tu@email.com"
               required
+              readOnly={isInvited}
               disabled={loading || authLoading}
             />
+            {isInvited && (
+              <p className="email-locked-note">
+                ⚠️ Debes usar este email para activar tu invitación
+              </p>
+            )}
           </div>
 
           <div>
@@ -219,11 +290,11 @@ Tu cuenta ha sido configurada y está lista para usar.`);
               {loading || authLoading ? (
                 <div className="flex items-center justify-center">
                   <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mr-2"></div>
-                  {isLogin ? 'Iniciando...' : 'Creando...'}
+                  {isLogin ? 'Iniciando...' : (isInvited ? 'Registrando...' : 'Creando...')}
                 </div>
               ) : (
                 <span>
-                  {isLogin ? 'Iniciar Sesión' : 'Crear Cuenta'}
+                  {isLogin ? 'Iniciar Sesión' : (isInvited ? '✨ Registrarme y Unirme' : 'Crear Cuenta')}
                 </span>
               )}
             </button>
