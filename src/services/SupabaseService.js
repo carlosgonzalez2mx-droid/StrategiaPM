@@ -427,10 +427,11 @@ class SupabaseService {
     }
   }
 
-  // Cargar datos del portafolio
+  // Cargar datos del portafolio - VERSIÓN OPTIMIZADA
   async loadPortfolioData() {
     try {
-      console.log('📊 Cargando datos del portafolio desde Supabase...');
+      console.log('📊 Cargando datos del portafolio desde Supabase (versión optimizada)...');
+      console.time('⚡ Carga Total del Portafolio');
       
       // Obtener usuario autenticado
       const { data: { user }, error: userError } = await this.supabase.auth.getUser();
@@ -449,31 +450,54 @@ class SupabaseService {
         return null;
       }
 
-      console.log('✅ Organización detectada exitosamente:', {
-        id: organization.id,
-        name: organization.name,
-        role: organization.role
-      });
+      const orgId = organization.id;
+      console.log('✅ Organización detectada:', organization.name);
 
-      // Cargar proyectos de la organización
-      console.log('📁 Cargando proyectos de la organización...');
-      const { data: projects, error: projectsError } = await this.supabase
-        .from('projects')
-        .select('*')
-        .eq('organization_id', organization.id)
-        .order('created_at', { ascending: false });
+      // ============================================
+      // PASO 1: QUERIES PARALELAS PRINCIPALES
+      // ============================================
+      console.time('📊 Queries Principales');
+      
+      const [
+        projectsResult,
+        resourcesResult,
+        alertsResult
+      ] = await Promise.all([
+        // Proyectos (solo campos esenciales)
+        this.supabase
+          .from('projects')
+          .select('*')
+          .eq('organization_id', orgId)
+          .order('created_at', { ascending: false }),
+        
+        // Recursos globales
+        this.supabase
+          .from('resources')
+          .select('*')
+          .eq('organization_id', orgId),
+        
+        // Alertas corporativas
+        this.supabase
+          .from('corporate_alerts')
+          .select('*')
+          .eq('organization_id', orgId)
+      ]);
 
-      if (projectsError) {
-        console.error('❌ Error cargando proyectos:', projectsError);
-        // No retornar null, continuar con array vacío
+      console.timeEnd('📊 Queries Principales');
+
+      if (projectsResult.error) {
+        console.error('❌ Error cargando proyectos:', projectsResult.error);
       }
 
-      console.log(`✅ Proyectos cargados: ${projects?.length || 0}`);
+      const projects = projectsResult.data || [];
+      const globalResources = resourcesResult.data || [];
+      const corporateAlerts = alertsResult.data || [];
 
-      // Convertir nombres de columnas de snake_case a camelCase para compatibilidad con el frontend
-      const convertedProjects = (projects || []).map(project => ({
+      console.log(`✅ Proyectos cargados: ${projects.length}`);
+
+      // Convertir nombres de columnas de snake_case a camelCase
+      const convertedProjects = projects.map(project => ({
         ...project,
-        // Convertir campos de snake_case a camelCase
         startDate: project.start_date || project.startDate,
         endDate: project.end_date || project.endDate,
         businessCase: project.business_case || project.businessCase,
@@ -482,9 +506,9 @@ class SupabaseService {
         managementReserve: project.management_reserve || project.managementReserve,
         createdAt: project.created_at || project.createdAt,
         updatedAt: project.updated_at || project.updatedAt,
-        organizationId: project.organization_id || project.organizationId, // CORRECCIÓN: Agregar conversión de organization_id
-        ownerId: project.owner_id || project.ownerId, // CORRECCIÓN: Agregar conversión de owner_id
-        // Mantener también los nombres originales para compatibilidad hacia atrás
+        organizationId: project.organization_id || project.organizationId,
+        ownerId: project.owner_id || project.ownerId,
+        // Mantener nombres originales para compatibilidad
         start_date: project.start_date,
         end_date: project.end_date,
         business_case: project.business_case,
@@ -497,283 +521,265 @@ class SupabaseService {
         owner_id: project.owner_id
       }));
 
-      console.log(`✅ Proyectos convertidos: ${convertedProjects?.length || 0}`);
-
-      // Si no hay proyectos, crear uno de demostración
-      if (!convertedProjects || convertedProjects.length === 0) {
-        console.log('📝 Creando proyecto de demostración...');
+      // Si no hay proyectos, retornar estructura básica
+      if (convertedProjects.length === 0) {
+        console.log('⚠️ No hay proyectos en la organización');
+        console.timeEnd('⚡ Carga Total del Portafolio');
         
-        // Generar UUID válido
-        const generateUUID = () => {
-          return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-            const r = Math.random() * 16 | 0;
-            const v = c === 'x' ? r : (r & 0x3 | 0x8);
-            return v.toString(16);
-          });
+        return {
+          organization,
+          projects: [],
+          tasksByProject: {},
+          risksByProject: {},
+          globalResources: globalResources,
+          corporateAlerts: corporateAlerts,
+          purchaseOrdersByProject: {},
+          advancesByProject: {},
+          invoicesByProject: {},
+          contractsByProject: {},
+          resourceAssignmentsByProject: {},
+          auditLogsByProject: {},
+          minutasByProject: {},
+          includeWeekendsByProject: {},
+          user: { id: user.id, email: user.email },
+          currentProjectId: null,
+          version: '1.0.0',
+          lastUpdated: new Date().toISOString()
         };
-
-        const demoProject = {
-          id: generateUUID(),
-          name: 'Proyecto de Demostración',
-          description: 'Proyecto de ejemplo para familiarizarse con el sistema',
-          status: 'active',
-          priority: 'medium',
-          start_date: new Date().toISOString().split('T')[0],
-          end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          budget: 100000,
-          manager: user.email,
-          sponsor: 'Sistema',
-          organization_id: organization.id,
-          owner_id: user.id,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
-        
-        const { data: newProject, error: createProjectError } = await this.supabase
-          .from('projects')
-          .insert(demoProject)
-          .select('*')
-          .single();
-        
-        if (createProjectError) {
-          console.error('❌ Error creando proyecto de demostración:', createProjectError);
-          return null;
-        }
-        
-        convertedProjects = [newProject];
-        console.log('✅ Proyecto de demostración creado');
       }
 
-      // Cargar tareas por proyecto
-      const tasksByProject = {};
-      for (const project of convertedProjects) {
-        const { data: tasks, error: tasksError } = await this.supabase
+      // ============================================
+      // PASO 2: BATCH LOADING - 1 QUERY POR TABLA
+      // ============================================
+      console.time('📦 Batch Loading');
+      
+      const projectIds = convertedProjects.map(p => p.id);
+      
+      const [
+        tasksResult,
+        risksResult,
+        purchaseOrdersResult,
+        advancesResult,
+        invoicesResult,
+        contractsResult,
+        resourceAssignmentsResult,
+        minuteTasksResult,
+        projectConfigsResult
+      ] = await Promise.all([
+        // TODAS las tasks en 1 query
+        this.supabase
           .from('tasks')
           .select('*')
-          .eq('project_id', project.id);
-
-        if (tasksError) {
-          console.warn(`⚠️ Error cargando tareas para proyecto ${project.id}:`, tasksError);
-          tasksByProject[project.id] = [];
-        } else {
-          // Convertir nombres de columnas de snake_case a camelCase SIN DUPLICAR
-          const convertedTasks = (tasks || []).map(task => {
-            // Crear objeto limpio sin duplicar campos
-            const cleanTask = {
-              id: task.id,
-              name: task.name,
-              description: task.description,
-              duration: task.duration,
-              progress: task.progress,
-              priority: task.priority,
-              cost: task.cost,
-              predecessors: task.predecessors,
-              successors: task.successors,
-              resources: task.resources,
-              status: task.status,
-              project_id: task.project_id,
-              owner_id: task.owner_id,
-              created_at: task.created_at,
-              updated_at: task.updated_at,
-              // Convertir campos snake_case a camelCase
-              wbsCode: task.wbs_code,
-              startDate: task.start_date,
-              endDate: task.end_date,
-              assignedTo: task.assigned_to,
-              isMilestone: task.is_milestone,
-              originalDuration: task.original_duration
-            };
-            
-            // Remover campos undefined/null
-            Object.keys(cleanTask).forEach(key => {
-              if (cleanTask[key] === undefined || cleanTask[key] === null) {
-                delete cleanTask[key];
-              }
-            });
-            
-            return cleanTask;
-          });
-          
-          tasksByProject[project.id] = convertedTasks;
-          console.log(`✅ Tareas cargadas para proyecto ${project.id}: ${convertedTasks.length}`);
-        }
-      }
-
-      // Cargar riesgos por proyecto
-      const risksByProject = {};
-      for (const project of convertedProjects) {
-        const { data: risks, error: risksError } = await this.supabase
+          .in('project_id', projectIds),
+        
+        // TODOS los risks en 1 query
+        this.supabase
           .from('risks')
           .select('*')
-          .eq('project_id', project.id);
-
-        if (risksError) {
-          console.warn(`⚠️ Error cargando riesgos para proyecto ${project.id}:`, risksError);
-          risksByProject[project.id] = [];
-        } else {
-          risksByProject[project.id] = risks || [];
-        }
-      }
-
-      // Cargar recursos globales
-      const { data: globalResources, error: resourcesError } = await this.supabase
-        .from('resources')
-        .select('*')
-        .eq('organization_id', organization.id);
-
-      if (resourcesError) {
-        console.warn('⚠️ Error cargando recursos:', resourcesError);
-      }
-
-      // Cargar alertas corporativas
-      const { data: corporateAlerts, error: alertsError } = await this.supabase
-        .from('corporate_alerts')
-        .select('*')
-        .eq('organization_id', organization.id);
-
-      if (alertsError) {
-        console.warn('⚠️ Error cargando alertas:', alertsError);
-      }
-
-      // Cargar órdenes de compra por proyecto
-      const purchaseOrdersByProject = {};
-      for (const project of convertedProjects) {
-        const { data: purchaseOrders, error: poError } = await this.supabase
+          .in('project_id', projectIds),
+        
+        // TODAS las purchase_orders en 1 query
+        this.supabase
           .from('purchase_orders')
           .select('*')
-          .eq('project_id', project.id);
+          .in('project_id', projectIds),
         
-        if (poError) {
-          console.warn(`⚠️ Error cargando órdenes de compra para proyecto ${project.id}:`, poError);
-          purchaseOrdersByProject[project.id] = [];
-        } else {
-          purchaseOrdersByProject[project.id] = purchaseOrders || [];
-        }
-      }
-
-      // Cargar anticipos por proyecto
-      const advancesByProject = {};
-      for (const project of convertedProjects) {
-        const { data: advances, error: advancesError } = await this.supabase
+        // TODOS los advances en 1 query
+        this.supabase
           .from('advances')
           .select('*')
-          .eq('project_id', project.id);
+          .in('project_id', projectIds),
         
-        if (advancesError) {
-          console.warn(`⚠️ Error cargando anticipos para proyecto ${project.id}:`, advancesError);
-          advancesByProject[project.id] = [];
-        } else {
-          advancesByProject[project.id] = advances || [];
-        }
-      }
-
-      // Cargar facturas por proyecto
-      const invoicesByProject = {};
-      for (const project of convertedProjects) {
-        const { data: invoices, error: invoicesError } = await this.supabase
+        // TODAS las invoices en 1 query
+        this.supabase
           .from('invoices')
           .select('*')
-          .eq('project_id', project.id);
+          .in('project_id', projectIds),
         
-        if (invoicesError) {
-          console.warn(`⚠️ Error cargando facturas para proyecto ${project.id}:`, invoicesError);
-          invoicesByProject[project.id] = [];
-        } else {
-          invoicesByProject[project.id] = invoices || [];
-        }
-      }
-
-      // Cargar contratos por proyecto
-      const contractsByProject = {};
-      for (const project of convertedProjects) {
-        const { data: contracts, error: contractsError } = await this.supabase
+        // TODOS los contracts en 1 query
+        this.supabase
           .from('contracts')
           .select('*')
-          .eq('project_id', project.id);
+          .in('project_id', projectIds),
         
-        if (contractsError) {
-          console.warn(`⚠️ Error cargando contratos para proyecto ${project.id}:`, contractsError);
-          contractsByProject[project.id] = [];
-        } else {
-          contractsByProject[project.id] = contracts || [];
-        }
-      }
-
-      // Cargar asignaciones de recursos por proyecto
-      const resourceAssignmentsByProject = {};
-      for (const project of convertedProjects) {
-        const { data: assignments, error: assignmentsError } = await this.supabase
+        // TODOS los resource_assignments en 1 query
+        this.supabase
           .from('resource_assignments')
           .select('*')
-          .eq('project_id', project.id);
+          .in('project_id', projectIds),
         
-        if (assignmentsError) {
-          console.warn(`⚠️ Error cargando asignaciones para proyecto ${project.id}:`, assignmentsError);
-          resourceAssignmentsByProject[project.id] = [];
-        } else {
-          resourceAssignmentsByProject[project.id] = assignments || [];
-        }
-      }
+        // TODAS las minute_tasks en 1 query
+        this.supabase
+          .from('minute_tasks')
+          .select('*')
+          .in('project_id', projectIds),
+        
+        // TODAS las configuraciones en 1 query
+        this.supabase
+          .from('project_configurations')
+          .select('*')
+          .in('project_id', projectIds)
+      ]);
 
-      // NOTA: Los logs de auditoría se cargan desde localStorage
-      // No desde la tabla 'audit_logs' de Supabase
-      const auditLogsByProject = {};
+      console.timeEnd('📦 Batch Loading');
 
-      // Cargar minutas por proyecto
+      // ============================================
+      // PASO 3: AGRUPAR DATOS POR PROYECTO
+      // ============================================
+      console.time('🔨 Procesamiento de Datos');
+      
+      // Inicializar objetos para cada proyecto
+      const tasksByProject = {};
+      const risksByProject = {};
+      const purchaseOrdersByProject = {};
+      const advancesByProject = {};
+      const invoicesByProject = {};
+      const contractsByProject = {};
+      const resourceAssignmentsByProject = {};
       const minutasByProject = {};
-      for (const project of convertedProjects) {
-        const { success, minutas } = await this.loadMinutasByProject(project.id);
-
-        if (success) {
-          // Convertir de formato Supabase a formato frontend
-          minutasByProject[project.id] = (minutas || []).map(minuta => ({
-            id: minuta.id,
-            tarea: minuta.task_description,
-            responsable: minuta.responsible_person,
-            fecha: minuta.due_date,
-            hitoId: minuta.milestone_id,
-            estatus: minuta.status,
-            fechaCreacion: minuta.created_at
-          }));
-        } else {
-          minutasByProject[project.id] = [];
-        }
-      }
-
-      // Cargar configuraciones de proyectos (con manejo de errores mejorado)
       const includeWeekendsByProject = {};
-      for (const project of convertedProjects) {
-        try {
-          const { data: config, error: configError } = await this.supabase
-            .from('project_configurations')
-            .select('*')
-            .eq('project_id', project.id)
-            .single();
-          
-          if (configError) {
-            if (configError.code === 'PGRST116') {
-              // No hay configuración para este proyecto, usar valores por defecto
-              includeWeekendsByProject[project.id] = false;
-            } else {
-              console.warn(`⚠️ Error cargando configuración para proyecto ${project.id}:`, configError);
-              includeWeekendsByProject[project.id] = false;
-            }
-          } else {
-            includeWeekendsByProject[project.id] = config ? config.include_weekends : false;
-          }
-        } catch (error) {
-          console.warn(`⚠️ Error general cargando configuración para proyecto ${project.id}:`, error);
-          includeWeekendsByProject[project.id] = false;
-        }
-      }
 
+      // Inicializar arrays vacíos para cada proyecto
+      projectIds.forEach(id => {
+        tasksByProject[id] = [];
+        risksByProject[id] = [];
+        purchaseOrdersByProject[id] = [];
+        advancesByProject[id] = [];
+        invoicesByProject[id] = [];
+        contractsByProject[id] = [];
+        resourceAssignmentsByProject[id] = [];
+        minutasByProject[id] = [];
+        includeWeekendsByProject[id] = false;
+      });
+
+      // Agrupar tareas y convertir formato
+      (tasksResult.data || []).forEach(task => {
+        const cleanTask = {
+          id: task.id,
+          name: task.name,
+          description: task.description,
+          duration: task.duration,
+          progress: task.progress,
+          priority: task.priority,
+          cost: task.cost,
+          predecessors: task.predecessors,
+          successors: task.successors,
+          resources: task.resources,
+          status: task.status,
+          project_id: task.project_id,
+          owner_id: task.owner_id,
+          created_at: task.created_at,
+          updated_at: task.updated_at,
+          // Convertir snake_case a camelCase
+          wbsCode: task.wbs_code,
+          startDate: task.start_date,
+          endDate: task.end_date,
+          assignedTo: task.assigned_to,
+          isMilestone: task.is_milestone,
+          originalDuration: task.original_duration
+        };
+        
+        // Remover undefined/null
+        Object.keys(cleanTask).forEach(key => {
+          if (cleanTask[key] === undefined || cleanTask[key] === null) {
+            delete cleanTask[key];
+          }
+        });
+        
+        if (tasksByProject[task.project_id]) {
+          tasksByProject[task.project_id].push(cleanTask);
+        }
+      });
+
+      // Agrupar riesgos
+      (risksResult.data || []).forEach(risk => {
+        if (risksByProject[risk.project_id]) {
+          risksByProject[risk.project_id].push(risk);
+        }
+      });
+
+      // Agrupar órdenes de compra
+      (purchaseOrdersResult.data || []).forEach(po => {
+        if (purchaseOrdersByProject[po.project_id]) {
+          purchaseOrdersByProject[po.project_id].push(po);
+        }
+      });
+
+      // Agrupar anticipos
+      (advancesResult.data || []).forEach(adv => {
+        if (advancesByProject[adv.project_id]) {
+          advancesByProject[adv.project_id].push(adv);
+        }
+      });
+
+      // Agrupar facturas
+      (invoicesResult.data || []).forEach(inv => {
+        if (invoicesByProject[inv.project_id]) {
+          invoicesByProject[inv.project_id].push(inv);
+        }
+      });
+
+      // Agrupar contratos
+      (contractsResult.data || []).forEach(cont => {
+        if (contractsByProject[cont.project_id]) {
+          contractsByProject[cont.project_id].push(cont);
+        }
+      });
+
+      // Agrupar asignaciones de recursos
+      (resourceAssignmentsResult.data || []).forEach(ra => {
+        if (resourceAssignmentsByProject[ra.project_id]) {
+          resourceAssignmentsByProject[ra.project_id].push(ra);
+        }
+      });
+
+      // Agrupar y convertir minutas
+      (minuteTasksResult.data || []).forEach(mt => {
+        const convertedMinuta = {
+          id: mt.id,
+          tarea: mt.task_description,
+          responsable: mt.responsible_person,
+          fecha: mt.due_date,
+          hitoId: mt.milestone_id,
+          estatus: mt.status,
+          fechaCreacion: mt.created_at
+        };
+        
+        if (minutasByProject[mt.project_id]) {
+          minutasByProject[mt.project_id].push(convertedMinuta);
+        }
+      });
+
+      // Procesar configuraciones
+      (projectConfigsResult.data || []).forEach(config => {
+        includeWeekendsByProject[config.project_id] = config.include_weekends || false;
+      });
+
+      console.timeEnd('🔨 Procesamiento de Datos');
+      console.timeEnd('⚡ Carga Total del Portafolio');
+
+      // ============================================
+      // LOGS DE RENDIMIENTO
+      // ============================================
+      console.log('📊 Estadísticas de carga optimizada:');
+      console.log(`  - Proyectos: ${convertedProjects.length}`);
+      console.log(`  - Tasks totales: ${tasksResult.data?.length || 0}`);
+      console.log(`  - Risks totales: ${risksResult.data?.length || 0}`);
+      console.log(`  - Purchase Orders: ${purchaseOrdersResult.data?.length || 0}`);
+      console.log(`  - Minutas: ${minuteTasksResult.data?.length || 0}`);
+      console.log(`  - Queries ejecutadas: 13 (vs ${4 + (convertedProjects.length * 9)} antes)`);
+      console.log(`  - Mejora: ~${Math.round(((4 + (convertedProjects.length * 9) - 13) / (4 + (convertedProjects.length * 9))) * 100)}% menos queries`);
+
+      // ============================================
+      // RETORNO: Estructura compatible con código existente
+      // ============================================
       const portfolioData = {
         organization,
-        projects: convertedProjects || [],
+        projects: convertedProjects,
         tasksByProject: tasksByProject,
         risksByProject: risksByProject,
-        globalResources: globalResources || [],
-        corporateAlerts: corporateAlerts || [],
+        globalResources: globalResources,
+        corporateAlerts: corporateAlerts,
         purchaseOrdersByProject: purchaseOrdersByProject,
         user: {
           id: user.id,
@@ -783,7 +789,7 @@ class SupabaseService {
         invoicesByProject: invoicesByProject,
         contractsByProject: contractsByProject,
         resourceAssignmentsByProject: resourceAssignmentsByProject,
-        auditLogsByProject: auditLogsByProject,
+        auditLogsByProject: {},  // Se carga desde localStorage
         minutasByProject: minutasByProject,
         includeWeekendsByProject: includeWeekendsByProject,
         currentProjectId: convertedProjects && convertedProjects.length > 0 ? convertedProjects[0].id : null,
@@ -791,7 +797,7 @@ class SupabaseService {
         lastUpdated: new Date().toISOString()
       };
 
-      console.log('✅ Datos del portafolio cargados:', portfolioData);
+      console.log('✅ Datos del portafolio cargados y optimizados');
       return portfolioData;
 
     } catch (error) {

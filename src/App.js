@@ -28,6 +28,12 @@ import SupabaseAuth from './components/SupabaseAuth';
 import OrganizationMembers from './components/OrganizationMembers';
 import UserManagement from './components/UserManagement';
 import SplashScreen from './components/SplashScreen';
+
+// Super Admin Components
+import SuperAdminRoute from './components/admin/SuperAdminRoute';
+import SuperAdminDashboard from './components/admin/SuperAdminDashboard';
+import OrganizationDetails from './components/admin/OrganizationDetails';
+
 import filePersistenceService from './services/FilePersistenceService';
 import supabaseService from './services/SupabaseService';
 
@@ -1911,7 +1917,28 @@ function App() {
     <Router>
       <AuthProvider>
         <ProjectProvider>
-          <AppContent />
+          <Routes>
+            {/* Rutas de Super-Admin */}
+            <Route 
+              path="/admin" 
+              element={
+                <SuperAdminRoute>
+                  <SuperAdminDashboard />
+                </SuperAdminRoute>
+              } 
+            />
+            <Route 
+              path="/admin/organizations/:orgId" 
+              element={
+                <SuperAdminRoute>
+                  <OrganizationDetails />
+                </SuperAdminRoute>
+              } 
+            />
+            
+            {/* Ruta principal - App normal */}
+            <Route path="/*" element={<AppContent />} />
+          </Routes>
         </ProjectProvider>
       </AuthProvider>
     </Router>
