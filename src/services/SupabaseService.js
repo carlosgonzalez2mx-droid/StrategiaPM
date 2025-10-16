@@ -1341,10 +1341,20 @@ class SupabaseService {
           if (minutas && minutas.length > 0) {
             console.log(`📋 Guardando minutas para proyecto ${projectId}: ${minutas.length} minutas`);
 
-            // Insertar nuevas minutas (sin eliminar las existentes)
-            const result = await this.saveMinutas(projectId, minutas);
-            if (!result.success) {
-              console.warn(`⚠️ Error guardando minutas para proyecto ${projectId}:`, result.error);
+            try {
+              // Usar upsert para manejar duplicados sin eliminar minutas existentes
+              const result = await this.saveMinutas(projectId, minutas);
+              if (!result.success) {
+                console.warn(`⚠️ Error guardando minutas para proyecto ${projectId}:`, result.error);
+                console.warn(`⚠️ Continuando con el guardado de otros datos...`);
+                // NO lanzar error - continuar con el resto del guardado
+              } else {
+                console.log(`✅ Minutas guardadas exitosamente para proyecto ${projectId}`);
+              }
+            } catch (minutasError) {
+              console.error(`❌ Error inesperado guardando minutas para proyecto ${projectId}:`, minutasError);
+              console.warn(`⚠️ Continuando con el guardado de otros datos...`);
+              // NO lanzar error - continuar con el resto del guardado
             }
           }
         }
@@ -2379,33 +2389,113 @@ class SupabaseService {
 
       console.log(`💾 Guardando ${minutaTasks.length} minutas para proyecto: ${projectId}`);
 
-      // Preparar datos para insertar
-      const minutasToInsert = minutaTasks.map(minuta => ({
-        id: minuta.id,
-        project_id: projectId,
-        organization_id: this.organizationId,
-        user_id: this.currentUser.id,
-        task_description: minuta.tarea,
-        responsible_person: minuta.responsable,
-        due_date: minuta.fecha,
-        milestone_id: minuta.hitoId,
-        status: minuta.estatus || 'Pendiente',
-        created_at: minuta.fechaCreacion || new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }));
+      // Función para generar UUID válido si no existe
+      const generateUUID = () => {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+          const r = Math.random() * 16 | 0;
+          const v = c === 'x' ? r : (r & 0x3 | 0x8);
+          return v.toString(16);
+        });
+      };
 
+      // Preparar datos para insertar/actualizar
+      const minutasToUpsert = minutaTasks.map(minuta => {
+        // Verificar si el ID es un UUID válido
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        const minutaId = uuidRegex.test(minuta.id) ? minuta.id : generateUUID();
+        
+        // Log si se generó un nuevo UUID
+        if (minutaId !== minuta.id) {
+          console.log(`🔄 Generando nuevo UUID para minuta "${minuta.tarea}": ${minuta.id} → ${minutaId}`);
+        }
+
+        return {
+          id: minutaId,
+          project_id: projectId,
+          organization_id: this.organizationId,
+          user_id: this.currentUser.id,
+          task_description: minuta.tarea,
+          responsible_person: minuta.responsable,
+          due_date: minuta.fecha,
+          milestone_id: minuta.hitoId,
+          status: minuta.estatus || 'Pendiente',
+          created_at: minuta.fechaCreacion || new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+      });
+
+      // Verificar duplicados antes de enviar
+      const minutaIds = new Set();
+      const duplicateIds = [];
+      minutasToUpsert.forEach(minuta => {
+        if (minutaIds.has(minuta.id)) {
+          duplicateIds.push(minuta.id);
+        } else {
+          minutaIds.add(minuta.id);
+        }
+      });
+
+      if (duplicateIds.length > 0) {
+        console.warn(`⚠️ DUPLICADOS DETECTADOS EN MINUTAS ANTES DE ENVIAR:`, duplicateIds);
+        console.warn(`⚠️ Total duplicados: ${duplicateIds.length} de ${minutasToUpsert.length} minutas`);
+        
+        // Remover duplicados manteniendo solo la primera ocurrencia
+        const uniqueMinutas = [];
+        const processedIds = new Set();
+        minutasToUpsert.forEach(minuta => {
+          if (!processedIds.has(minuta.id)) {
+            processedIds.add(minuta.id);
+            uniqueMinutas.push(minuta);
+          }
+        });
+        
+        console.log(`🔄 Removiendo ${duplicateIds.length} minutas duplicadas, procesando ${uniqueMinutas.length} únicas`);
+        minutasToUpsert = uniqueMinutas;
+      }
+
+      // Usar upsert para manejar duplicados sin eliminar minutas existentes
       const { data, error } = await this.supabase
         .from('minute_tasks')
-        .insert(minutasToInsert)
+        .upsert(minutasToUpsert, { 
+          onConflict: 'id',
+          ignoreDuplicates: false 
+        })
         .select('*');
 
       if (error) {
         console.error('❌ Error guardando minutas:', error);
+        console.error('❌ Detalles del error:', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
         return { success: false, error };
       }
 
-      console.log(`✅ Minutas guardadas: ${data?.length || 0}`);
+      console.log(`✅ Minutas guardadas/actualizadas: ${data?.length || 0}`);
 
+      // Verificar si se guardaron correctamente
+      try {
+        const { data: savedMinutas, error: verifyError } = await this.supabase
+          .from('minute_tasks')
+          .select('id, task_description, created_at')
+          .eq('project_id', projectId)
+          .order('created_at', { ascending: false });
+
+        if (!verifyError && savedMinutas) {
+          const savedCount = savedMinutas.length;
+          const expectedCount = minutasToUpsert.length;
+          
+          if (savedCount >= expectedCount) {
+            console.log(`✅ Verificación exitosa: ${savedCount} minutas en Supabase para proyecto ${projectId}`);
+          } else {
+            console.warn(`⚠️ Posible discrepancia: Esperadas ${expectedCount}, Encontradas ${savedCount} minutas`);
+          }
+        }
+      } catch (verifyError) {
+        console.warn(`⚠️ Error verificando minutas guardadas:`, verifyError);
+      }
 
       return { success: true, data };
 
