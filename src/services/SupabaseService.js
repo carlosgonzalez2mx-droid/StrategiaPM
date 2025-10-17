@@ -876,6 +876,15 @@ class SupabaseService {
     this.isSaving = true;
     console.log('💾 Guardando datos del portafolio en Supabase...');
 
+    // Disparar evento de inicio de sincronización
+    const syncStartEvent = new CustomEvent('supabaseSyncing', {
+      detail: { 
+        timestamp: new Date().toISOString(),
+        message: 'Iniciando sincronización con Supabase'
+      }
+    });
+    window.dispatchEvent(syncStartEvent);
+
     try {
 
       // Guardar/actualizar proyectos
@@ -1408,10 +1417,33 @@ class SupabaseService {
       }
 
       console.log('✅ Datos del portafolio guardados en Supabase');
+      
+      // Disparar evento de guardado exitoso
+      const saveSuccessEvent = new CustomEvent('supabaseDataSaved', {
+        detail: { 
+          timestamp: new Date().toISOString(),
+          message: 'Datos guardados exitosamente en Supabase',
+          dataSize: JSON.stringify(data).length,
+          path: 'Supabase Cloud'
+        }
+      });
+      window.dispatchEvent(saveSuccessEvent);
+      
       return true;
 
     } catch (error) {
       console.error('❌ Error guardando datos del portafolio:', error);
+      
+      // Disparar evento de error
+      const errorEvent = new CustomEvent('supabaseError', {
+        detail: { 
+          timestamp: new Date().toISOString(),
+          message: `Error guardando en Supabase: ${error.message}`,
+          error: error
+        }
+      });
+      window.dispatchEvent(errorEvent);
+      
       return false;
     } finally {
       // Liberar flag de guardado
