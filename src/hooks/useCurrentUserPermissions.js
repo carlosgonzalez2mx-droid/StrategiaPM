@@ -3,9 +3,12 @@
 // ==========================================
 // Hook para obtener permisos del usuario actual
 // Elimina verificaciones duplicadas de isOwnerOrAdmin
+// V2: Integra sistema de mapeo de roles
 
 import { useMemo } from 'react';
 import supabaseService from '../services/SupabaseService';
+import { useRoleMapping } from './useRoleMapping';
+import { ROLES } from '../constants/roles';
 
 /**
  * Hook para verificar permisos del usuario actual en la organización
@@ -15,6 +18,8 @@ import supabaseService from '../services/SupabaseService';
  * @returns {Object} { currentUser, currentUserMembership, currentUserRole, isOwnerOrAdmin, isOwner, isAdmin, isMember, canInvite, canEditRoles, canRemoveMembers }
  */
 const useCurrentUserPermissions = (members = []) => {
+  const { mapRole, hasPermission } = useRoleMapping();
+  
   return useMemo(() => {
     // Obtener usuario actual de Supabase
     const currentUser = supabaseService.getCurrentUser();
@@ -24,6 +29,7 @@ const useCurrentUserPermissions = (members = []) => {
         currentUser: null,
         currentUserMembership: null,
         currentUserRole: null,
+        mappedRole: null,
         isOwnerOrAdmin: false,
         isOwner: false,
         isAdmin: false,
@@ -44,6 +50,7 @@ const useCurrentUserPermissions = (members = []) => {
         currentUser,
         currentUserMembership: null,
         currentUserRole: null,
+        mappedRole: null,
         isOwnerOrAdmin: false,
         isOwner: false,
         isAdmin: false,
@@ -54,18 +61,20 @@ const useCurrentUserPermissions = (members = []) => {
       };
     }
 
-    const role = currentUserMembership.role;
+    const originalRole = currentUserMembership.role;
+    const mappedRole = mapRole(originalRole);
     
-    // Calcular permisos basados en el rol
-    const isOwner = role === 'owner';
-    const isAdmin = role === 'admin';
+    // Calcular permisos basados en el rol mapeado
+    const isOwner = mappedRole === ROLES.OWNER;
+    const isAdmin = mappedRole === ROLES.ADMIN;
     const isOwnerOrAdmin = isOwner || isAdmin;
-    const isMember = role === 'organization_member_write' || role === 'organization_member_read';
+    const isMember = mappedRole === ROLES.MEMBER_WRITE || mappedRole === ROLES.MEMBER_READ;
 
     return {
       currentUser,
       currentUserMembership,
-      currentUserRole: role,
+      currentUserRole: originalRole,
+      mappedRole,
       
       // Permisos básicos
       isOwnerOrAdmin,
@@ -73,30 +82,32 @@ const useCurrentUserPermissions = (members = []) => {
       isAdmin,
       isMember,
       
-      // Permisos específicos
-      canInvite: isOwnerOrAdmin,
-      canEditRoles: isOwnerOrAdmin,
-      canRemoveMembers: isOwnerOrAdmin,
+      // Permisos específicos usando el sistema de permisos
+      canInvite: hasPermission(mappedRole, 'canInvite'),
+      canEditRoles: hasPermission(mappedRole, 'canEditRoles'),
+      canRemoveMembers: hasPermission(mappedRole, 'canRemoveMembers'),
       
       // Función helper para verificar si puede editar un miembro específico
       canEditMember: (targetMember) => {
-        if (!isOwnerOrAdmin) return false;
+        if (!hasPermission(mappedRole, 'canEditRoles')) return false;
         // Owner puede editar a todos
         if (isOwner) return true;
         // Admin no puede editar a owner
-        if (targetMember.role === 'owner') return false;
+        const targetMappedRole = mapRole(targetMember?.role);
+        if (targetMappedRole === ROLES.OWNER) return false;
         return true;
       },
       
       // Función helper para verificar si puede eliminar un miembro específico
       canRemoveMember: (targetMember) => {
-        if (!isOwnerOrAdmin) return false;
+        if (!hasPermission(mappedRole, 'canRemoveMembers')) return false;
         // No puede eliminarse a sí mismo
-        if (targetMember.user_email === currentUser.email) return false;
+        if (targetMember?.user_email === currentUser.email) return false;
         // Owner puede eliminar a todos (excepto a sí mismo)
         if (isOwner) return true;
         // Admin no puede eliminar a owner ni a otros admins
-        if (targetMember.role === 'owner' || targetMember.role === 'admin') return false;
+        const targetMappedRole = mapRole(targetMember?.role);
+        if (targetMappedRole === ROLES.OWNER || targetMappedRole === ROLES.ADMIN) return false;
         return true;
       }
     };

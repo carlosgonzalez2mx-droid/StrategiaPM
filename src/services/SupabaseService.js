@@ -302,9 +302,16 @@ class SupabaseService {
     }
   }
 
-  // Autenticación
+  // Autenticación mejorada con manejo robusto de errores
   async signUp(email, password, name) {
+    let authUser = null;
+    let userCreated = false;
+    let organizationCreated = false;
+    
     try {
+      console.log('🚀 Iniciando registro de usuario:', email);
+      
+      // PASO 1: Crear usuario en auth.users
       const { data, error } = await this.supabase.auth.signUp({
         email,
         password,
@@ -316,82 +323,257 @@ class SupabaseService {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error en auth.signUp:', error);
+        throw error;
+      }
 
-      // Crear usuario en la tabla users
-      if (data.user) {
+      if (!data.user) {
+        throw new Error('No se pudo crear el usuario en auth.users');
+      }
+
+      authUser = data.user;
+      console.log('✅ Usuario creado en auth.users:', authUser.id);
+
+      // PASO 2: Crear usuario en tabla users con manejo robusto de errores
+      try {
         const { error: userError } = await this.supabase
           .from('users')
           .insert({
-            id: data.user.id,
-            email: data.user.email,
+            id: authUser.id,
+            email: authUser.email,
             name: name,
             role: 'user'
           });
 
         if (userError) {
-          console.warn('⚠️ Error creando usuario en tabla users:', userError);
+          // Si es error de duplicado, verificar si ya existe
+          if (userError.code === '23505') {
+            console.log('ℹ️ Usuario ya existe en tabla users, verificando...');
+            const { data: existingUser } = await this.supabase
+              .from('users')
+              .select('id')
+              .eq('id', authUser.id)
+              .single();
+            
+            if (existingUser) {
+              console.log('✅ Usuario ya existe en tabla users');
+              userCreated = true;
+            } else {
+              throw new Error('Error de duplicado pero usuario no encontrado');
+            }
+          } else {
+            throw userError;
+          }
+        } else {
+          console.log('✅ Usuario creado en tabla users');
+          userCreated = true;
         }
+      } catch (userError) {
+        console.error('❌ Error crítico creando usuario en tabla users:', userError);
+        
+        // ROLLBACK: Eliminar usuario de auth.users si falla la creación en users
+        try {
+          console.log('🔄 Iniciando rollback - eliminando usuario de auth.users...');
+          await this.supabase.auth.admin.deleteUser(authUser.id);
+          console.log('✅ Rollback completado');
+        } catch (rollbackError) {
+          console.error('❌ Error en rollback:', rollbackError);
+        }
+        
+        throw new Error(`Error creando usuario en tabla users: ${userError.message}`);
+      }
 
-        // Crear organización para el usuario
+      // PASO 3: Crear organización para el usuario
+      try {
         const { data: orgData, error: orgError } = await this.supabase
           .from('organizations')
           .insert({
             name: `${name}'s Organization`,
-            owner_id: data.user.id
+            owner_id: authUser.id
           })
           .select('id')
           .single();
 
         if (orgError) {
           console.warn('⚠️ Error creando organización:', orgError);
+          // No es crítico, el usuario puede ser invitado a una organización existente
         } else {
-          // DETECCIÓN AUTOMÁTICA: Usar organización creada
+          console.log('✅ Organización creada:', orgData.id);
           this.organizationId = orgData.id;
+          organizationCreated = true;
         }
+      } catch (orgError) {
+        console.warn('⚠️ Error no crítico creando organización:', orgError);
       }
 
-      this.currentUser = data.user;
+      // PASO 4: Configurar usuario actual
+      this.currentUser = authUser;
       
-      // ACTIVAR INVITACIONES PENDIENTES AUTOMÁTICAMENTE
-      const invitationResult = await this.activatePendingInvitations(email, data.user.id);
+      // PASO 5: Activar invitaciones pendientes
+      const invitationResult = await this.activatePendingInvitations(email, authUser.id);
+      
+      console.log('🎉 Registro completado exitosamente');
+      console.log('📊 Resumen:', {
+        authUser: !!authUser,
+        userCreated,
+        organizationCreated,
+        invitationsActivated: invitationResult.activated
+      });
       
       return { 
         success: true, 
-        user: data.user,
-        invitationActivation: invitationResult
+        user: authUser,
+        invitationActivation: invitationResult,
+        details: {
+          userCreated,
+          organizationCreated,
+          organizationId: this.organizationId
+        }
       };
+      
     } catch (error) {
       console.error('❌ Error en signUp:', error);
-      return { success: false, error: error.message };
+      
+      // Si el usuario fue creado en auth.users pero falló en users, intentar limpiar
+      if (authUser && !userCreated) {
+        console.log('🧹 Limpiando usuario huérfano de auth.users...');
+        try {
+          await this.supabase.auth.admin.deleteUser(authUser.id);
+        } catch (cleanupError) {
+          console.error('❌ Error limpiando usuario huérfano:', cleanupError);
+        }
+      }
+      
+      return { 
+        success: false, 
+        error: error.message,
+        details: {
+          authUser: !!authUser,
+          userCreated,
+          organizationCreated
+        }
+      };
     }
   }
 
   async signIn(email, password) {
     try {
+      console.log('🚀 Iniciando login de usuario:', email);
+      
+      // PASO 1: Autenticar en auth.users
       const { data, error } = await this.supabase.auth.signInWithPassword({
         email,
         password
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Error en auth.signIn:', error);
+        throw error;
+      }
 
+      if (!data.user) {
+        throw new Error('No se pudo autenticar el usuario');
+      }
+
+      console.log('✅ Usuario autenticado en auth.users:', data.user.id);
       this.currentUser = data.user;
-      
-      // TAMBIÉN VERIFICAR INVITACIONES PENDIENTES EN LOGIN
-      // (Por si el usuario ya tenía cuenta antes de ser invitado)
+
+      // PASO 2: Verificar/crear usuario en tabla users (SINCRONIZACIÓN AUTOMÁTICA)
+      try {
+        const { data: existingUser, error: userError } = await this.supabase
+          .from('users')
+          .select('id, email, name, role')
+          .eq('id', data.user.id)
+          .single();
+
+        if (userError) {
+          if (userError.code === 'PGRST116') {
+            // Usuario no existe en tabla users, crearlo
+            console.log('⚠️ Usuario no existe en tabla users, creando...');
+            
+            const { error: createError } = await this.supabase
+              .from('users')
+              .insert({
+                id: data.user.id,
+                email: data.user.email,
+                name: data.user.user_metadata?.name || data.user.email.split('@')[0],
+                role: data.user.user_metadata?.role || 'user'
+              });
+
+            if (createError) {
+              console.error('❌ Error creando usuario en tabla users:', createError);
+              throw new Error(`Error sincronizando usuario: ${createError.message}`);
+            }
+            
+            console.log('✅ Usuario sincronizado en tabla users');
+          } else {
+            throw userError;
+          }
+        } else {
+          console.log('✅ Usuario existe en tabla users');
+          
+          // Verificar si necesita actualización
+          const needsUpdate = 
+            existingUser.email !== data.user.email ||
+            existingUser.name !== (data.user.user_metadata?.name || data.user.email.split('@')[0]);
+          
+          if (needsUpdate) {
+            console.log('🔄 Actualizando datos del usuario en tabla users...');
+            const { error: updateError } = await this.supabase
+              .from('users')
+              .update({
+                email: data.user.email,
+                name: data.user.user_metadata?.name || data.user.email.split('@')[0],
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', data.user.id);
+            
+            if (updateError) {
+              console.warn('⚠️ Error actualizando usuario:', updateError);
+            } else {
+              console.log('✅ Usuario actualizado en tabla users');
+            }
+          }
+        }
+      } catch (syncError) {
+        console.error('❌ Error crítico en sincronización de usuario:', syncError);
+        // No fallar el login por problemas de sincronización, pero logear el error
+        console.warn('⚠️ Continuando con login a pesar del error de sincronización');
+      }
+
+      // PASO 3: Activar invitaciones pendientes
       const invitationResult = await this.activatePendingInvitations(email, data.user.id);
       
+      // PASO 4: Cargar organización
       await this.loadOrganization();
+      
+      console.log('🎉 Login completado exitosamente');
+      console.log('📊 Resumen:', {
+        userAuthenticated: !!data.user,
+        invitationsActivated: invitationResult.activated,
+        organizationId: this.organizationId
+      });
       
       return { 
         success: true, 
         user: data.user,
-        invitationActivation: invitationResult
+        invitationActivation: invitationResult,
+        details: {
+          organizationId: this.organizationId,
+          synchronized: true
+        }
       };
     } catch (error) {
       console.error('❌ Error en signIn:', error);
-      return { success: false, error: error.message };
+      return { 
+        success: false, 
+        error: error.message,
+        details: {
+          userAuthenticated: false,
+          synchronized: false
+        }
+      };
     }
   }
 
@@ -1509,6 +1691,158 @@ class SupabaseService {
   // Obtener usuario actual
   getCurrentUser() {
     return this.currentUser;
+  }
+
+  // Función de sincronización automática de usuarios
+  async syncUserToPublicTable(userId = null) {
+    try {
+      const targetUserId = userId || this.currentUser?.id;
+      
+      if (!targetUserId) {
+        console.warn('⚠️ No hay usuario para sincronizar');
+        return { success: false, error: 'No hay usuario para sincronizar' };
+      }
+
+      console.log('🔄 Sincronizando usuario:', targetUserId);
+
+      // Obtener datos del usuario de auth.users
+      const { data: authUser, error: authError } = await this.supabase.auth.admin.getUserById(targetUserId);
+      
+      if (authError || !authUser.user) {
+        console.error('❌ Error obteniendo usuario de auth.users:', authError);
+        return { success: false, error: 'Usuario no encontrado en auth.users' };
+      }
+
+      const user = authUser.user;
+
+      // Verificar si ya existe en public.users
+      const { data: existingUser, error: checkError } = await this.supabase
+        .from('users')
+        .select('id')
+        .eq('id', targetUserId)
+        .single();
+
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.error('❌ Error verificando usuario existente:', checkError);
+        return { success: false, error: checkError.message };
+      }
+
+      if (existingUser) {
+        // Usuario existe, actualizar si es necesario
+        console.log('ℹ️ Usuario existe, verificando actualizaciones...');
+        
+        const { error: updateError } = await this.supabase
+          .from('users')
+          .update({
+            email: user.email,
+            name: user.user_metadata?.name || user.email.split('@')[0],
+            role: user.user_metadata?.role || 'user',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', targetUserId);
+
+        if (updateError) {
+          console.error('❌ Error actualizando usuario:', updateError);
+          return { success: false, error: updateError.message };
+        }
+
+        console.log('✅ Usuario actualizado en public.users');
+        return { success: true, action: 'updated' };
+      } else {
+        // Usuario no existe, crearlo
+        console.log('ℹ️ Usuario no existe, creando...');
+        
+        const { error: createError } = await this.supabase
+          .from('users')
+          .insert({
+            id: user.id,
+            email: user.email,
+            name: user.user_metadata?.name || user.email.split('@')[0],
+            role: user.user_metadata?.role || 'user'
+          });
+
+        if (createError) {
+          console.error('❌ Error creando usuario:', createError);
+          return { success: false, error: createError.message };
+        }
+
+        console.log('✅ Usuario creado en public.users');
+        return { success: true, action: 'created' };
+      }
+
+    } catch (error) {
+      console.error('❌ Error en syncUserToPublicTable:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Función de health check para verificar sincronización
+  async checkUserSyncHealth() {
+    try {
+      if (!this.currentUser?.id) {
+        return { 
+          status: 'no_user', 
+          message: 'No hay usuario autenticado',
+          healthy: false 
+        };
+      }
+
+      // Verificar si el usuario existe en public.users
+      const { data: publicUser, error } = await this.supabase
+        .from('users')
+        .select('id, email, name, role, updated_at')
+        .eq('id', this.currentUser.id)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return { 
+            status: 'missing_in_public', 
+            message: 'Usuario no existe en tabla public.users',
+            healthy: false,
+            needsSync: true
+          };
+        } else {
+          return { 
+            status: 'error', 
+            message: `Error verificando usuario: ${error.message}`,
+            healthy: false 
+          };
+        }
+      }
+
+      // Verificar si los datos están sincronizados
+      const isEmailSynced = publicUser.email === this.currentUser.email;
+      const isNameSynced = publicUser.name === (this.currentUser.user_metadata?.name || this.currentUser.email.split('@')[0]);
+
+      if (!isEmailSynced || !isNameSynced) {
+        return { 
+          status: 'out_of_sync', 
+          message: 'Datos del usuario desactualizados',
+          healthy: false,
+          needsSync: true,
+          details: {
+            emailSynced: isEmailSynced,
+            nameSynced: isNameSynced
+          }
+        };
+      }
+
+      return { 
+        status: 'healthy', 
+        message: 'Usuario correctamente sincronizado',
+        healthy: true,
+        user: publicUser
+      };
+
+    } catch (error) {
+      console.error('❌ Error en checkUserSyncHealth:', error);
+      return { 
+        status: 'error', 
+        message: `Error en health check: ${error.message}`,
+        healthy: false 
+      };
+    }
   }
 
   // Verificar si está autenticado

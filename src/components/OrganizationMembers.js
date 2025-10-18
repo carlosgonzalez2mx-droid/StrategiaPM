@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import useAuditLog from '../hooks/useAuditLog';
 import supabaseService from '../services/SupabaseService';
 import { FUNCTIONAL_ROLES, FUNCTIONAL_ROLE_LABELS } from '../constants/unifiedRoles';
+import { ROLES, ROLE_LABELS, ROLE_OPTIONS, mapLegacyRole } from '../constants/roles';
 import useOrganizationId from '../hooks/useOrganizationId';
 import useCurrentUserPermissions from '../hooks/useCurrentUserPermissions';
 import useInviteModal from '../hooks/useInviteModal';
@@ -338,7 +339,8 @@ Una vez registrado con ese email, tendrá acceso automáticamente.`);
     
     // VERIFICAR PERMISOS: Usar hook de permisos
     if (!canRemoveMember(memberToDelete)) {
-      if (memberToDelete?.role === 'owner') {
+      const mappedRole = mapLegacyRole(memberToDelete?.role);
+      if (mappedRole === ROLES.OWNER) {
         alert('❌ No se puede eliminar al propietario de la organización.');
       } else {
         alert('❌ No tienes permisos para eliminar este miembro.');
@@ -511,7 +513,8 @@ Solo así verá que ya no tiene acceso a la organización.`;
     
     // VERIFICAR PERMISOS: Usar hook de permisos
     if (!canEditMember(editingMember)) {
-      if (editingMember.role === 'owner') {
+      const mappedRole = mapLegacyRole(editingMember.role);
+      if (mappedRole === ROLES.OWNER) {
         alert('❌ No se puede cambiar el rol del propietario de la organización.');
       } else {
         alert('❌ No tienes permisos para cambiar el rol de este miembro.');
@@ -836,15 +839,9 @@ Solo así verá que ya no tiene acceso a la organización.`;
   };
 
   const getRoleLabel = (role) => {
-    switch (role) {
-      case 'organization_owner': return '👑 Administrador';
-      case 'organization_member_write': return '✏️ Miembro (Editar)';
-      case 'organization_member_read': return '👀 Miembro (Solo lectura)';
-      case 'owner': return '👑 Propietario';
-      case 'admin': return '👑 Administrador';
-      case 'member': return '✏️ Miembro';
-      default: return role;
-    }
+    // Mapear rol legacy a rol estándar y obtener su etiqueta
+    const mappedRole = mapLegacyRole(role);
+    return ROLE_LABELS[mappedRole] || role;
   };
 
   return (
@@ -1121,9 +1118,11 @@ Solo así verá que ya no tiene acceso a la organización.`;
                       value={inviteRole}
                       onChange={(e) => setInviteRole(e.target.value)}
                     >
-                      <option value="organization_owner">👑 Administrador (Gestionar organización)</option>
-                      <option value="organization_member_write">✏️ Miembro (Ver y editar proyectos)</option>
-                      <option value="organization_member_read">👀 Miembro (Solo lectura)</option>
+                      {ROLE_OPTIONS.map(option => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </div>
@@ -1195,9 +1194,11 @@ Solo así verá que ya no tiene acceso a la organización.`;
                   onChange={(e) => setNewRole(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="organization_member_write">✏️ Miembro (Ver y editar proyectos)</option>
-                  <option value="organization_member_read">👀 Miembro (Solo lectura)</option>
-                  <option value="admin">👑 Administrador</option>
+                  {ROLE_OPTIONS.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
                 </select>
                 
                 <div className="mt-2 text-xs text-gray-500">
