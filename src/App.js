@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { debounce } from 'lodash';
 import './App.css';
 import './index.css';
 
@@ -24,6 +25,7 @@ import ProjectArchive from './components/ProjectArchive';
 import SyncIndicator from './components/SyncIndicator';
 import BackupManager from './components/BackupManager';
 import FileStatusIndicator from './components/FileStatusIndicator';
+import AutoSaveIndicator from './components/AutoSaveIndicator';
 import SupabaseAuth from './components/SupabaseAuth';
 import OrganizationMembers from './components/OrganizationMembers';
 import UserManagement from './components/UserManagement';
@@ -302,6 +304,46 @@ function MainApp() {
     }
   }, [tasksByProject]);
 
+  // Sistema de auto-guardado con debouncing
+  const debouncedSave = useCallback(
+    debounce(async (dataToSave) => {
+      if (!useSupabase || !supabaseService.isAuthenticated()) {
+        console.log('⏭️ Saltando guardado - No autenticado o Supabase deshabilitado');
+        return;
+      }
+      
+      console.log('💾 Auto-guardando cambios...');
+      const saveStartTime = Date.now();
+      
+      try {
+        const success = await supabaseService.savePortfolioData(dataToSave);
+        
+        if (success) {
+          const duration = Date.now() - saveStartTime;
+          console.log(`✅ Auto-guardado exitoso en ${duration}ms`);
+          
+          // Disparar evento para actualizar UI
+          const event = new CustomEvent('autoSaveComplete', { 
+            detail: { duration, timestamp: new Date().toISOString() } 
+          });
+          window.dispatchEvent(event);
+        } else {
+          console.warn('⚠️ Auto-guardado falló');
+        }
+      } catch (error) {
+        console.error('❌ Error en auto-guardado:', error);
+      }
+    }, 2000), // Esperar 2 segundos después del último cambio
+    [useSupabase]
+  );
+
+  // Cancelar guardado pendiente al desmontar
+  useEffect(() => {
+    return () => {
+      debouncedSave.cancel();
+    };
+  }, [debouncedSave]);
+
   // Ref para prevenir actualizaciones simultáneas
   const isUpdatingTasksRef = useRef(false);
   const isUpdatingTasksByProjectRef = useRef(false);
@@ -547,6 +589,22 @@ function MainApp() {
         tasksInProject: updatedProjects[currentProjectId]?.length,
         duplicatesRemoved: duplicatesFound,
         sortedByWbsCode: true
+      });
+      
+      // Auto-guardar cambios con debouncing
+      debouncedSave({
+        projects,
+        tasksByProject: updatedProjects,
+        risksByProject,
+        purchaseOrdersByProject,
+        advancesByProject,
+        invoicesByProject,
+        contractsByProject,
+        resourceAssignmentsByProject,
+        globalResources,
+        auditLogsByProject,
+        minutasByProject,
+        includeWeekendsByProject
       });
       
       return updatedProjects;
@@ -1782,6 +1840,7 @@ function MainApp() {
         </div>
       )}
       <FileStatusIndicator />
+      <AutoSaveIndicator />
       <BackupManager onRestoreData={importData} />
       
       <div className="flex">

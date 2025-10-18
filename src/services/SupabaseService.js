@@ -12,6 +12,36 @@ class SupabaseService {
     this.isSaving = false; // Flag para prevenir guardados simultáneos
   }
 
+  // Generar ID determinístico basado en proyecto + identificador único
+  generateDeterministicId(projectId, uniqueIdentifier) {
+    // Si ya es un UUID válido, devolverlo tal cual
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (uuidRegex.test(uniqueIdentifier)) {
+      return uniqueIdentifier;
+    }
+    
+    // Crear un ID determinístico basado en proyecto + identificador
+    const baseString = `${projectId}-${uniqueIdentifier}`;
+    let hash = 0;
+    
+    for (let i = 0; i < baseString.length; i++) {
+      const char = baseString.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    
+    // Convertir a formato UUID-like
+    const hashHex = Math.abs(hash).toString(16).padStart(32, '0');
+    
+    return [
+      hashHex.substring(0, 8),
+      hashHex.substring(8, 12),
+      '4' + hashHex.substring(13, 16),
+      '8' + hashHex.substring(17, 20),
+      hashHex.substring(20, 32)
+    ].join('-');
+  }
+
   // Inicializar el servicio
   async initialize() {
     try {
@@ -993,7 +1023,9 @@ class SupabaseService {
             
             // Verificar si el ID es un UUID válido
             const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-            const taskId = uuidRegex.test(task.id) ? task.id : generateUUID();
+            const taskId = uuidRegex.test(task.id) 
+              ? task.id 
+              : this.generateDeterministicId(projectId, task.wbsCode || task.id || generateUUID());
             
             // Log si se generó un nuevo UUID
             if (taskId !== task.id) {
@@ -1070,26 +1102,48 @@ class SupabaseService {
             console.error(`🚨 Total duplicados: ${duplicateIds.length} de ${tasksToUpsert.length} tareas`);
           }
           
-          // REEMPLAZO COMPLETO: Eliminar tareas existentes y insertar nuevas
-          console.log(`🗑️ Eliminando tareas existentes del proyecto ${projectId}...`);
-          const { error: deleteError } = await this.supabase
-            .from('tasks')
-            .delete()
-            .eq('project_id', projectId)
-            .eq('owner_id', this.currentUser.id);
+          // UPSERT: Actualiza si existe, inserta si es nuevo
+          console.log(`📝 Guardando ${tasksToUpsert.length} tareas con UPSERT para proyecto ${projectId}...`);
 
-          if (deleteError) {
-            console.error(`❌ Error eliminando tareas existentes para proyecto ${projectId}:`, deleteError);
-            throw deleteError;
+          // Primero, obtener las tareas existentes para preservar datos no modificados
+          const { data: existingTasks, error: fetchError } = await this.supabase
+            .from('tasks')
+            .select('id')
+            .eq('project_id', projectId);
+
+          if (fetchError) {
+            console.warn('⚠️ No se pudieron verificar tareas existentes:', fetchError);
           }
 
-          console.log(`📝 Insertando ${tasksToUpsert.length} tareas nuevas para proyecto ${projectId}...`);
-          const { error: tasksError } = await this.supabase
+          // Marcar tareas para eliminación (las que ya no están en el array nuevo)
+          const newTaskIds = new Set(tasksToUpsert.map(t => t.id));
+          const existingTaskIds = new Set((existingTasks || []).map(t => t.id));
+          const tasksToDelete = Array.from(existingTaskIds).filter(id => !newTaskIds.has(id));
+
+          // Eliminar tareas que ya no existen
+          if (tasksToDelete.length > 0) {
+            console.log(`🗑️ Eliminando ${tasksToDelete.length} tareas que ya no están en el cronograma`);
+            const { error: deleteError } = await this.supabase
+              .from('tasks')
+              .delete()
+              .in('id', tasksToDelete);
+            
+            if (deleteError) {
+              console.error('❌ Error eliminando tareas obsoletas:', deleteError);
+            }
+          }
+
+          // UPSERT las tareas actuales
+          const { data: upsertedTasks, error: tasksError } = await this.supabase
             .from('tasks')
-            .insert(tasksToUpsert);
+            .upsert(tasksToUpsert, {
+              onConflict: 'id',
+              ignoreDuplicates: false
+            })
+            .select('id, name');
 
           if (tasksError) {
-            console.error(`❌ Error guardando tareas para proyecto ${projectId}:`, tasksError);
+            console.error(`❌ Error en UPSERT de tareas para proyecto ${projectId}:`, tasksError);
             console.error(`❌ Detalles del error:`, {
               code: tasksError.code,
               message: tasksError.message,
@@ -1097,7 +1151,7 @@ class SupabaseService {
               hint: tasksError.hint
             });
           } else {
-            console.log(`✅ TAREAS REEMPLAZADAS COMPLETAMENTE para proyecto ${projectId}: ${tasksToUpsert.length} tareas nuevas (cronograma anterior eliminado)`);
+            console.log(`✅ UPSERT exitoso: ${upsertedTasks?.length || 0} tareas actualizadas/creadas`);
             
             // VERIFICAR SI SUPABASE DUPLICÓ LAS TAREAS
             try {

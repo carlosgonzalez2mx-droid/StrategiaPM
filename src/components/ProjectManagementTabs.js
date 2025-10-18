@@ -544,8 +544,16 @@ const ProjectManagementTabs = ({
   // 8. Resource Assignments: Usar la función setResourceAssignments que ya filtra por proyecto
   const projectResourceAssignments = Array.isArray(resourceAssignments) ? resourceAssignments : [];
 
-  // Solo mostrar proyectos activos
-  const activeProjects = projects?.filter(p => p.status === 'active') || [];
+  // Solo mostrar proyectos activos ordenados alfabéticamente (con soporte numérico)
+  const activeProjects = useMemo(() => {
+    if (!projects) return [];
+    return projects
+      .filter(p => p.status === 'active')
+      .sort((a, b) => a.name.localeCompare(b.name, undefined, { 
+        numeric: true,
+        sensitivity: 'base'
+      }));
+  }, [projects]);
 
   // IMPORTANTE: Los datos deben filtrarse por proyecto seleccionado
   // Actualmente se están usando todos los datos sin filtrar, lo que puede mostrar información incorrecta
