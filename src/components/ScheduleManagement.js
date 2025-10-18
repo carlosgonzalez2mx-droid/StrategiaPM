@@ -4753,8 +4753,18 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         successors: task.successors?.filter(succId => succId !== taskId) || []
       }));
       
+      // ✅ CORRECCIÓN: Reasignar wbsCode para mantener secuencia correcta
+      const finalTasks = cleanedTasks.map((task, index) => ({
+        ...task,
+        wbsCode: index + 1
+      }));
+      
       console.log('✅ Tarea eliminada exitosamente');
-      return cleanedTasks;
+      console.log('🔧 wbsCode reasignados después de eliminación:', 
+        finalTasks.map(t => ({ name: t.name, wbsCode: t.wbsCode }))
+      );
+      
+      return finalTasks;
     });
   };
 
