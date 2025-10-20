@@ -97,28 +97,7 @@ function MainApp() {
   }, []);
   
   // ===== ESTADO MULTI-PROYECTO =====
-  const [projects, setProjects] = useState([
-    // Proyecto de demostración para familiarizarse con el sistema
-    {
-      id: 'demo-001',
-      name: 'Proyecto de Demostración',
-      description: 'Proyecto de ejemplo para familiarizarse con el sistema. Puede eliminarse cuando agregue sus proyectos reales.',
-      status: 'active',
-      priority: 'medium',
-      startDate: new Date().toISOString().split('T')[0],
-      endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 días desde hoy
-      budget: 100000,
-      contingencyReserve: 10000,
-      managementReserve: 5000,
-      manager: 'Usuario Demo',
-      sponsor: 'Organización',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      version: '1.0.0',
-      progress: 0,
-      organizationId: 'demo-org-001' // CORRECCIÓN: Agregar organizationId para compatibilidad con localStorage
-    }
-  ]);
+  const [projects, setProjects] = useState([]);
 
   // Función para obtener el proyecto inicial con lógica de respaldo
   const getInitialProjectId = () => {
@@ -144,8 +123,8 @@ function MainApp() {
       return projects[0].id;
     }
     
-    // 4. Fallback por defecto
-    return 'demo-001';
+    // 4. NO HAY PROYECTOS - retornar null
+    return null;
   };
 
   const [currentProjectId, setCurrentProjectId] = useState(getInitialProjectId);
@@ -180,14 +159,10 @@ function MainApp() {
   // Work Packages eliminados - ya no se usan
 
   // Tareas por proyecto - cada proyecto tiene su propio cronograma
-  const [tasksByProject, setTasksByProject] = useState({
-    'demo-001': [] // Proyecto de demostración - sin tareas iniciales
-  });
+  const [tasksByProject, setTasksByProject] = useState({});
 
   // Configuración de días laborables por proyecto - cada proyecto puede tener su propia configuración
-  const [includeWeekendsByProject, setIncludeWeekendsByProject] = useState({
-    'demo-001': false // Por defecto: solo días laborales (lunes a viernes)
-  });
+  const [includeWeekendsByProject, setIncludeWeekendsByProject] = useState({});
 
   // Función para limpiar datos corruptos - CON MONITOREO INTELIGENTE
   const cleanTasksByProject = (data) => {
@@ -720,14 +695,10 @@ function MainApp() {
   };
 
   // Riesgos por proyecto - cada proyecto tiene su propia gestión de riesgos
-  const [risksByProject, setRisksByProject] = useState({
-    'demo-001': [] // Proyecto de demostración - sin riesgos iniciales
-  });
+  const [risksByProject, setRisksByProject] = useState({});
 
   // Minutas por proyecto - cada proyecto tiene sus propias minutas y tareas
-  const [minutasByProject, setMinutasByProject] = useState({
-    'demo-001': [] // Proyecto de demostración - sin minutas iniciales
-  });
+  const [minutasByProject, setMinutasByProject] = useState({});
 
   // Función para obtener riesgos del proyecto actual
   const getCurrentProjectRisks = () => {
@@ -838,22 +809,14 @@ function MainApp() {
 
   // ===== FUNCIONES DE GESTIÓN FINANCIERA =====
   
-  const [purchaseOrdersByProject, setPurchaseOrdersByProject] = useState({
-    'demo-001': [] // Proyecto de demostración - sin órdenes iniciales
-  });
+  const [purchaseOrdersByProject, setPurchaseOrdersByProject] = useState({});
   
 
-  const [advancesByProject, setAdvancesByProject] = useState({
-    'demo-001': [] // Proyecto de demostración - sin anticipos iniciales
-  });
+  const [advancesByProject, setAdvancesByProject] = useState({});
 
-  const [invoicesByProject, setInvoicesByProject] = useState({
-    'demo-001': [] // Proyecto de demostración - sin facturas iniciales
-  });
+  const [invoicesByProject, setInvoicesByProject] = useState({});
 
-  const [contractsByProject, setContractsByProject] = useState({
-    'demo-001': [] // Proyecto de demostración - sin contratos iniciales
-  });
+  const [contractsByProject, setContractsByProject] = useState({});
 
   const getCurrentProjectPurchaseOrders = () => {
     return purchaseOrdersByProject[currentProjectId] || [];
@@ -874,9 +837,7 @@ function MainApp() {
   // ===== FUNCIONES DE GESTIÓN DE RECURSOS =====
   
   const [globalResources, setGlobalResources] = useState([]);
-  const [resourceAssignmentsByProject, setResourceAssignmentsByProject] = useState({
-    'demo-001': [] // Proyecto de demostración - sin asignaciones iniciales
-  });
+  const [resourceAssignmentsByProject, setResourceAssignmentsByProject] = useState({});
 
   const getCurrentProjectResourceAssignments = () => {
     return resourceAssignmentsByProject[currentProjectId] || [];
@@ -884,9 +845,7 @@ function MainApp() {
 
   // ===== FUNCIONES DE AUDITORÍA =====
   
-  const [auditLogsByProject, setAuditLogsByProject] = useState({
-    'demo-001': [] // Proyecto de demostración - sin logs iniciales
-  });
+  const [auditLogsByProject, setAuditLogsByProject] = useState({});
   const [dataLoaded, setDataLoaded] = useState(false);
 
   const getCurrentProjectAuditLogs = () => {
@@ -1534,6 +1493,34 @@ function MainApp() {
 
   // ===== FUNCIONES DE GESTIÓN DE PROYECTOS =====
   
+  // Función helper segura para obtener datos del proyecto actual
+  const getCurrentProjectData = (dataType) => {
+    if (!currentProjectId) return [];
+    
+    switch (dataType) {
+      case 'tasks':
+        return tasksByProject[currentProjectId] || [];
+      case 'risks':
+        return risksByProject[currentProjectId] || [];
+      case 'minutas':
+        return minutasByProject[currentProjectId] || [];
+      case 'purchaseOrders':
+        return purchaseOrdersByProject[currentProjectId] || [];
+      case 'advances':
+        return advancesByProject[currentProjectId] || [];
+      case 'invoices':
+        return invoicesByProject[currentProjectId] || [];
+      case 'contracts':
+        return contractsByProject[currentProjectId] || [];
+      case 'resourceAssignments':
+        return resourceAssignmentsByProject[currentProjectId] || [];
+      case 'auditLogs':
+        return auditLogsByProject[currentProjectId] || [];
+      default:
+        return [];
+    }
+  };
+  
   // Función para calcular el progreso automático del proyecto basado en sus tareas
   const calculateProjectProgress = (projectId) => {
     const projectTasks = tasksByProject[projectId] || [];
@@ -1800,6 +1787,53 @@ function MainApp() {
     }
   }, [permissionsLoading, userRole, isReadOnly, activeSection]);
 
+  // 🚀 NUEVO: Escuchar eventos de actualización de tareas de minutas
+  useEffect(() => {
+    const handleMinutaStatusChanged = (event) => {
+      const { tareaId, newStatus, projectId, timestamp } = event.detail;
+      console.log('🔄 Evento minutaStatusChanged recibido:', { tareaId, newStatus, projectId, timestamp });
+      
+      // Forzar recálculo del Dashboard resumen
+      console.log('🔄 Forzando recálculo del Dashboard resumen...');
+      // El Dashboard se actualizará automáticamente cuando cambien los datos
+    };
+
+    const handleAutoSaveTrigger = (event) => {
+      const { source, data } = event.detail;
+      console.log('🔄 Evento autoSaveTrigger recibido:', { source, data });
+      
+      // Activar el auto-save existente
+      if (source === 'minutaUpdate') {
+        console.log('🔄 Activando auto-save por actualización de minuta...');
+        
+        // 🚀 NUEVO: Activar el auto-save manualmente
+        const dataToSave = {
+          projects,
+          tasksByProject,
+          risksByProject,
+          purchaseOrdersByProject,
+          advancesByProject,
+          invoicesByProject,
+          contractsByProject,
+          minutasByProject: data?.minutasTasks || minutasByProject
+        };
+        
+        console.log('🔄 Ejecutando auto-save manual para minutas...');
+        debouncedSave(dataToSave);
+      }
+    };
+
+    // Agregar listeners
+    window.addEventListener('minutaStatusChanged', handleMinutaStatusChanged);
+    window.addEventListener('autoSaveTrigger', handleAutoSaveTrigger);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('minutaStatusChanged', handleMinutaStatusChanged);
+      window.removeEventListener('autoSaveTrigger', handleAutoSaveTrigger);
+    };
+  }, [debouncedSave]);
+
   // Estados de modales
   const [showPOModal, setShowPOModal] = useState(false);
   const [showAdvanceModal, setShowAdvanceModal] = useState(false);
@@ -1811,6 +1845,66 @@ function MainApp() {
   // ===== RENDERIZADO =====
   
   const currentProject = projects.find(p => p.id === currentProjectId);
+
+  // Validar que hay un proyecto seleccionado
+  if (!currentProject && projects.length > 0) {
+    // Hay proyectos pero ninguno seleccionado, seleccionar el primero
+    const firstProject = projects[0];
+    setCurrentProjectId(firstProject.id);
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Seleccionando proyecto...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Si no hay proyectos, mostrar mensaje de bienvenida
+  if (!currentProject && projects.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
+        <div className="text-center max-w-md mx-auto p-8">
+          <div className="text-6xl mb-6">📁</div>
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">
+            ¡Bienvenido al Sistema de Gestión de Proyectos!
+          </h2>
+          <p className="text-gray-600 mb-8 text-lg">
+            Comienza creando tu primer proyecto para gestionar cronogramas, riesgos, presupuestos y más.
+          </p>
+          <button
+            onClick={() => {
+              // Crear un proyecto básico
+              const newProject = {
+                id: `proj-${Date.now()}`,
+                name: 'Mi Primer Proyecto',
+                description: 'Proyecto inicial para familiarizarse con el sistema',
+                status: 'active',
+                priority: 'medium',
+                startDate: new Date().toISOString().split('T')[0],
+                endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                budget: 100000,
+                contingencyReserve: 10000,
+                managementReserve: 5000,
+                manager: user?.email || 'Usuario',
+                sponsor: 'Organización',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                version: '1.0.0',
+                progress: 0
+              };
+              setProjects([newProject]);
+              setCurrentProjectId(newProject.id);
+            }}
+            className="bg-blue-600 text-white px-8 py-4 rounded-lg hover:bg-blue-700 text-lg font-semibold shadow-lg transition-colors"
+          >
+            ➕ Crear Mi Primer Proyecto
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

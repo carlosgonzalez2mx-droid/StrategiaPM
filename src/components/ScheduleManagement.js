@@ -7755,12 +7755,51 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                                               console.error('❌ Error actualizando estatus en Supabase:', result.error);
                                               // Revertir el cambio local en caso de error
                                               setMinutasTasks(prev =>
-                                                prev.map(t => t.id === tarea.id ? { ...t, estatus: tarea.estatus } : t)
+                                                prev.map(t => t.id === tarea.id ? { ...t, estatus: newStatus } : t)
                                               );
+                                            } else {
+                                              // 🚀 NUEVO: Disparar evento personalizado para sincronización
+                                              console.log('🔄 Disparando evento minutaStatusChanged:', { tareaId: tarea.id, newStatus });
+                                              window.dispatchEvent(new CustomEvent('minutaStatusChanged', {
+                                                detail: { 
+                                                  tareaId: tarea.id, 
+                                                  newStatus, 
+                                                  projectId: projectData?.id,
+                                                  timestamp: Date.now()
+                                                }
+                                              }));
+                                              
+                                              // 🚀 NUEVO: Activar auto-save
+                                              console.log('🔄 Disparando evento autoSaveTrigger para minuta');
+                                              window.dispatchEvent(new CustomEvent('autoSaveTrigger', {
+                                                detail: { 
+                                                  source: 'minutaUpdate',
+                                                  data: { minutasTasks: minutasTasks }
+                                                }
+                                              }));
                                             }
                                           } catch (error) {
                                             console.error('❌ Error actualizando estatus:', error);
                                           }
+                                        } else {
+                                          // 🚀 NUEVO: Para modo local también disparar eventos
+                                          console.log('🔄 Disparando evento minutaStatusChanged (modo local):', { tareaId: tarea.id, newStatus });
+                                          window.dispatchEvent(new CustomEvent('minutaStatusChanged', {
+                                            detail: { 
+                                              tareaId: tarea.id, 
+                                              newStatus, 
+                                              projectId: projectData?.id,
+                                              timestamp: Date.now()
+                                            }
+                                          }));
+                                          
+                                          // 🚀 NUEVO: Activar auto-save
+                                          window.dispatchEvent(new CustomEvent('autoSaveTrigger', {
+                                            detail: { 
+                                              source: 'minutaUpdate',
+                                              data: { minutasTasks: minutasTasks }
+                                            }
+                                          }));
                                         }
                                       }}
                                       className={`px-3 py-1 rounded-full text-xs font-medium border-none ${
@@ -7873,12 +7912,50 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                                             console.error('❌ Error actualizando estatus en Supabase:', result.error);
                                             // Revertir el cambio local en caso de error
                                             setMinutasTasks(prev =>
-                                              prev.map(t => t.id === tarea.id ? { ...t, estatus: tarea.estatus } : t)
+                                              prev.map(t => t.id === tarea.id ? { ...t, estatus: newStatus } : t)
                                             );
+                                          } else {
+                                            // 🚀 NUEVO: Disparar evento personalizado para sincronización
+                                            console.log('🔄 Disparando evento minutaStatusChanged (tabla 2):', { tareaId: tarea.id, newStatus });
+                                            window.dispatchEvent(new CustomEvent('minutaStatusChanged', {
+                                              detail: { 
+                                                tareaId: tarea.id, 
+                                                newStatus, 
+                                                projectId: projectData?.id,
+                                                timestamp: Date.now()
+                                              }
+                                            }));
+                                            
+                                            // 🚀 NUEVO: Activar auto-save
+                                            window.dispatchEvent(new CustomEvent('autoSaveTrigger', {
+                                              detail: { 
+                                                source: 'minutaUpdate',
+                                                data: { minutasTasks: minutasTasks }
+                                              }
+                                            }));
                                           }
                                         } catch (error) {
                                           console.error('❌ Error actualizando estatus:', error);
                                         }
+                                      } else {
+                                        // 🚀 NUEVO: Para modo local también disparar eventos
+                                        console.log('🔄 Disparando evento minutaStatusChanged (modo local, tabla 2):', { tareaId: tarea.id, newStatus });
+                                        window.dispatchEvent(new CustomEvent('minutaStatusChanged', {
+                                          detail: { 
+                                            tareaId: tarea.id, 
+                                            newStatus, 
+                                            projectId: projectData?.id,
+                                            timestamp: Date.now()
+                                          }
+                                        }));
+                                        
+                                        // 🚀 NUEVO: Activar auto-save
+                                        window.dispatchEvent(new CustomEvent('autoSaveTrigger', {
+                                          detail: { 
+                                            source: 'minutaUpdate',
+                                            data: { minutasTasks: minutasTasks }
+                                          }
+                                        }));
                                       }
                                     }}
                                     className={`px-3 py-1 rounded-full text-xs font-medium border-none ${

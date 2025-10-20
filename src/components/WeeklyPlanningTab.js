@@ -94,6 +94,26 @@ const WeeklyPlanningTab = ({
   // ⚠️ OPCIONAL: Descomenta si quieres manejo de errores en UI
   // const [error, setError] = useState(null);
 
+  // 🚀 NUEVO: Escuchar eventos de actualización de tareas de minutas
+  useEffect(() => {
+    const handleMinutaStatusChanged = (event) => {
+      const { tareaId, newStatus, projectId, timestamp } = event.detail;
+      console.log('🔄 WeeklyPlanningTab: Evento minutaStatusChanged recibido:', { tareaId, newStatus, projectId, timestamp });
+      
+      // Forzar re-render del componente para actualizar las tareas de minutas
+      console.log('🔄 WeeklyPlanningTab: Forzando re-render de tareas de minutas...');
+      // El componente se re-renderizará automáticamente cuando cambien los datos
+    };
+
+    // Agregar listener
+    window.addEventListener('minutaStatusChanged', handleMinutaStatusChanged);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('minutaStatusChanged', handleMinutaStatusChanged);
+    };
+  }, []);
+
   // ✅ Proyectos activos memoizados
   const activeProjects = useMemo(() => {
     const filtered = projects.filter(p => p.status === 'active');

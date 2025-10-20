@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import PortfolioCharts from './PortfolioCharts';
 import CorporateAlerts from './CorporateAlerts';
 import ConsolidatedCashFlow from './ConsolidatedCashFlow';
@@ -17,6 +17,29 @@ const ConsolidatedDashboard = ({
   advancesByProject = {},
   invoicesByProject = {}
 }) => {
+  
+  // 🚀 NUEVO: Estado para forzar re-render cuando cambien las tareas de minutas
+  const [dashboardRefreshKey, setDashboardRefreshKey] = useState(0);
+  
+  // 🚀 NUEVO: Escuchar eventos de actualización de tareas de minutas
+  useEffect(() => {
+    const handleMinutaStatusChanged = (event) => {
+      const { tareaId, newStatus, projectId, timestamp } = event.detail;
+      console.log('🔄 ConsolidatedDashboard: Evento minutaStatusChanged recibido:', { tareaId, newStatus, projectId, timestamp });
+      
+      // Forzar re-render del Dashboard
+      console.log('🔄 ConsolidatedDashboard: Forzando re-render del Dashboard...');
+      setDashboardRefreshKey(prev => prev + 1);
+    };
+
+    // Agregar listener
+    window.addEventListener('minutaStatusChanged', handleMinutaStatusChanged);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('minutaStatusChanged', handleMinutaStatusChanged);
+    };
+  }, []);
   
   // Calcular métricas del portfolio (solo proyectos activos)
   const activeProjects = projects?.filter(p => p.status === 'active') || [];

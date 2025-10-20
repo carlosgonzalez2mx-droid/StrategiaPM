@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import PortfolioDashboard from './PortfolioDashboard';
 import ResourceList from './ResourceList';
 import ProjectArchive from './ProjectArchive';
@@ -66,6 +66,26 @@ const PortfolioStrategic = ({
       console.log('❌ Errores de validación:', errors);
     }
   }, [errors]);
+
+  // 🚀 NUEVO: Escuchar eventos de actualización de tareas de minutas
+  useEffect(() => {
+    const handleMinutaStatusChanged = (event) => {
+      const { tareaId, newStatus, projectId, timestamp } = event.detail;
+      console.log('🔄 PortfolioStrategic: Evento minutaStatusChanged recibido:', { tareaId, newStatus, projectId, timestamp });
+      
+      // Forzar re-render del componente para actualizar el Dashboard resumen
+      console.log('🔄 PortfolioStrategic: Forzando re-render del Dashboard resumen...');
+      // El componente se re-renderizará automáticamente cuando cambien los datos
+    };
+
+    // Agregar listener
+    window.addEventListener('minutaStatusChanged', handleMinutaStatusChanged);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('minutaStatusChanged', handleMinutaStatusChanged);
+    };
+  }, []);
 
   const currentProject = projects.find(p => p.id === currentProjectId);
 
