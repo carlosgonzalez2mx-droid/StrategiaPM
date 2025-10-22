@@ -7743,9 +7743,16 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                                         const newStatus = e.target.value;
 
                                         // Actualizar inmediatamente en el estado local
-                                        setMinutasTasks(prev =>
-                                          prev.map(t => t.id === tarea.id ? { ...t, estatus: newStatus } : t)
-                                        );
+                                        setMinutasTasks(prev => {
+                                          const updatedTasks = prev.map(t => t.id === tarea.id ? { ...t, estatus: newStatus } : t);
+                                          
+                                          // 🔧 CORRECCIÓN: Actualizar estado global para sincronización con Dashboard
+                                          if (updateProjectMinutas) {
+                                            updateProjectMinutas(projectData?.id, updatedTasks);
+                                          }
+                                          
+                                          return updatedTasks;
+                                        });
 
                                         // Si usa Supabase, actualizar en la base de datos
                                         if (useSupabase) {

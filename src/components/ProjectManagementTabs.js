@@ -195,6 +195,26 @@ const ProjectManagementTabs = ({
     };
   }, [activeTab]);
 
+  // 🔧 CORRECCIÓN: Escuchar cambios de estado de minutas para sincronización con Dashboard
+  useEffect(() => {
+    const handleMinutaStatusUpdate = (event) => {
+      const { tareaId, newStatus, projectId } = event.detail;
+      
+      // Solo actualizar si es del proyecto actual
+      if (projectId === currentProjectId) {
+        console.log('🔄 ProjectManagementTabs: Actualizando estado de minuta:', { tareaId, newStatus });
+        setMinutaTasks(prev => prev.map(task => 
+          task.id === tareaId ? { ...task, estatus: newStatus } : task
+        ));
+      }
+    };
+
+    window.addEventListener('minutaStatusChanged', handleMinutaStatusUpdate);
+    return () => {
+      window.removeEventListener('minutaStatusChanged', handleMinutaStatusUpdate);
+    };
+  }, [currentProjectId]);
+
   // Redirigir a pestaña válida si el usuario está en una pestaña oculta
   useEffect(() => {
     const availableTabIds = projectTabs.map(tab => tab.id);
