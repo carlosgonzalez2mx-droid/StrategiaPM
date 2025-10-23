@@ -45,6 +45,7 @@ import { ProjectProvider } from './contexts/ProjectContext';
 import { ProjectsProvider, useProjects } from './contexts/ProjectsContext';
 import { FinancialProvider, useFinancial } from './contexts/FinancialContext';
 import { TasksProvider, useTasks } from './contexts/TasksContext';
+import { ConfigProvider, useConfig } from './contexts/ConfigContext';
 
 // Hooks
 import usePermissions from './hooks/usePermissions';
@@ -154,6 +155,23 @@ function MainApp() {
     importTasksToCurrentProject,
   } = useTasks();
 
+  // ===== CONTEXTO DE CONFIGURACIÓN =====
+  // Usar el nuevo ConfigContext en lugar de estado local
+  const {
+    portfolioViewMode,
+    setPortfolioViewMode,
+    viewMode,
+    setViewMode,
+    useSupabase,
+    setUseSupabase,
+    supabaseInitialized,
+    setSupabaseInitialized,
+    showAuthModal,
+    setShowAuthModal,
+    dataLoaded,
+    setDataLoaded,
+  } = useConfig();
+
   // Cargar script de diagnóstico solo en desarrollo
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
@@ -162,15 +180,6 @@ function MainApp() {
       });
     }
   }, []);
-
-  // ===== ESTADO DE UI Y CONFIGURACIÓN =====
-  const [portfolioViewMode, setPortfolioViewMode] = useState('portfolio'); // 'portfolio', 'project', 'schedule'
-  const [viewMode, setViewMode] = useState('dashboard');
-
-  // Estado para controlar el modo de persistencia
-  const [useSupabase, setUseSupabase] = useState(false);
-  const [supabaseInitialized, setSupabaseInitialized] = useState(false);
-  const [showAuthModal, setShowAuthModal] = useState(false);
 
   // Work Packages eliminados - ya no se usan
   // Tareas, minutas, riesgos - MIGRADO A TasksContext
@@ -317,7 +326,7 @@ function MainApp() {
   // NOTA: auditLogsByProject, getCurrentProjectAuditLogs
   // ahora vienen de TasksContext (via useTasks hook)
 
-  const [dataLoaded, setDataLoaded] = useState(false);
+  // NOTA: dataLoaded ahora viene de ConfigContext (via useConfig hook)
 
   // ===== SISTEMA DE PERSISTENCIA =====
   
@@ -1535,12 +1544,13 @@ function MainApp() {
 function App() {
   return (
     <Router>
-      <AuthProvider>
-        <ProjectsProvider>
-          <FinancialProvider>
-            <TasksProvider>
-              <ProjectProvider>
-                <Routes>
+      <ConfigProvider>
+        <AuthProvider>
+          <ProjectsProvider>
+            <FinancialProvider>
+              <TasksProvider>
+                <ProjectProvider>
+                  <Routes>
                 {/* Rutas de Super-Admin */}
                 <Route
                   path="/admin"
@@ -1561,12 +1571,13 @@ function App() {
 
                 {/* Ruta principal - App normal */}
                 <Route path="/*" element={<AppContent />} />
-                </Routes>
-              </ProjectProvider>
-            </TasksProvider>
-          </FinancialProvider>
-        </ProjectsProvider>
-      </AuthProvider>
+                  </Routes>
+                </ProjectProvider>
+              </TasksProvider>
+            </FinancialProvider>
+          </ProjectsProvider>
+        </AuthProvider>
+      </ConfigProvider>
     </Router>
   );
 }
