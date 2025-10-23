@@ -44,6 +44,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProjectProvider } from './contexts/ProjectContext';
 import { ProjectsProvider, useProjects } from './contexts/ProjectsContext';
 import { FinancialProvider, useFinancial } from './contexts/FinancialContext';
+import { TasksProvider, useTasks } from './contexts/TasksContext';
 
 // Hooks
 import usePermissions from './hooks/usePermissions';
@@ -126,6 +127,33 @@ function MainApp() {
     updateCurrentProjectResourceAssignments,
   } = useFinancial();
 
+  // ===== CONTEXTO DE TAREAS =====
+  // Usar el nuevo TasksContext en lugar de estado local
+  const {
+    tasksByProject,
+    setTasksByProject,
+    safeSetTasksByProject,
+    minutasByProject,
+    setMinutasByProject,
+    risksByProject,
+    setRisksByProject,
+    includeWeekendsByProject,
+    setIncludeWeekendsByProject,
+    auditLogsByProject,
+    setAuditLogsByProject,
+    getCurrentProjectTasks,
+    getCurrentProjectMinutas,
+    getCurrentProjectRisks,
+    getCurrentProjectIncludeWeekends,
+    getCurrentProjectAuditLogs,
+    updateCurrentProjectTasks,
+    updateCurrentProjectMinutas,
+    updateCurrentProjectRisks,
+    updateCurrentProjectIncludeWeekends,
+    updateCurrentProjectAuditLogs,
+    importTasksToCurrentProject,
+  } = useTasks();
+
   // Cargar script de diagnóstico solo en desarrollo
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
@@ -145,127 +173,10 @@ function MainApp() {
   const [showAuthModal, setShowAuthModal] = useState(false);
 
   // Work Packages eliminados - ya no se usan
+  // Tareas, minutas, riesgos - MIGRADO A TasksContext
 
-  // Tareas por proyecto - cada proyecto tiene su propio cronograma
-  const [tasksByProject, setTasksByProject] = useState({});
-
-  // Configuración de días laborables por proyecto - cada proyecto puede tener su propia configuración
-  const [includeWeekendsByProject, setIncludeWeekendsByProject] = useState({});
-
-  // Función para limpiar datos corruptos - CON MONITOREO INTELIGENTE
-  const cleanTasksByProject = (data) => {
-    if (!data || typeof data !== 'object') {
-      console.warn('🚨 CORRUPCIÓN REAL: data no es un objeto válido');
-      return {};
-    }
-    
-    const cleaned = {};
-    let hasRealCorruption = false;
-    let corruptionDetails = [];
-    
-    Object.keys(data).forEach(projectId => {
-      const projectTasks = data[projectId];
-      
-      // Detectar corrupción REAL (no arrays válidos)
-      if (typeof projectTasks === 'function') {
-        console.warn(`🚨 CORRUPCIÓN REAL detectada en proyecto ${projectId}: función en lugar de array`);
-        corruptionDetails.push(`${projectId}: función`);
-        cleaned[projectId] = [];
-        hasRealCorruption = true;
-      } else if (projectTasks && !Array.isArray(projectTasks) && typeof projectTasks === 'object' && projectTasks.constructor !== Array) {
-        console.warn(`🚨 CORRUPCIÓN REAL detectada en proyecto ${projectId}: objeto no-array`);
-        corruptionDetails.push(`${projectId}: objeto no-array`);
-        cleaned[projectId] = [];
-        hasRealCorruption = true;
-      } else {
-        // Datos válidos - mantener tal como están
-        cleaned[projectId] = projectTasks;
-      }
-    });
-    
-    if (hasRealCorruption) {
-      console.warn(`🚨 CORRUPCIÓN REAL detectada y corregida:`, corruptionDetails);
-      // Crear backup antes de limpiar
-      const backup = JSON.stringify(data);
-      localStorage.setItem('corruption-backup-' + Date.now(), backup);
-      console.log('💾 Backup de datos corruptos creado');
-    } else {
-      console.log('✅ Datos válidos, sin limpieza necesaria');
-    }
-    
-    return cleaned;
-  };
-
-  // Función para obtener tareas del proyecto actual
-  const getCurrentProjectTasks = () => {
-    // Obtener tareas directamente sin limpiar datos corruptos aquí
-    // La limpieza se hace solo una vez al cargar datos iniciales
-    const tasks = tasksByProject[currentProjectId] || [];
-    
-    // DEBUG: Logging detallado para identificar mezcla de proyectos
-    console.log(`🔍 getCurrentProjectTasks - Proyecto ${currentProjectId}:`, {
-      currentProjectId,
-      tasksCount: tasks.length,
-      tasksWithDifferentProjects: tasks.filter(t => t.projectId && t.projectId !== currentProjectId).length,
-      sampleTasks: tasks.slice(0, 3).map(t => ({
-        id: t.id,
-        name: t.name,
-        projectId: t.projectId,
-        startDate: t.startDate,
-        endDate: t.endDate,
-        cost: t.cost,
-        isMilestone: t.isMilestone
-      })),
-      tasksWithCosts: tasks.filter(t => t.cost > 0).length,
-      tasksWithCostsDetails: tasks.filter(t => t.cost > 0).map(t => ({
-        id: t.id,
-        name: t.name,
-        startDate: t.startDate,
-        endDate: t.endDate,
-        cost: t.cost,
-        isMilestone: t.isMilestone
-      }))
-    });
-    
-    // Solo loggear si hay un problema potencial
-    if (!Array.isArray(tasks)) {
-      console.warn('⚠️ Datos corruptos detectados en getCurrentProjectTasks:', {
-        currentProjectId,
-        tasksType: typeof tasks,
-        tasksValue: tasks
-      });
-      return []; // Retornar array vacío si hay datos corruptos
-    }
-    
-    return tasks;
-  };
-
-  // Ref para controlar si ya se limpiaron los datos corruptos
-  const dataCleanedRef = useRef(false);
-
-  // Limpiar datos corruptos SOLO al cargar datos iniciales, no en useEffect
-  const cleanCorruptDataOnce = useCallback(() => {
-    if (!dataCleanedRef.current && tasksByProject && typeof tasksByProject === 'object' && !Array.isArray(tasksByProject) && Object.keys(tasksByProject).length > 0) {
-      // Verificar si hay datos corruptos antes de limpiar
-      let hasCorruptData = false;
-      for (const [projectId, tasks] of Object.entries(tasksByProject)) {
-        if (typeof tasks === 'function' || (tasks && !Array.isArray(tasks))) {
-          hasCorruptData = true;
-          console.warn('⚠️ Datos corruptos detectados en tasksByProject para proyecto:', projectId, 'tipo:', typeof tasks);
-          break;
-        }
-      }
-      
-      if (hasCorruptData) {
-        const cleanedTasksByProject = cleanTasksByProject(tasksByProject);
-        if (cleanedTasksByProject !== tasksByProject) {
-          console.warn('⚠️ Datos corruptos detectados en tasksByProject, limpiando...');
-          safeSetTasksByProject(cleanedTasksByProject);
-        }
-      }
-      dataCleanedRef.current = true; // Marcar como limpiado SIEMPRE
-    }
-  }, [tasksByProject]);
+  // cleanTasksByProject, getCurrentProjectTasks, cleanCorruptDataOnce
+  // MIGRADO A TasksContext - ahora vienen del hook useTasks()
 
   // Sistema de auto-guardado con debouncing
   const debouncedSave = useCallback(
@@ -307,296 +218,8 @@ function MainApp() {
     };
   }, [debouncedSave]);
 
-  // Ref para prevenir actualizaciones simultáneas
-  const isUpdatingTasksRef = useRef(false);
-  const isUpdatingTasksByProjectRef = useRef(false);
-
-  // Función wrapper segura para setTasksByProject
-  const safeSetTasksByProject = useCallback((newTasksByProject) => {
-    // PREVENIR ACTUALIZACIONES SIMULTÁNEAS DE TASKSBYPROJECT
-    if (isUpdatingTasksByProjectRef.current) {
-      console.warn('⚠️ safeSetTasksByProject - ACTUALIZACIÓN EN PROGRESO, OMITIENDO');
-      return;
-    }
-
-    console.log('📊 safeSetTasksByProject - INICIANDO:', {
-      newTasksByProjectType: typeof newTasksByProject,
-      isArray: Array.isArray(newTasksByProject),
-      keys: newTasksByProject && typeof newTasksByProject === 'object' ? Object.keys(newTasksByProject) : 'N/A'
-    });
-
-    // Marcar como actualizando
-    isUpdatingTasksByProjectRef.current = true;
-
-    // Validar datos antes de guardar
-    if (!newTasksByProject || typeof newTasksByProject !== 'object' || Array.isArray(newTasksByProject)) {
-      console.error('❌ safeSetTasksByProject - DATOS INVÁLIDOS:', {
-        type: typeof newTasksByProject,
-        isArray: Array.isArray(newTasksByProject),
-        value: newTasksByProject
-      });
-      isUpdatingTasksByProjectRef.current = false;
-      return;
-    }
-
-    // Detectar duplicados antes de guardar
-    let totalTasks = 0;
-    let totalDuplicates = 0;
-    Object.entries(newTasksByProject).forEach(([projectId, tasks]) => {
-      if (Array.isArray(tasks)) {
-        totalTasks += tasks.length;
-        
-        // Detectar duplicados por ID
-        const taskIds = new Set();
-        tasks.forEach(task => {
-          if (taskIds.has(task.id)) {
-            totalDuplicates++;
-          } else {
-            taskIds.add(task.id);
-          }
-        });
-      }
-    });
-
-    if (totalDuplicates > 0) {
-      console.warn(`⚠️ safeSetTasksByProject - DUPLICADOS DETECTADOS: ${totalDuplicates} de ${totalTasks} tareas`);
-    }
-
-    // Aplicar ordenamiento por wbsCode a todas las tareas de todos los proyectos
-    const sortedTasksByProject = {};
-    for (const [projectId, tasks] of Object.entries(newTasksByProject)) {
-      if (Array.isArray(tasks) && tasks.length > 0) {
-        sortedTasksByProject[projectId] = sortTasksByWbsCode(tasks);
-        console.log(`📊 Proyecto ${projectId}: ${tasks.length} tareas ordenadas por wbsCode`);
-      } else {
-        sortedTasksByProject[projectId] = tasks;
-      }
-    }
-
-    setTasksByProject(sortedTasksByProject);
-
-    // Liberar flag después de un delay
-    setTimeout(() => {
-      isUpdatingTasksByProjectRef.current = false;
-      console.log('📊 safeSetTasksByProject - FLAG LIBERADO');
-    }, 100);
-  }, []);
-
-  // Función para actualizar tareas del proyecto actual
-  const updateCurrentProjectTasks = (newTasks, bypassProtection = false) => {
-    // PREVENIR ACTUALIZACIONES SIMULTÁNEAS (excepto para importación)
-    if (!bypassProtection && isUpdatingTasksRef.current) {
-      console.warn('⚠️ updateCurrentProjectTasks - ACTUALIZACIÓN EN PROGRESO, OMITIENDO');
-      return;
-    }
-
-    console.log('📊 updateCurrentProjectTasks - INICIANDO:', {
-      currentProjectId,
-      newTasksLength: newTasks?.length,
-      newTasksType: typeof newTasks
-    });
-    
-    // Validar que newTasks sea un array válido
-    if (!Array.isArray(newTasks)) {
-      console.error('❌ updateCurrentProjectTasks - newTasks NO ES UN ARRAY:', {
-        currentProjectId,
-        newTasksType: typeof newTasks,
-        newTasksValue: newTasks
-      });
-      return; // No actualizar si no es un array válido
-    }
-
-    // Marcar como actualizando
-    isUpdatingTasksRef.current = true;
-    
-    // Función para generar UUID válido
-    const generateUUID = () => {
-      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        const r = Math.random() * 16 | 0;
-        const v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-      });
-    };
-    
-    // Validar y corregir IDs de tareas con detección robusta de duplicados
-    const taskIds = new Set();
-    const taskContentHashes = new Set();
-    const uniqueTasks = [];
-    let duplicatesFound = 0;
-    let invalidIdsFixed = 0;
-    
-    // CORRECCIÓN: Crear mapeo de IDs originales a nuevos UUIDs para preservar orden
-    const idMapping = new Map();
-    
-    for (const task of newTasks) {
-      // Verificar si el ID es un UUID válido
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-      let taskId = task.id;
-      const originalId = task.id;
-      
-      if (!uuidRegex.test(taskId)) {
-        console.warn(`⚠️ ID inválido detectado: ${taskId} - ${task.name}, generando nuevo UUID`);
-        taskId = generateUUID();
-        invalidIdsFixed++;
-        
-        // Guardar mapeo para actualizar referencias
-        idMapping.set(originalId, taskId);
-      }
-      
-      // Crear hash de contenido más robusto para detectar duplicados
-      const contentHash = JSON.stringify({
-        name: task.name,
-        duration: task.duration,
-        startDate: task.startDate,
-        endDate: task.endDate,
-        description: task.description,
-        predecessors: task.predecessors,
-        successors: task.successors
-      });
-      
-      const isDuplicateById = taskIds.has(taskId);
-      const isDuplicateByContent = taskContentHashes.has(contentHash);
-      
-      if (isDuplicateById || isDuplicateByContent) {
-        console.warn(`⚠️ Tarea duplicada detectada: ${taskId} - ${task.name} (por ${isDuplicateById ? 'ID' : 'contenido'})`);
-        duplicatesFound++;
-        continue; // Saltar esta tarea duplicada
-      }
-      
-      // Agregar a conjuntos de control
-      taskIds.add(taskId);
-      taskContentHashes.add(contentHash);
-      
-      // CORRECCIÓN: Actualizar referencias de predecessors y successors con nuevos IDs
-      const updatedPredecessors = (task.predecessors || []).map(predId => 
-        idMapping.get(predId) || predId
-      );
-      const updatedSuccessors = (task.successors || []).map(succId => 
-        idMapping.get(succId) || succId
-      );
-      
-      // Crear objeto limpio de la tarea
-      const cleanTask = {
-        id: taskId,
-        name: task.name,
-        description: task.description,
-        duration: task.duration,
-        startDate: task.startDate,
-        endDate: task.endDate,
-        progress: task.progress || 0,
-        priority: task.priority,
-        cost: task.cost || 0,
-        predecessors: updatedPredecessors,
-        successors: updatedSuccessors,
-        resources: task.resources || [],
-        status: task.status || 'pending',
-        wbsCode: task.wbsCode,
-        assignedTo: task.assignedTo,
-        isMilestone: task.isMilestone || false,
-        originalDuration: task.originalDuration
-      };
-      
-      // Remover campos undefined/null
-      Object.keys(cleanTask).forEach(key => {
-        if (cleanTask[key] === undefined || cleanTask[key] === null) {
-          delete cleanTask[key];
-        }
-      });
-      
-      uniqueTasks.push(cleanTask);
-    }
-    
-    if (duplicatesFound > 0) {
-      console.warn(`⚠️ Se encontraron ${duplicatesFound} tareas duplicadas, eliminando duplicados...`);
-    }
-    
-    if (invalidIdsFixed > 0) {
-      console.warn(`🔧 Se corrigieron ${invalidIdsFixed} IDs inválidos con UUIDs válidos`);
-      console.log('🔍 Mapeo de IDs actualizado:', Array.from(idMapping.entries()));
-    }
-    
-    // Solo loggear si hay un problema potencial
-    if (uniqueTasks.length === 0) {
-      console.warn('⚠️ updateCurrentProjectTasks - TAREAS VACÍAS:', {
-        currentProjectId,
-        newTasksLength: uniqueTasks.length
-      });
-    }
-    
-    setTasksByProject(prev => {
-      console.log('📊 updateCurrentProjectTasks - setTasksByProject INICIANDO:', {
-        currentProjectId,
-        prevKeys: Object.keys(prev || {}),
-        newTasksLength: uniqueTasks.length,
-        duplicatesRemoved: duplicatesFound
-      });
-      
-      // Verificar que prev sea un objeto válido
-      if (!prev || typeof prev !== 'object' || Array.isArray(prev)) {
-        console.error('❌ updateCurrentProjectTasks - prev NO ES UN OBJETO VÁLIDO:', {
-          prevType: typeof prev,
-          prevValue: prev
-        });
-        return prev; // Retornar prev sin cambios si no es válido
-      }
-      
-      const updatedProjects = Object.assign({}, prev);
-      
-      // Aplicar ordenamiento por wbsCode a las tareas del proyecto actual
-      const sortedTasks = sortTasksByWbsCode(uniqueTasks);
-      updatedProjects[currentProjectId] = sortedTasks;
-      
-      console.log('📊 updateCurrentProjectTasks - setTasksByProject COMPLETADO:', {
-        currentProjectId,
-        updatedKeys: Object.keys(updatedProjects),
-        tasksInProject: updatedProjects[currentProjectId]?.length,
-        duplicatesRemoved: duplicatesFound,
-        sortedByWbsCode: true
-      });
-      
-      // Auto-guardar cambios con debouncing
-      debouncedSave({
-        projects,
-        tasksByProject: updatedProjects,
-        risksByProject,
-        purchaseOrdersByProject,
-        advancesByProject,
-        invoicesByProject,
-        contractsByProject,
-        resourceAssignmentsByProject,
-        globalResources,
-        auditLogsByProject,
-        minutasByProject,
-        includeWeekendsByProject
-      });
-      
-      return updatedProjects;
-    });
-
-    // Liberar flag de actualización después de un breve delay
-    setTimeout(() => {
-      isUpdatingTasksRef.current = false;
-      console.log('📊 updateCurrentProjectTasks - FLAG LIBERADO');
-    }, 100);
-  };
-
-  // Función especial para importación que bypassa la protección
-  const importTasksToCurrentProject = (newTasks) => {
-    console.log('📊 importTasksToCurrentProject - REEMPLAZO COMPLETO DE CRONOGRAMA:', {
-      currentProjectId,
-      currentTasksCount: getCurrentProjectTasks()?.length || 0,
-      newTasksLength: newTasks?.length
-    });
-    
-    // IMPORTANTE: Esta función REEMPLAZA COMPLETAMENTE el cronograma anterior
-    // No mezcla tareas, las reemplaza por completo
-    console.log('🔄 REEMPLAZANDO CRONOGRAMA COMPLETO - Tareas anteriores serán eliminadas');
-    
-    // Forzar bypass de protección para importación
-    updateCurrentProjectTasks(newTasks, true);
-    
-    console.log('✅ CRONOGRAMA REEMPLAZADO EXITOSAMENTE');
-  };
+  // NOTA: safeSetTasksByProject, updateCurrentProjectTasks, importTasksToCurrentProject
+  // ahora vienen de TasksContext (via useTasks hook)
 
   // Función para limpiar duplicados en Supabase
   const cleanDuplicatesInSupabase = async () => {
@@ -668,35 +291,9 @@ function MainApp() {
     }
   };
 
-  // Función para obtener configuración de días laborables del proyecto actual
-  const getCurrentProjectIncludeWeekends = () => {
-    return includeWeekendsByProject[currentProjectId] || false;
-  };
-
-  // Función para actualizar configuración de días laborables del proyecto actual
-  const updateCurrentProjectIncludeWeekends = (includeWeekends) => {
-    setIncludeWeekendsByProject(prev => {
-      const updatedProjects = Object.assign({}, prev);
-      updatedProjects[currentProjectId] = includeWeekends;
-      return updatedProjects;
-    });
-  };
-
-  // Riesgos por proyecto - cada proyecto tiene su propia gestión de riesgos
-  const [risksByProject, setRisksByProject] = useState({});
-
-  // Minutas por proyecto - cada proyecto tiene sus propias minutas y tareas
-  const [minutasByProject, setMinutasByProject] = useState({});
-
-  // Función para obtener riesgos del proyecto actual
-  const getCurrentProjectRisks = () => {
-    return risksByProject[currentProjectId] || [];
-  };
-
-  // Función para obtener minutas del proyecto actual
-  const getCurrentProjectMinutas = () => {
-    return minutasByProject[currentProjectId] || [];
-  };
+  // NOTA: getCurrentProjectIncludeWeekends, updateCurrentProjectIncludeWeekends,
+  // risksByProject, minutasByProject, getCurrentProjectRisks, getCurrentProjectMinutas
+  // ahora vienen de TasksContext (via useTasks hook)
 
   // Función para actualizar minutas de un proyecto específico
   const updateProjectMinutas = (projectId, newMinutas) => {
@@ -706,26 +303,7 @@ function MainApp() {
     }));
   };
 
-  // Función para actualizar riesgos del proyecto actual
-  const updateCurrentProjectRisks = (newRisksOrUpdater) => {
-    // Si es una función (setter de React), ejecutarla para obtener el array
-    if (typeof newRisksOrUpdater === 'function') {
-      const currentRisks = getCurrentProjectRisks();
-      const newRisks = newRisksOrUpdater(currentRisks);
-      setRisksByProject(prev => {
-        const updatedProjects = Object.assign({}, prev);
-        updatedProjects[currentProjectId] = newRisks;
-        return updatedProjects;
-      });
-    } else {
-      // Si es directamente un array, pasarlo
-      setRisksByProject(prev => {
-        const updatedProjects = Object.assign({}, prev);
-        updatedProjects[currentProjectId] = newRisksOrUpdater;
-        return updatedProjects;
-      });
-    }
-  };
+  // NOTA: updateCurrentProjectRisks ahora viene de TasksContext (via useTasks hook)
 
   // updateCurrentProjectPurchaseOrders, updateCurrentProjectAdvances,
   // updateCurrentProjectInvoices, updateCurrentProjectContracts
@@ -736,13 +314,10 @@ function MainApp() {
   // Las funciones getCurrentProjectXXX() ahora vienen del hook useFinancial()
 
   // ===== FUNCIONES DE AUDITORÍA =====
-  
-  const [auditLogsByProject, setAuditLogsByProject] = useState({});
-  const [dataLoaded, setDataLoaded] = useState(false);
+  // NOTA: auditLogsByProject, getCurrentProjectAuditLogs
+  // ahora vienen de TasksContext (via useTasks hook)
 
-  const getCurrentProjectAuditLogs = () => {
-    return auditLogsByProject[currentProjectId] || [];
-  };
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   // ===== SISTEMA DE PERSISTENCIA =====
   
@@ -963,10 +538,10 @@ function MainApp() {
           console.log('📂 No se encontraron datos guardados');
           console.log('📂 savedData es:', savedData);
         }
-        
-        // Limpiar datos corruptos una sola vez después de cargar
-        cleanCorruptDataOnce();
-        
+
+        // NOTA: La limpieza de datos corruptos ahora se hace automáticamente
+        // en TasksContext via safeSetTasksByProject
+
         // Marcar que los datos iniciales se han cargado
         console.log('✅ Marcando dataLoaded como true');
         setDataLoaded(true);
@@ -1963,8 +1538,9 @@ function App() {
       <AuthProvider>
         <ProjectsProvider>
           <FinancialProvider>
-            <ProjectProvider>
-              <Routes>
+            <TasksProvider>
+              <ProjectProvider>
+                <Routes>
                 {/* Rutas de Super-Admin */}
                 <Route
                   path="/admin"
@@ -1985,8 +1561,9 @@ function App() {
 
                 {/* Ruta principal - App normal */}
                 <Route path="/*" element={<AppContent />} />
-              </Routes>
-            </ProjectProvider>
+                </Routes>
+              </ProjectProvider>
+            </TasksProvider>
           </FinancialProvider>
         </ProjectsProvider>
       </AuthProvider>
