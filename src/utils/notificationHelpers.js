@@ -253,7 +253,7 @@ export const notifyStatusChanged = async ({ userEmail, userId, change, oldStatus
   });
 };
 
-export default {
+const notificationHelpers = {
   createNotification,
   getUnreadNotifications,
   markAsRead,
@@ -264,3 +264,5 @@ export default {
   notifyCCBVoteRequired,
   notifyStatusChanged
 };
+
+export default notificationHelpers;

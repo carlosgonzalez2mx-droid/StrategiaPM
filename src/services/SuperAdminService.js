@@ -208,5 +208,7 @@ class SuperAdminService {
   }
 }
 
-export default new SuperAdminService();
+const superAdminService = new SuperAdminService();
+
+export default superAdminService;
 

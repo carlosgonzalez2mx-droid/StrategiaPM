@@ -132,7 +132,7 @@ export const debugGroupCollapsed = (groupName, callback) => {
 };
 
 // Exportar todo como objeto por si se prefiere usar debugLog.log() en lugar de debugLog()
-export default {
+const debugLogUtils = {
   log: debugLog,
   error: debugError,
   success: debugSuccess,
@@ -140,4 +140,6 @@ export default {
   group: debugGroup,
   groupCollapsed: debugGroupCollapsed
 };
+
+export default debugLogUtils;
 

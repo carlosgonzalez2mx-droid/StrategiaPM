@@ -400,7 +400,7 @@ export const getFunctionalRoleMetadata = (functionalRole) => {
   return FUNCTIONAL_ROLE_LABELS[functionalRole] || null;
 };
 
-export default {
+const unifiedRoles = {
   ORG_ROLES,
   FUNCTIONAL_ROLES,
   FUNCTIONAL_ROLE_LABELS,
@@ -410,3 +410,5 @@ export default {
   getFunctionalRoleLabel,
   getFunctionalRoleMetadata
 };
+
+export default unifiedRoles;
