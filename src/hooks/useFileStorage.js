@@ -1,65 +1,81 @@
 import { useState, useEffect, useCallback } from 'react';
 import supabaseService from '../services/SupabaseService';
+import useStorageProvider from './useStorageProvider';
+import useFileValidation, { FILE_LIMITS } from './useFileValidation';
 
-// Configuración de límites
-const FILE_LIMITS = {
-  maxFileSize: 10 * 1024 * 1024, // 10MB
-  maxFilesPerProject: 100,
-  maxTotalSizePerProject: 500 * 1024 * 1024, // 500MB
-  allowedTypes: ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx', 'xls', 'xlsx'],
-  allowedMimeTypes: [
-    'application/pdf',
-    'image/jpeg',
-    'image/jpg',
-    'image/png',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'application/vnd.ms-excel',
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-  ]
-};
-
+/**
+ * Hook principal para gestión de archivos del proyecto
+ *
+ * Refactorizado para usar hooks especializados:
+ * - useStorageProvider: Gestión del proveedor de almacenamiento
+ * - useFileValidation: Validación y procesamiento de archivos
+ *
+ * @param {string} projectId - ID del proyecto
+ * @returns {Object} Estado y funciones para gestión de archivos
+ */
 const useFileStorage = (projectId) => {
+  // Estado local
   const [files, setFiles] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [storageProvider, setStorageProvider] = useState('local'); // 'local' o 'supabase'
-  const [isSupabaseAvailable, setIsSupabaseAvailable] = useState(false);
 
-  // Verificar disponibilidad de Supabase al inicializar
-  useEffect(() => {
-    const checkSupabaseAvailability = async () => {
-      try {
-        if (supabaseService.isAuthenticated()) {
-          console.log('🔍 Verificando disponibilidad de Supabase Storage...');
-          const isAvailable = await supabaseService.initializeStorage();
-          setIsSupabaseAvailable(isAvailable);
-          setStorageProvider(isAvailable ? 'supabase' : 'local');
-          console.log(`✅ Storage provider configurado: ${isAvailable ? 'Supabase' : 'Local'}`);
-        } else {
-          console.log('⚠️ Usuario no autenticado, usando almacenamiento local');
-          setIsSupabaseAvailable(false);
-          setStorageProvider('local');
-        }
-      } catch (error) {
-        console.error('❌ Error verificando Supabase:', error);
-        console.log('🔄 Fallback a localStorage debido a error de Supabase');
-        setIsSupabaseAvailable(false);
-        setStorageProvider('local');
-      }
-    };
+  // Hooks especializados
+  const {
+    storageProvider,
+    isSupabaseAvailable,
+    switchStorageProvider: switchProvider,
+    shouldUseSupabase,
+  } = useStorageProvider();
 
-    checkSupabaseAvailability();
-  }, []);
+  const {
+    validateAndProcessFile,
+    fileToBase64,
+    FILE_LIMITS: fileLimits,
+  } = useFileValidation();
 
-  // Cargar archivos del proyecto
+  // Cargar archivos del proyecto al montar o cambiar proyecto/proveedor
   useEffect(() => {
     if (!projectId) return;
-    
     loadProjectFiles();
   }, [projectId, storageProvider, isSupabaseAvailable]);
 
-  // Función para cargar archivos según el proveedor de almacenamiento
+  /**
+   * Carga archivos desde localStorage
+   */
+  const loadFromLocalStorage = useCallback(() => {
+    try {
+      const key = `project-files-${projectId}`;
+      const savedFiles = localStorage.getItem(key);
+
+      if (savedFiles) {
+        const parsedFiles = JSON.parse(savedFiles);
+        setFiles(Array.isArray(parsedFiles) ? parsedFiles : []);
+        console.log(`📂 ${parsedFiles.length} archivos cargados desde localStorage`);
+      } else {
+        setFiles([]);
+      }
+    } catch (error) {
+      console.error('❌ Error cargando desde localStorage:', error);
+      setFiles([]);
+    }
+  }, [projectId]);
+
+  /**
+   * Guarda archivos en localStorage
+   */
+  const saveFiles = useCallback((fileList) => {
+    try {
+      const key = `project-files-${projectId}`;
+      localStorage.setItem(key, JSON.stringify(fileList));
+      console.log(`💾 ${fileList.length} archivos guardados en localStorage`);
+    } catch (error) {
+      console.error('❌ Error guardando en localStorage:', error);
+    }
+  }, [projectId]);
+
+  /**
+   * Carga archivos del proyecto según el proveedor de almacenamiento
+   */
   const loadProjectFiles = useCallback(async () => {
     if (!projectId) return;
 
@@ -67,27 +83,27 @@ const useFileStorage = (projectId) => {
     setError(null);
 
     try {
-      if (isSupabaseAvailable && storageProvider === 'supabase') {
+      if (shouldUseSupabase()) {
         // Cargar desde Supabase Storage
         console.log(`📂 Cargando archivos desde Supabase para proyecto ${projectId}...`);
-        const { success, files: supabaseFiles, error } = await supabaseService.listProjectFiles(projectId);
-        
+        const { success, files: supabaseFiles, error: supabaseError } =
+          await supabaseService.listProjectFiles(projectId);
+
         if (success) {
           // Convertir archivos de Supabase al formato esperado
           const convertedFiles = supabaseFiles.map(file => ({
             ...file,
-            // Asegurar que tenga todos los campos necesarios
             mimeType: file.metadata?.mimeType || 'application/octet-stream',
             description: file.metadata?.description || '',
             relatedItemId: file.metadata?.relatedItemId || null,
-            content: file.publicUrl, // URL para acceso directo
+            content: file.publicUrl,
             fileExtension: file.fileName.split('.').pop()?.toLowerCase() || ''
           }));
-          
+
           setFiles(convertedFiles);
           console.log(`✅ ${convertedFiles.length} archivos cargados desde Supabase`);
         } else {
-          console.error('❌ Error cargando desde Supabase:', error);
+          console.error('❌ Error cargando desde Supabase:', supabaseError);
           // Fallback a localStorage
           loadFromLocalStorage();
         }
@@ -98,139 +114,30 @@ const useFileStorage = (projectId) => {
     } catch (error) {
       console.error('❌ Error cargando archivos:', error);
       setError('Error al cargar archivos del proyecto');
-      // Fallback a localStorage
+      // Fallback a localStorage en caso de error
       loadFromLocalStorage();
     } finally {
       setIsLoading(false);
     }
-  }, [projectId, isSupabaseAvailable, storageProvider]);
+  }, [projectId, shouldUseSupabase, loadFromLocalStorage]);
 
-  // Función auxiliar para cargar desde localStorage
-  const loadFromLocalStorage = useCallback(() => {
-    try {
-      const savedFiles = localStorage.getItem(`project-files-${projectId}`);
-      if (savedFiles) {
-        const parsedFiles = JSON.parse(savedFiles);
-        setFiles(parsedFiles);
-        console.log(`✅ ${parsedFiles.length} archivos cargados desde localStorage`);
-      }
-    } catch (error) {
-      console.error('❌ Error cargando desde localStorage:', error);
-      setError('Error al cargar archivos del proyecto');
-    }
-  }, [projectId]);
-
-  // Guardar archivos en localStorage
-  const saveFiles = useCallback((fileList) => {
-    if (!projectId) return;
-    
-    try {
-      localStorage.setItem(`project-files-${projectId}`, JSON.stringify(fileList));
-    } catch (error) {
-      console.error('Error saving project files:', error);
-      setError('Error al guardar archivos del proyecto');
-    }
-  }, [projectId]);
-
-  // Validar archivo
-  const validateFile = useCallback((file) => {
-    // Validar tamaño
-    if (file.size > FILE_LIMITS.maxFileSize) {
-      throw new Error(`El archivo es demasiado grande. Máximo ${FILE_LIMITS.maxFileSize / (1024 * 1024)}MB`);
-    }
-
-    // Validar tipo
-    const fileExtension = file.name.split('.').pop().toLowerCase();
-    if (!FILE_LIMITS.allowedTypes.includes(fileExtension)) {
-      throw new Error(`Tipo de archivo no permitido. Tipos permitidos: ${FILE_LIMITS.allowedTypes.join(', ')}`);
-    }
-
-    // Validar MIME type
-    if (!FILE_LIMITS.allowedMimeTypes.includes(file.type)) {
-      throw new Error('Tipo de archivo no válido');
-    }
-
-    return true;
-  }, []);
-
-  // Comprimir imagen si es necesario
-  const compressImage = useCallback(async (file) => {
-    if (!file.type.startsWith('image/')) return file;
-
-    return new Promise((resolve) => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      const img = new Image();
-
-      img.onload = () => {
-        // Calcular nuevas dimensiones (máximo 1200px)
-        const maxSize = 1200;
-        let { width, height } = img;
-        
-        if (width > height && width > maxSize) {
-          height = (height * maxSize) / width;
-          width = maxSize;
-        } else if (height > maxSize) {
-          width = (width * maxSize) / height;
-          height = maxSize;
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        
-        ctx.drawImage(img, 0, 0, width, height);
-        
-        canvas.toBlob((blob) => {
-          const compressedFile = new File([blob], file.name, {
-            type: file.type,
-            lastModified: Date.now()
-          });
-          resolve(compressedFile);
-        }, file.type, 0.8); // Calidad 80%
-      };
-
-      img.src = URL.createObjectURL(file);
-    });
-  }, []);
-
-  // Convertir archivo a base64
-  const fileToBase64 = useCallback((file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = error => reject(error);
-    });
-  }, []);
-
-  // Subir archivo
+  /**
+   * Sube un archivo al proyecto
+   */
   const uploadFile = useCallback(async (file, category, relatedItemId, description = '') => {
     setIsLoading(true);
     setError(null);
 
     try {
-      // Validar archivo
-      validateFile(file);
-
-      // Verificar límites del proyecto
-      if (files.length >= FILE_LIMITS.maxFilesPerProject) {
-        throw new Error(`Límite de archivos alcanzado. Máximo ${FILE_LIMITS.maxFilesPerProject} archivos por proyecto`);
-      }
-
-      const totalSize = files.reduce((sum, f) => sum + f.fileSize, 0) + file.size;
-      if (totalSize > FILE_LIMITS.maxTotalSizePerProject) {
-        throw new Error(`Límite de tamaño alcanzado. Máximo ${FILE_LIMITS.maxTotalSizePerProject / (1024 * 1024)}MB por proyecto`);
-      }
-
-      // Comprimir imagen si es necesario
-      const processedFile = await compressImage(file);
+      // Validar y procesar archivo (validación + compresión)
+      const processedFile = await validateAndProcessFile(file, files);
 
       let newFile;
 
-      if (isSupabaseAvailable && storageProvider === 'supabase') {
+      if (shouldUseSupabase()) {
         // Subir a Supabase Storage
         console.log('☁️ Subiendo archivo a Supabase Storage...');
-        
+
         const metadata = {
           description,
           relatedItemId,
@@ -240,9 +147,9 @@ const useFileStorage = (projectId) => {
         };
 
         const uploadResult = await supabaseService.uploadFileToStorage(
-          processedFile, 
-          projectId, 
-          category, 
+          processedFile,
+          projectId,
+          category,
           metadata
         );
 
@@ -255,9 +162,7 @@ const useFileStorage = (projectId) => {
             uploadedBy: supabaseService.getCurrentUser()?.email || 'Usuario Actual'
           };
 
-          // Agregar a la lista local
-          const updatedFiles = files.slice();
-          updatedFiles.push(newFile);
+          const updatedFiles = [...files, newFile];
           setFiles(updatedFiles);
 
           console.log('✅ Archivo subido exitosamente a Supabase Storage:', newFile.fileName);
@@ -265,9 +170,9 @@ const useFileStorage = (projectId) => {
           throw new Error(`Error subiendo a Supabase: ${uploadResult.error?.message || 'Error desconocido'}`);
         }
       } else {
-        // Subir a localStorage (fallback)
+        // Subir a localStorage
         console.log('💾 Subiendo archivo a localStorage...');
-        
+
         // Convertir a base64
         const base64Content = await fileToBase64(processedFile);
 
@@ -291,9 +196,7 @@ const useFileStorage = (projectId) => {
           }
         };
 
-        // Agregar a la lista
-        const updatedFiles = files.slice();
-        updatedFiles.push(newFile);
+        const updatedFiles = [...files, newFile];
         setFiles(updatedFiles);
         saveFiles(updatedFiles);
 
@@ -309,25 +212,25 @@ const useFileStorage = (projectId) => {
     } finally {
       setIsLoading(false);
     }
-  }, [files, projectId, validateFile, compressImage, fileToBase64, saveFiles, isSupabaseAvailable, storageProvider]);
+  }, [files, projectId, validateAndProcessFile, fileToBase64, saveFiles, shouldUseSupabase]);
 
-  // Eliminar archivo
+  /**
+   * Elimina un archivo del proyecto
+   */
   const deleteFile = useCallback(async (fileId) => {
     try {
-      // Encontrar el archivo a eliminar
       const fileToDelete = files.find(f => f.id === fileId);
       if (!fileToDelete) {
         throw new Error('Archivo no encontrado');
       }
 
-      // Si está en Supabase Storage, eliminarlo de allí también
-      if (isSupabaseAvailable && storageProvider === 'supabase' && fileToDelete.storagePath) {
+      // Eliminar de Supabase si corresponde
+      if (shouldUseSupabase() && fileToDelete.storagePath) {
         console.log('🗑️ Eliminando archivo de Supabase Storage...');
         const deleteResult = await supabaseService.deleteFileFromStorage(fileToDelete.storagePath);
-        
+
         if (!deleteResult.success) {
           console.warn('⚠️ Error eliminando archivo de Supabase Storage:', deleteResult.error);
-          // Continuar con la eliminación local aunque falle en Supabase
         } else {
           console.log('✅ Archivo eliminado de Supabase Storage');
         }
@@ -336,8 +239,8 @@ const useFileStorage = (projectId) => {
       // Eliminar de la lista local
       const updatedFiles = files.filter(f => f.id !== fileId);
       setFiles(updatedFiles);
-      
-      // Si es almacenamiento local, guardar en localStorage
+
+      // Guardar en localStorage si corresponde
       if (storageProvider === 'local') {
         saveFiles(updatedFiles);
       }
@@ -347,184 +250,170 @@ const useFileStorage = (projectId) => {
       console.error('Error deleting file:', error);
       setError('Error al eliminar archivo');
     }
-  }, [files, saveFiles, isSupabaseAvailable, storageProvider]);
+  }, [files, saveFiles, shouldUseSupabase, storageProvider]);
 
-  // Obtener archivos por categoría
+  /**
+   * Obtiene archivos por categoría
+   */
   const getFilesByCategory = useCallback((category) => {
     if (category === 'financial-only') {
-      // Para categoría financiera, incluir solo archivos relacionados con finanzas
-      return files.filter(f => 
-        ['purchase-order', 'invoice', 'advance', 'contract'].includes(f.category)
-      );
-    }
-    if (category === 'risk-evidence') {
-      // Para categoría de riesgos, incluir solo archivos relacionados con riesgos
-      return files.filter(f => 
-        ['risk-evidence'].includes(f.category)
+      return files.filter(f =>
+        f.category === 'contract' ||
+        f.category === 'invoice' ||
+        f.category === 'financial'
       );
     }
     return files.filter(f => f.category === category);
   }, [files]);
 
-  // Obtener archivos por item relacionado
+  /**
+   * Obtiene archivos por item relacionado
+   */
   const getFilesByRelatedItem = useCallback((relatedItemId) => {
     return files.filter(f => f.relatedItemId === relatedItemId);
   }, [files]);
 
-  // Buscar archivos
+  /**
+   * Busca archivos por término de búsqueda
+   */
   const searchFiles = useCallback((searchTerm) => {
+    if (!searchTerm) return files;
+
     const term = searchTerm.toLowerCase();
-    return files.filter(f => 
+    return files.filter(f =>
       f.fileName.toLowerCase().includes(term) ||
-      f.description.toLowerCase().includes(term) ||
-      f.category.toLowerCase().includes(term)
+      f.description?.toLowerCase().includes(term) ||
+      f.category?.toLowerCase().includes(term)
     );
   }, [files]);
 
-  // Obtener estadísticas de archivos
+  /**
+   * Obtiene estadísticas de archivos del proyecto
+   */
   const getFileStats = useCallback(() => {
-    const totalSize = files.reduce((sum, f) => sum + f.fileSize, 0);
-    const categories = Array.from(new Set(files.map(f => f.category)));
-    
+    const totalSize = files.reduce((sum, f) => sum + (f.fileSize || 0), 0);
+    const filesByCategory = files.reduce((acc, f) => {
+      acc[f.category] = (acc[f.category] || 0) + 1;
+      return acc;
+    }, {});
+
     return {
       totalFiles: files.length,
       totalSize,
       totalSizeMB: (totalSize / (1024 * 1024)).toFixed(2),
-      categories,
-      filesByCategory: categories.reduce((acc, cat) => {
-        acc[cat] = files.filter(f => f.category === cat).length;
-        return acc;
-      }, {})
+      filesByCategory,
+      percentageUsed: ((totalSize / FILE_LIMITS.maxTotalSizePerProject) * 100).toFixed(1)
     };
   }, [files]);
 
-  // Limpiar archivos del proyecto
+  /**
+   * Limpia todos los archivos del proyecto
+   */
   const clearProjectFiles = useCallback(() => {
-    if (!projectId) return;
-    
-    try {
-      localStorage.removeItem(`project-files-${projectId}`);
-      setFiles([]);
-      console.log('✅ Archivos del proyecto limpiados');
-    } catch (error) {
-      console.error('Error clearing project files:', error);
-      setError('Error al limpiar archivos del proyecto');
-    }
+    setFiles([]);
+    const key = `project-files-${projectId}`;
+    localStorage.removeItem(key);
+    console.log('🗑️ Archivos del proyecto limpiados');
   }, [projectId]);
 
-  // Función para cambiar el proveedor de almacenamiento
+  /**
+   * Cambia el proveedor de almacenamiento
+   */
   const switchStorageProvider = useCallback(async (provider) => {
-    if (provider === 'supabase' && !isSupabaseAvailable) {
-      console.warn('⚠️ Supabase no está disponible');
-      return false;
+    const success = await switchProvider(provider);
+    if (success) {
+      // Recargar archivos del nuevo proveedor
+      await loadProjectFiles();
     }
+    return success;
+  }, [switchProvider, loadProjectFiles]);
 
-    setStorageProvider(provider);
-    console.log(`🔄 Cambiando a proveedor de almacenamiento: ${provider}`);
-    
-    // Recargar archivos con el nuevo proveedor
-    await loadProjectFiles();
-    return true;
-  }, [isSupabaseAvailable, loadProjectFiles]);
-
-  // Función para sincronizar archivos locales con Supabase
+  /**
+   * Sincroniza archivos locales con Supabase
+   */
   const syncWithSupabase = useCallback(async () => {
     if (!isSupabaseAvailable) {
-      console.warn('⚠️ Supabase no está disponible para sincronización');
+      console.warn('⚠️ Supabase no está disponible');
       return false;
     }
 
     try {
       console.log('🔄 Iniciando sincronización con Supabase...');
-      
-      // Obtener archivos locales
-      const localFiles = files.filter(f => f.metadata?.storageProvider === 'local');
-      
+
+      // Cargar archivos locales
+      const key = `project-files-${projectId}`;
+      const savedFiles = localStorage.getItem(key);
+      const localFiles = savedFiles ? JSON.parse(savedFiles) : [];
+
       if (localFiles.length === 0) {
-        console.log('✅ No hay archivos locales para sincronizar');
+        console.log('📂 No hay archivos locales para sincronizar');
         return true;
       }
 
-      let syncedCount = 0;
-      let errorCount = 0;
+      console.log(`📤 Sincronizando ${localFiles.length} archivos con Supabase...`);
 
-      for (const localFile of localFiles) {
-        try {
-          // Convertir base64 de vuelta a File para subir
-          const response = await fetch(localFile.content);
-          const blob = await response.blob();
-          const file = new File([blob], localFile.fileName, { type: localFile.mimeType });
-
-          // Subir a Supabase
-          const uploadResult = await supabaseService.uploadFileToStorage(
-            file,
-            localFile.projectId,
-            localFile.category,
-            {
-              description: localFile.description,
-              relatedItemId: localFile.relatedItemId,
-              originalName: localFile.fileName,
-              uploadedBy: localFile.uploadedBy,
-              mimeType: localFile.mimeType
+      // Subir cada archivo local a Supabase
+      for (const file of localFiles) {
+        // Solo sincronizar archivos que no estén ya en Supabase
+        if (!file.storagePath && file.content) {
+          try {
+            // Reconstruir File object desde base64
+            const base64Data = file.content.split(',')[1];
+            const byteCharacters = atob(base64Data);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+              byteNumbers[i] = byteCharacters.charCodeAt(i);
             }
-          );
+            const byteArray = new Uint8Array(byteNumbers);
+            const blob = new Blob([byteArray], { type: file.mimeType });
+            const fileObject = new File([blob], file.fileName, { type: file.mimeType });
 
-          if (uploadResult.success) {
-            // Actualizar archivo local con información de Supabase
-            const updatedFile = {
-              ...localFile,
-              ...uploadResult.file,
-              metadata: {
-                ...localFile.metadata,
-                storageProvider: 'supabase',
-                syncedAt: new Date().toISOString()
-              }
-            };
-
-            // Actualizar en la lista local
-            const updatedFiles = files.map(f => 
-              f.id === localFile.id ? updatedFile : f
-            );
-            setFiles(updatedFiles);
-            
-            syncedCount++;
-            console.log(`✅ Sincronizado: ${localFile.fileName}`);
-          } else {
-            console.error(`❌ Error sincronizando ${localFile.fileName}:`, uploadResult.error);
-            errorCount++;
+            // Subir a Supabase
+            await uploadFile(fileObject, file.category, file.relatedItemId, file.description);
+          } catch (error) {
+            console.error(`❌ Error sincronizando archivo ${file.fileName}:`, error);
           }
-        } catch (error) {
-          console.error(`❌ Error procesando ${localFile.fileName}:`, error);
-          errorCount++;
         }
       }
 
-      console.log(`🎉 Sincronización completada: ${syncedCount} exitosos, ${errorCount} errores`);
+      console.log('✅ Sincronización completada');
       return true;
 
     } catch (error) {
       console.error('❌ Error en sincronización:', error);
       return false;
     }
-  }, [files, isSupabaseAvailable]);
+  }, [projectId, isSupabaseAvailable, uploadFile]);
 
+  // API pública del hook
   return {
+    // Estado
     files,
     isLoading,
     error,
     storageProvider,
     isSupabaseAvailable,
+
+    // Funciones de gestión de archivos
     uploadFile,
     deleteFile,
+    loadProjectFiles,
+
+    // Funciones de búsqueda y filtrado
     getFilesByCategory,
     getFilesByRelatedItem,
     searchFiles,
+
+    // Funciones de utilidad
     getFileStats,
     clearProjectFiles,
+
+    // Funciones de proveedor
     switchStorageProvider,
     syncWithSupabase,
-    loadProjectFiles,
-    fileLimits: FILE_LIMITS
+
+    // Constantes
+    fileLimits,
   };
 };
 
