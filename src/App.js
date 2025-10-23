@@ -43,6 +43,7 @@ import supabaseService from './services/SupabaseService';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProjectProvider } from './contexts/ProjectContext';
 import { ProjectsProvider, useProjects } from './contexts/ProjectsContext';
+import { FinancialProvider, useFinancial } from './contexts/FinancialContext';
 
 // Hooks
 import usePermissions from './hooks/usePermissions';
@@ -97,6 +98,33 @@ function MainApp() {
     setCurrentProjectId,
     getCurrentProject
   } = useProjects();
+
+  // ===== CONTEXTO FINANCIERO =====
+  // Usar el nuevo FinancialContext en lugar de estado local
+  const {
+    purchaseOrdersByProject,
+    setPurchaseOrdersByProject,
+    advancesByProject,
+    setAdvancesByProject,
+    invoicesByProject,
+    setInvoicesByProject,
+    contractsByProject,
+    setContractsByProject,
+    globalResources,
+    setGlobalResources,
+    resourceAssignmentsByProject,
+    setResourceAssignmentsByProject,
+    getCurrentProjectPurchaseOrders,
+    getCurrentProjectAdvances,
+    getCurrentProjectInvoices,
+    getCurrentProjectContracts,
+    getCurrentProjectResourceAssignments,
+    updateCurrentProjectPurchaseOrders,
+    updateCurrentProjectAdvances,
+    updateCurrentProjectInvoices,
+    updateCurrentProjectContracts,
+    updateCurrentProjectResourceAssignments,
+  } = useFinancial();
 
   // Cargar script de diagnóstico solo en desarrollo
   useEffect(() => {
@@ -699,109 +727,13 @@ function MainApp() {
     }
   };
 
-  // Función para actualizar órdenes de compra del proyecto actual
-  const updateCurrentProjectPurchaseOrders = (newPurchaseOrders) => {
-    // Validar que newPurchaseOrders sea un array válido
-    const safePurchaseOrders = Array.isArray(newPurchaseOrders) ? newPurchaseOrders : [];
-    
-    console.log('💾 ACTUALIZANDO ÓRDENES DE COMPRA:', {
-      currentProjectId,
-      newPurchaseOrdersType: typeof newPurchaseOrders,
-      newPurchaseOrdersIsArray: Array.isArray(newPurchaseOrders),
-      newPurchaseOrdersLength: safePurchaseOrders.length,
-      newPurchaseOrders: safePurchaseOrders
-    });
-    
-    setPurchaseOrdersByProject(prev => {
-      const updatedProjects = Object.assign({}, prev);
-      updatedProjects[currentProjectId] = safePurchaseOrders;
-      return updatedProjects;
-    });
-  };
-
-  // Función para actualizar anticipos del proyecto actual
-  const updateCurrentProjectAdvances = (newAdvances) => {
-    const safeAdvances = Array.isArray(newAdvances) ? newAdvances : [];
-    console.log('💾 ACTUALIZANDO ANTICIPOS:', {
-      currentProjectId,
-      newAdvancesType: typeof newAdvances,
-      newAdvancesIsArray: Array.isArray(newAdvances),
-      newAdvancesLength: safeAdvances.length
-    });
-    setAdvancesByProject(prev => {
-      const updatedProjects = Object.assign({}, prev);
-      updatedProjects[currentProjectId] = safeAdvances;
-      return updatedProjects;
-    });
-  };
-
-  // Función para actualizar facturas del proyecto actual
-  const updateCurrentProjectInvoices = (newInvoices) => {
-    const safeInvoices = Array.isArray(newInvoices) ? newInvoices : [];
-    console.log('💾 ACTUALIZANDO FACTURAS:', {
-      currentProjectId,
-      newInvoicesType: typeof newInvoices,
-      newInvoicesIsArray: Array.isArray(newInvoices),
-      newInvoicesLength: safeInvoices.length
-    });
-    setInvoicesByProject(prev => {
-      const updatedProjects = Object.assign({}, prev);
-      updatedProjects[currentProjectId] = safeInvoices;
-      return updatedProjects;
-    });
-  };
-
-  // Función para actualizar contratos del proyecto actual
-  const updateCurrentProjectContracts = (newContracts) => {
-    const safeContracts = Array.isArray(newContracts) ? newContracts : [];
-    console.log('💾 ACTUALIZANDO CONTRATOS:', {
-      currentProjectId,
-      newContractsType: typeof newContracts,
-      newContractsIsArray: Array.isArray(newContracts),
-      newContractsLength: safeContracts.length
-    });
-    setContractsByProject(prev => {
-      const updatedProjects = Object.assign({}, prev);
-      updatedProjects[currentProjectId] = safeContracts;
-      return updatedProjects;
-    });
-  };
+  // updateCurrentProjectPurchaseOrders, updateCurrentProjectAdvances,
+  // updateCurrentProjectInvoices, updateCurrentProjectContracts
+  // MIGRADO A FinancialContext - ahora vienen del hook useFinancial()
 
   // ===== FUNCIONES DE GESTIÓN FINANCIERA =====
-  
-  const [purchaseOrdersByProject, setPurchaseOrdersByProject] = useState({});
-  
-
-  const [advancesByProject, setAdvancesByProject] = useState({});
-
-  const [invoicesByProject, setInvoicesByProject] = useState({});
-
-  const [contractsByProject, setContractsByProject] = useState({});
-
-  const getCurrentProjectPurchaseOrders = () => {
-    return purchaseOrdersByProject[currentProjectId] || [];
-  };
-
-  const getCurrentProjectAdvances = () => {
-    return advancesByProject[currentProjectId] || [];
-  };
-
-  const getCurrentProjectInvoices = () => {
-    return invoicesByProject[currentProjectId] || [];
-  };
-
-  const getCurrentProjectContracts = () => {
-    return contractsByProject[currentProjectId] || [];
-  };
-
-  // ===== FUNCIONES DE GESTIÓN DE RECURSOS =====
-  
-  const [globalResources, setGlobalResources] = useState([]);
-  const [resourceAssignmentsByProject, setResourceAssignmentsByProject] = useState({});
-
-  const getCurrentProjectResourceAssignments = () => {
-    return resourceAssignmentsByProject[currentProjectId] || [];
-  };
+  // MIGRADO A FinancialContext - purchaseOrders, advances, invoices, contracts, resources
+  // Las funciones getCurrentProjectXXX() ahora vienen del hook useFinancial()
 
   // ===== FUNCIONES DE AUDITORÍA =====
   
@@ -2030,30 +1962,32 @@ function App() {
     <Router>
       <AuthProvider>
         <ProjectsProvider>
-          <ProjectProvider>
-            <Routes>
-              {/* Rutas de Super-Admin */}
-              <Route
-                path="/admin"
-                element={
-                  <SuperAdminRoute>
-                    <SuperAdminDashboard />
-                  </SuperAdminRoute>
-                }
-              />
-              <Route
-                path="/admin/organizations/:orgId"
-                element={
-                  <SuperAdminRoute>
-                    <OrganizationDetails />
-                  </SuperAdminRoute>
-                }
-              />
+          <FinancialProvider>
+            <ProjectProvider>
+              <Routes>
+                {/* Rutas de Super-Admin */}
+                <Route
+                  path="/admin"
+                  element={
+                    <SuperAdminRoute>
+                      <SuperAdminDashboard />
+                    </SuperAdminRoute>
+                  }
+                />
+                <Route
+                  path="/admin/organizations/:orgId"
+                  element={
+                    <SuperAdminRoute>
+                      <OrganizationDetails />
+                    </SuperAdminRoute>
+                  }
+                />
 
-              {/* Ruta principal - App normal */}
-              <Route path="/*" element={<AppContent />} />
-            </Routes>
-          </ProjectProvider>
+                {/* Ruta principal - App normal */}
+                <Route path="/*" element={<AppContent />} />
+              </Routes>
+            </ProjectProvider>
+          </FinancialProvider>
         </ProjectsProvider>
       </AuthProvider>
     </Router>
