@@ -42,6 +42,7 @@ import supabaseService from './services/SupabaseService';
 // Contextos
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProjectProvider } from './contexts/ProjectContext';
+import { ProjectsProvider, useProjects } from './contexts/ProjectsContext';
 
 // Hooks
 import usePermissions from './hooks/usePermissions';
@@ -83,10 +84,20 @@ const sortTasksByWbsCode = (tasks) => {
 // Componente principal de la aplicación (requiere autenticación)
 function MainApp() {
   const { user, showSplash, completeSplash } = useAuth();
-  
+
   // Hook de permisos para detectar usuarios de solo lectura
   const { isReadOnly, userRole, isLoading: permissionsLoading } = usePermissions();
-  
+
+  // ===== CONTEXTO DE PROYECTOS =====
+  // Usar el nuevo ProjectsContext en lugar de estado local
+  const {
+    projects,
+    setProjects,
+    currentProjectId,
+    setCurrentProjectId,
+    getCurrentProject
+  } = useProjects();
+
   // Cargar script de diagnóstico solo en desarrollo
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
@@ -95,66 +106,15 @@ function MainApp() {
       });
     }
   }, []);
-  
-  // ===== ESTADO MULTI-PROYECTO =====
-  const [projects, setProjects] = useState([]);
 
-  // Función para obtener el proyecto inicial con lógica de respaldo
-  const getInitialProjectId = () => {
-    // 1. Intentar cargar el último proyecto seleccionado desde localStorage
-    const lastSelectedProjectId = localStorage.getItem('lastSelectedProjectId');
-    
-    if (lastSelectedProjectId) {
-      // Verificar si el proyecto aún existe y está activo
-      const project = projects.find(p => p.id === lastSelectedProjectId);
-      if (project && project.status === 'active') {
-        return lastSelectedProjectId;
-      }
-    }
-    
-    // 2. Si no hay proyecto seleccionado o no está activo, buscar el primer proyecto activo
-    const activeProject = projects.find(p => p.status === 'active');
-    if (activeProject) {
-      return activeProject.id;
-    }
-    
-    // 3. Si no hay proyectos activos, usar el primer proyecto disponible
-    if (projects.length > 0) {
-      return projects[0].id;
-    }
-    
-    // 4. NO HAY PROYECTOS - retornar null
-    return null;
-  };
-
-  const [currentProjectId, setCurrentProjectId] = useState(getInitialProjectId);
+  // ===== ESTADO DE UI Y CONFIGURACIÓN =====
   const [portfolioViewMode, setPortfolioViewMode] = useState('portfolio'); // 'portfolio', 'project', 'schedule'
   const [viewMode, setViewMode] = useState('dashboard');
-  
+
   // Estado para controlar el modo de persistencia
   const [useSupabase, setUseSupabase] = useState(false);
   const [supabaseInitialized, setSupabaseInitialized] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
-
-  // Corregir currentProjectId si no coincide con ningún proyecto existente
-  useEffect(() => {
-    if (projects && projects.length > 0) {
-      const projectExists = projects.find(p => p.id === currentProjectId);
-      if (!projectExists) {
-        // Buscar el primer proyecto activo disponible
-        const activeProject = projects.find(p => p.status === 'active');
-        const fallbackProjectId = activeProject ? activeProject.id : projects[0].id;
-        
-        console.log('🔧 CORRIGIENDO currentProjectId:', {
-          currentProjectId,
-          availableProjects: projects.map(p => ({ id: p.id, name: p.name, status: p.status })),
-          fallbackTo: fallbackProjectId,
-          reason: 'Proyecto no encontrado, usando primer proyecto disponible'
-        });
-        setCurrentProjectId(fallbackProjectId);
-      }
-    }
-  }, [projects, currentProjectId]);
 
   // Work Packages eliminados - ya no se usan
 
@@ -1844,7 +1804,7 @@ function MainApp() {
 
   // ===== RENDERIZADO =====
   
-  const currentProject = projects.find(p => p.id === currentProjectId);
+  const currentProject = getCurrentProject();
 
   // Validar que hay un proyecto seleccionado
   if (!currentProject && projects.length > 0) {
@@ -2069,30 +2029,32 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <ProjectProvider>
-          <Routes>
-            {/* Rutas de Super-Admin */}
-            <Route 
-              path="/admin" 
-              element={
-                <SuperAdminRoute>
-                  <SuperAdminDashboard />
-                </SuperAdminRoute>
-              } 
-            />
-            <Route 
-              path="/admin/organizations/:orgId" 
-              element={
-                <SuperAdminRoute>
-                  <OrganizationDetails />
-                </SuperAdminRoute>
-              } 
-            />
-            
-            {/* Ruta principal - App normal */}
-            <Route path="/*" element={<AppContent />} />
-          </Routes>
-        </ProjectProvider>
+        <ProjectsProvider>
+          <ProjectProvider>
+            <Routes>
+              {/* Rutas de Super-Admin */}
+              <Route
+                path="/admin"
+                element={
+                  <SuperAdminRoute>
+                    <SuperAdminDashboard />
+                  </SuperAdminRoute>
+                }
+              />
+              <Route
+                path="/admin/organizations/:orgId"
+                element={
+                  <SuperAdminRoute>
+                    <OrganizationDetails />
+                  </SuperAdminRoute>
+                }
+              />
+
+              {/* Ruta principal - App normal */}
+              <Route path="/*" element={<AppContent />} />
+            </Routes>
+          </ProjectProvider>
+        </ProjectsProvider>
       </AuthProvider>
     </Router>
   );
