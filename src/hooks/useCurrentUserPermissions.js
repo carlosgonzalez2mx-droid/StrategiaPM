@@ -12,10 +12,46 @@ import { ROLES } from '../constants/roles';
 
 /**
  * Hook para verificar permisos del usuario actual en la organización
- * Refactorizado para usar useAuthUser como base
  *
- * @param {Array} members - Lista de miembros de la organización
- * @returns {Object} { currentUser, currentUserMembership, currentUserRole, isOwnerOrAdmin, isOwner, isAdmin, isMember, canInvite, canEditRoles, canRemoveMembers }
+ * Busca la membresía del usuario actual en la lista de miembros, mapea su rol
+ * a un rol estándar y calcula permisos específicos para gestión de usuarios.
+ *
+ * Elimina la necesidad de verificaciones duplicadas de isOwnerOrAdmin en componentes.
+ * Usa useAuthUser para autenticación y useRoleMapping para normalización de roles.
+ *
+ * @param {Array<Object>} members - Lista de miembros de la organización
+ * @param {string} members[].user_email - Email del miembro
+ * @param {string} members[].role - Rol del miembro en la organización
+ *
+ * @returns {Object} Permisos y metadata del usuario actual
+ * @returns {Object|null} return.currentUser - Objeto de usuario de Supabase
+ * @returns {Object|null} return.currentUserMembership - Objeto de membresía del usuario
+ * @returns {string|null} return.currentUserRole - Rol original del usuario (de DB)
+ * @returns {string|null} return.mappedRole - Rol mapeado a estándar (OWNER, ADMIN, MEMBER_WRITE, MEMBER_READ)
+ * @returns {boolean} return.isOwnerOrAdmin - Si es owner o admin
+ * @returns {boolean} return.isOwner - Si es owner
+ * @returns {boolean} return.isAdmin - Si es admin
+ * @returns {boolean} return.isMember - Si es miembro (write o read)
+ * @returns {boolean} return.canInvite - Puede invitar usuarios
+ * @returns {boolean} return.canEditRoles - Puede editar roles de usuarios
+ * @returns {boolean} return.canRemoveMembers - Puede eliminar miembros
+ * @returns {Function} return.canEditMember - Verifica si puede editar un miembro específico
+ * @returns {Function} return.canRemoveMember - Verifica si puede eliminar un miembro específico
+ *
+ * @example
+ * const { isOwnerOrAdmin, canInvite, canEditMember, canRemoveMember } = useCurrentUserPermissions(members);
+ *
+ * return (
+ *   <div>
+ *     {canInvite && <InviteButton />}
+ *     {members.map(member => (
+ *       <MemberRow key={member.id}>
+ *         {canEditMember(member) && <EditButton />}
+ *         {canRemoveMember(member) && <RemoveButton />}
+ *       </MemberRow>
+ *     ))}
+ *   </div>
+ * );
  */
 const useCurrentUserPermissions = (members = []) => {
   // Hook base de autenticación

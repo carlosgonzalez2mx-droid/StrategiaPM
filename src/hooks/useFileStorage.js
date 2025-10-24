@@ -6,12 +6,57 @@ import useFileValidation, { FILE_LIMITS } from './useFileValidation';
 /**
  * Hook principal para gestión de archivos del proyecto
  *
+ * Proporciona funcionalidad completa de gestión de archivos con soporte para:
+ * - Almacenamiento dual: localStorage + Supabase Storage
+ * - Validación automática de archivos (tamaño, tipo, límites)
+ * - Compresión automática de imágenes
+ * - Categorización de archivos
+ * - Búsqueda y filtrado
+ * - Sincronización entre proveedores
+ *
  * Refactorizado para usar hooks especializados:
  * - useStorageProvider: Gestión del proveedor de almacenamiento
  * - useFileValidation: Validación y procesamiento de archivos
  *
  * @param {string} projectId - ID del proyecto
+ *
  * @returns {Object} Estado y funciones para gestión de archivos
+ * @returns {Array<Object>} return.files - Lista de archivos del proyecto
+ * @returns {boolean} return.isLoading - Estado de carga
+ * @returns {string|null} return.error - Mensaje de error si existe
+ * @returns {string} return.storageProvider - Proveedor activo ('local' o 'supabase')
+ * @returns {boolean} return.isSupabaseAvailable - Si Supabase Storage está disponible
+ * @returns {Function} return.uploadFile - Sube un archivo al proyecto
+ * @returns {Function} return.deleteFile - Elimina un archivo
+ * @returns {Function} return.loadProjectFiles - Recarga archivos del proyecto
+ * @returns {Function} return.getFilesByCategory - Filtra archivos por categoría
+ * @returns {Function} return.getFilesByRelatedItem - Filtra archivos por item relacionado
+ * @returns {Function} return.searchFiles - Busca archivos por nombre
+ * @returns {Function} return.getFileStats - Obtiene estadísticas de archivos
+ * @returns {Function} return.clearProjectFiles - Limpia archivos del proyecto
+ * @returns {Function} return.switchStorageProvider - Cambia proveedor de almacenamiento
+ * @returns {Function} return.syncWithSupabase - Sincroniza archivos con Supabase
+ * @returns {Object} return.fileLimits - Límites de archivos (tamaño, cantidad, tipos)
+ *
+ * @example
+ * const {
+ *   files,
+ *   isLoading,
+ *   uploadFile,
+ *   deleteFile,
+ *   getFilesByCategory
+ * } = useFileStorage(projectId);
+ *
+ * // Subir archivo
+ * const handleUpload = async (file) => {
+ *   const result = await uploadFile(file, 'contract', 'Contrato principal');
+ *   if (result.success) {
+ *     console.log('Archivo subido:', result.file);
+ *   }
+ * };
+ *
+ * // Obtener archivos de una categoría
+ * const contracts = getFilesByCategory('contract');
  */
 const useFileStorage = (projectId) => {
   // Estado local

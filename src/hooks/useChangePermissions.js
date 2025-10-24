@@ -5,7 +5,58 @@ import useAuthUser from './useAuthUser';
 
 /**
  * Hook para obtener permisos de control de cambios del usuario actual
- * Refactorizado para usar useAuthUser como base
+ *
+ * Calcula permisos específicos para el módulo de Control de Cambios basándose en:
+ * - Rol organizacional (owner, admin, organization_member_write/read)
+ * - Rol funcional (change_manager, change_analyst, ccb_member, developer, etc.)
+ *
+ * Permisos disponibles:
+ * - canCreate: Crear solicitudes de cambio
+ * - canApprove: Aprobar cambios (con límites de costo/tiempo)
+ * - canReject: Rechazar cambios
+ * - canImplement: Marcar cambios como implementados
+ * - canVoteInCCB: Votar en Change Control Board
+ * - canAssign: Asignar cambios a otros usuarios
+ * - canComment: Comentar en cambios
+ * - canViewAll: Ver todos los cambios (no solo asignados)
+ *
+ * @returns {Object} Permisos de control de cambios
+ * @returns {Object} return.permissions - Objeto con permisos y metadata
+ * @returns {boolean} return.permissions.canCreate - Puede crear cambios
+ * @returns {boolean} return.permissions.canApprove - Puede aprobar cambios
+ * @returns {boolean} return.permissions.canReject - Puede rechazar cambios
+ * @returns {boolean} return.permissions.canImplement - Puede implementar cambios
+ * @returns {boolean} return.permissions.canVoteInCCB - Puede votar en CCB
+ * @returns {boolean} return.permissions.canAssign - Puede asignar cambios
+ * @returns {boolean} return.permissions.canComment - Puede comentar
+ * @returns {boolean} return.permissions.canViewAll - Puede ver todos los cambios
+ * @returns {Object} return.permissions.approvalLimit - Límites de aprobación {cost, schedule}
+ * @returns {string|null} return.permissions.changeRole - Rol específico de cambios
+ * @returns {string} return.permissions.level - Nivel de permisos (none, basic, intermediate, advanced, full)
+ * @returns {string|null} return.permissions.userId - ID del usuario
+ * @returns {string|null} return.permissions.userName - Nombre del usuario
+ * @returns {string|null} return.permissions.userEmail - Email del usuario
+ * @returns {string|null} return.permissions.orgRole - Rol organizacional
+ * @returns {string|null} return.permissions.functionalRole - Rol funcional
+ * @returns {boolean} return.loading - Estado de carga
+ * @returns {string|null} return.error - Mensaje de error si existe
+ * @returns {Function} return.canApproveSpecificChange - Verifica si puede aprobar cambio específico
+ *
+ * @example
+ * const { permissions, loading, canApproveSpecificChange } = useChangePermissions();
+ *
+ * if (loading) return <Spinner />;
+ *
+ * // Verificar permisos
+ * if (permissions.canCreate) {
+ *   return <CreateChangeButton />;
+ * }
+ *
+ * // Verificar aprobación específica
+ * const canApprove = canApproveSpecificChange(5000, 10); // $5000, 10 días
+ * if (canApprove) {
+ *   return <ApproveButton />;
+ * }
  */
 const useChangePermissions = () => {
   // Hook base de autenticación
@@ -175,7 +226,23 @@ const useChangePermissions = () => {
   }, [isAuthenticated, userEmail, organizationId, isAuthLoading, currentUser, userId]);
 
   /**
-   * Verifica si el usuario puede aprobar un cambio específico
+   * Verifica si el usuario puede aprobar un cambio específico basándose en límites
+   *
+   * Compara el impacto en costo y tiempo del cambio contra los límites de aprobación
+   * del usuario. Ambos límites deben cumplirse para aprobar.
+   *
+   * @param {number|string} costImpact - Impacto en costo (USD)
+   * @param {number|string} scheduleImpact - Impacto en cronograma (días)
+   * @returns {boolean} True si el usuario puede aprobar este cambio específico
+   *
+   * @example
+   * const { canApproveSpecificChange } = useChangePermissions();
+   *
+   * // Cambio pequeño: $1000, 5 días
+   * canApproveSpecificChange(1000, 5); // true para analyst
+   *
+   * // Cambio grande: $50000, 30 días
+   * canApproveSpecificChange(50000, 30); // false para analyst, true para manager
    */
   const canApproveSpecificChange = (costImpact, scheduleImpact) => {
     if (!permissions.canApprove) return false;

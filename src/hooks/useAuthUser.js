@@ -5,13 +5,29 @@ import supabaseService from '../services/SupabaseService';
  * Hook base para autenticación y usuario actual
  *
  * Centraliza la lógica común de todos los hooks de permisos:
- * - Obtención del usuario actual
- * - Estado de loading
- * - Verificación de autenticación
- * - Detección de organización
- * - Prevención de loops infinitos
+ * - Obtención del usuario actual desde Supabase
+ * - Estado de loading con prevención de loops infinitos
+ * - Verificación de autenticación y membresías activas
+ * - Detección automática de organización
+ * - Auto sign-out para usuarios sin membresías
+ * - Suscripción a cambios de autenticación (SIGNED_IN, SIGNED_OUT)
  *
- * @returns {Object} Estado de autenticación y usuario
+ * @returns {Object} Estado de autenticación y funciones de usuario
+ * @returns {Object|null} return.currentUser - Objeto de usuario de Supabase (user_metadata, email, id)
+ * @returns {string|null} return.organizationId - ID de la organización actual del usuario
+ * @returns {boolean} return.isLoading - Estado de carga del usuario y organización
+ * @returns {boolean} return.isAuthenticated - Si el usuario está autenticado (tiene email)
+ * @returns {string|null} return.userEmail - Email del usuario actual (helper de currentUser.email)
+ * @returns {string|null} return.userId - ID del usuario actual (helper de currentUser.id)
+ * @returns {Function} return.reloadUser - Función para recargar usuario y organización manualmente
+ *
+ * @example
+ * const { currentUser, isAuthenticated, userEmail, organizationId, isLoading } = useAuthUser();
+ *
+ * if (isLoading) return <Spinner />;
+ * if (!isAuthenticated) return <LoginPrompt />;
+ *
+ * return <div>Bienvenido {userEmail}</div>;
  */
 const useAuthUser = () => {
   const [currentUser, setCurrentUser] = useState(null);
@@ -133,7 +149,21 @@ const useAuthUser = () => {
   }, []);
 
   /**
-   * Recarga el usuario y organización
+   * Recarga manualmente el usuario y organización desde Supabase
+   *
+   * Útil cuando se necesita forzar una actualización del estado de autenticación,
+   * por ejemplo después de cambiar de organización o actualizar el perfil.
+   *
+   * @async
+   * @function reloadUser
+   * @returns {Promise<void>}
+   *
+   * @example
+   * const { reloadUser } = useAuthUser();
+   *
+   * // Después de cambiar organización
+   * await switchOrganization(newOrgId);
+   * await reloadUser(); // Actualizar estado
    */
   const reloadUser = async () => {
     isLoadingRef.current = false;

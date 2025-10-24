@@ -3,8 +3,40 @@ import supabaseService from '../services/SupabaseService';
 import useAuthUser from './useAuthUser';
 
 /**
- * Hook para manejar permisos de usuario basado en roles
- * Refactorizado para usar useAuthUser como base
+ * Hook para manejar permisos de usuario basado en roles organizacionales
+ *
+ * Obtiene el rol del usuario desde organization_members y calcula permisos específicos.
+ * Usa useAuthUser como base para autenticación y detección de organización.
+ *
+ * Roles soportados:
+ * - owner/admin: Todos los permisos
+ * - organization_member_write: Editar y exportar
+ * - organization_member_read: Solo exportar (read-only)
+ *
+ * @returns {Object} Permisos y estado del usuario
+ * @returns {Object} return.permissions - Objeto con flags de permisos
+ * @returns {boolean} return.permissions.canEdit - Puede editar proyectos/datos
+ * @returns {boolean} return.permissions.canDelete - Puede eliminar elementos
+ * @returns {boolean} return.permissions.canInvite - Puede invitar usuarios
+ * @returns {boolean} return.permissions.canManageUsers - Puede gestionar usuarios
+ * @returns {boolean} return.permissions.canArchive - Puede archivar proyectos
+ * @returns {boolean} return.permissions.canExport - Puede exportar datos
+ * @returns {Function} return.isReadOnly - Retorna true si el usuario es read-only
+ * @returns {boolean} return.isLoading - Estado de carga de permisos
+ * @returns {string|null} return.userRole - Rol del usuario en la organización
+ *
+ * @example
+ * const { permissions, isReadOnly, isLoading, userRole } = usePermissions();
+ *
+ * if (isLoading) return <Spinner />;
+ *
+ * return (
+ *   <div>
+ *     {permissions.canEdit && <EditButton />}
+ *     {permissions.canDelete && <DeleteButton />}
+ *     {isReadOnly() && <Badge>Solo lectura</Badge>}
+ *   </div>
+ * );
  */
 const usePermissions = () => {
   // Hook base de autenticación
@@ -153,7 +185,13 @@ const usePermissions = () => {
     loadUserRole();
   }, [isAuthenticated, userEmail, organizationId, isAuthLoading]);
 
-  // Función para calcular permisos basado en el rol
+  /**
+   * Calcula los permisos específicos basándose en el rol del usuario
+   *
+   * @private
+   * @param {string} role - Rol del usuario (owner, admin, organization_member_write, organization_member_read)
+   * @returns {Object} Objeto con flags de permisos específicos
+   */
   const calculatePermissions = (role) => {
     switch (role) {
       case 'owner':
