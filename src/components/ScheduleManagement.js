@@ -4493,17 +4493,17 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
           updatedTasks = newTasks;
           console.log('🚀 NUEVO SISTEMA - Tarea agregada al final. Total tareas:', updatedTasks.length);
         }
-        
-        // Aplicar ordenamiento por wbsCode para todos los proyectos
-        updatedTasks = sortTasksByWbsCode(updatedTasks);
-        
-        // Actualizar wbsCode de todas las tareas para mantener secuencia correcta
+
+        // ❌ NO ORDENAR por wbsCode después de inserción manual
+        // La tarea ya fue insertada en la posición correcta arriba
+        // Ordenar por wbsCode movería la tarea nueva a una posición incorrecta
+        // Solo renumerar wbsCodes para mantener secuencia correcta 1, 2, 3, ...
         updatedTasks = updatedTasks.map((task, index) => ({
           ...task,
           wbsCode: index + 1
         }));
-        
-        console.log('🚀 NUEVA FUNCIÓN - wbsCode actualizados para mantener secuencia:', 
+
+        console.log('🚀 NUEVA FUNCIÓN - wbsCode actualizados para mantener secuencia:',
           updatedTasks.map(t => ({ name: t.name, wbsCode: t.wbsCode }))
         );
         
