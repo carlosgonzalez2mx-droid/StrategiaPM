@@ -1,41 +1,10 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { debounce } from 'lodash';
 import './App.css';
 import './index.css';
 
-// Componentes
-import LoginForm from './components/LoginForm';
-import ProtectedRoute from './components/ProtectedRoute';
-import Sidebar from './components/Sidebar';
-import ConsolidatedDashboard from './components/ConsolidatedDashboard';
-import IntegratedPMODashboard from './components/IntegratedPMODashboard';
-import PortfolioStrategic from './components/PortfolioStrategic';
-import ProjectManagementTabs from './components/ProjectManagementTabs';
-import ScheduleManagement from './components/ScheduleManagement';
-import FinancialManagement from './components/FinancialManagement';
-import ResourceManagement from './components/ResourceManagement';
-import RiskManagement from './components/RiskManagement';
-import ChangeManagement from './components/ChangeManagement';
-import CashFlowProjection from './components/CashFlowProjection';
-import FileManager from './components/FileManager';
-import ReportsManagement from './components/ReportsManagement';
-import ProjectAudit from './components/ProjectAudit';
-import ProjectArchive from './components/ProjectArchive';
-import SyncIndicator from './components/SyncIndicator';
-import BackupManager from './components/BackupManager';
-import FileStatusIndicator from './components/FileStatusIndicator';
-import AutoSaveIndicator from './components/AutoSaveIndicator';
-import SupabaseAuth from './components/SupabaseAuth';
-import OrganizationMembers from './components/OrganizationMembers';
-import UserManagement from './components/UserManagement';
-import SplashScreen from './components/SplashScreen';
-
-// Super Admin Components
-import SuperAdminRoute from './components/admin/SuperAdminRoute';
-import SuperAdminDashboard from './components/admin/SuperAdminDashboard';
-import OrganizationDetails from './components/admin/OrganizationDetails';
-
+// Servicios
 import filePersistenceService from './services/FilePersistenceService';
 import supabaseService from './services/SupabaseService';
 
@@ -49,6 +18,45 @@ import { ConfigProvider, useConfig } from './contexts/ConfigContext';
 
 // Hooks
 import usePermissions from './hooks/usePermissions';
+
+// Utilidades de precarga
+import { preloadComponentsOnIdle } from './utils/preloadComponents';
+
+// Componentes pequeños y frecuentes (carga directa)
+import LoginForm from './components/LoginForm';
+import ProtectedRoute from './components/ProtectedRoute';
+import Sidebar from './components/Sidebar';
+import SyncIndicator from './components/SyncIndicator';
+import FileStatusIndicator from './components/FileStatusIndicator';
+import AutoSaveIndicator from './components/AutoSaveIndicator';
+import SupabaseAuth from './components/SupabaseAuth';
+import SplashScreen from './components/SplashScreen';
+import LoadingFallback from './components/LoadingFallback';
+import ErrorBoundary from './components/ErrorBoundary';
+
+// Componentes grandes con lazy loading (code splitting)
+const ConsolidatedDashboard = lazy(() => import('./components/ConsolidatedDashboard'));
+const IntegratedPMODashboard = lazy(() => import('./components/IntegratedPMODashboard'));
+const PortfolioStrategic = lazy(() => import('./components/PortfolioStrategic'));
+const ProjectManagementTabs = lazy(() => import('./components/ProjectManagementTabs'));
+const ScheduleManagement = lazy(() => import('./components/ScheduleManagement'));
+const FinancialManagement = lazy(() => import('./components/FinancialManagement'));
+const ResourceManagement = lazy(() => import('./components/ResourceManagement'));
+const RiskManagement = lazy(() => import('./components/RiskManagement'));
+const ChangeManagement = lazy(() => import('./components/ChangeManagement'));
+const CashFlowProjection = lazy(() => import('./components/CashFlowProjection'));
+const FileManager = lazy(() => import('./components/FileManager'));
+const ReportsManagement = lazy(() => import('./components/ReportsManagement'));
+const ProjectAudit = lazy(() => import('./components/ProjectAudit'));
+const ProjectArchive = lazy(() => import('./components/ProjectArchive'));
+const BackupManager = lazy(() => import('./components/BackupManager'));
+const OrganizationMembers = lazy(() => import('./components/OrganizationMembers'));
+const UserManagement = lazy(() => import('./components/UserManagement'));
+
+// Super Admin Components (lazy loading)
+const SuperAdminRoute = lazy(() => import('./components/admin/SuperAdminRoute'));
+const SuperAdminDashboard = lazy(() => import('./components/admin/SuperAdminDashboard'));
+const OrganizationDetails = lazy(() => import('./components/admin/OrganizationDetails'));
 
 // Función de ordenamiento de tareas por wbsCode (importada desde ScheduleManagement)
 const sortTasksByWbsCode = (tasks) => {
@@ -90,6 +98,16 @@ function MainApp() {
 
   // Hook de permisos para detectar usuarios de solo lectura
   const { isReadOnly, userRole, isLoading: permissionsLoading } = usePermissions();
+
+  // Precargar componentes más utilizados cuando el navegador esté idle
+  useEffect(() => {
+    preloadComponentsOnIdle([
+      ProjectManagementTabs,
+      ScheduleManagement,
+      FinancialManagement,
+      ConsolidatedDashboard
+    ]);
+  }, []);
 
   // ===== CONTEXTO DE PROYECTOS =====
   // Usar el nuevo ProjectsContext en lugar de estado local
@@ -1550,28 +1568,32 @@ function App() {
             <FinancialProvider>
               <TasksProvider>
                 <ProjectProvider>
-                  <Routes>
-                {/* Rutas de Super-Admin */}
-                <Route
-                  path="/admin"
-                  element={
-                    <SuperAdminRoute>
-                      <SuperAdminDashboard />
-                    </SuperAdminRoute>
-                  }
-                />
-                <Route
-                  path="/admin/organizations/:orgId"
-                  element={
-                    <SuperAdminRoute>
-                      <OrganizationDetails />
-                    </SuperAdminRoute>
-                  }
-                />
+                  <ErrorBoundary>
+                    <Suspense fallback={<LoadingFallback message="Cargando aplicación..." />}>
+                      <Routes>
+                        {/* Rutas de Super-Admin */}
+                        <Route
+                          path="/admin"
+                          element={
+                            <SuperAdminRoute>
+                              <SuperAdminDashboard />
+                            </SuperAdminRoute>
+                          }
+                        />
+                        <Route
+                          path="/admin/organizations/:orgId"
+                          element={
+                            <SuperAdminRoute>
+                              <OrganizationDetails />
+                            </SuperAdminRoute>
+                          }
+                        />
 
-                {/* Ruta principal - App normal */}
-                <Route path="/*" element={<AppContent />} />
-                  </Routes>
+                        {/* Ruta principal - App normal */}
+                        <Route path="/*" element={<AppContent />} />
+                      </Routes>
+                    </Suspense>
+                  </ErrorBoundary>
                 </ProjectProvider>
               </TasksProvider>
             </FinancialProvider>
