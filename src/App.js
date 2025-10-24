@@ -172,14 +172,14 @@ function MainApp() {
     setDataLoaded,
   } = useConfig();
 
-  // Cargar script de diagnóstico solo en desarrollo
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      import('./debug-file-storage').catch(err => {
-        console.warn('No se pudo cargar el script de diagnóstico:', err);
-      });
-    }
-  }, []);
+  // NOTA: Script de diagnóstico deshabilitado temporalmente
+  // useEffect(() => {
+  //   if (process.env.NODE_ENV === 'development') {
+  //     import('./debug-file-storage').catch(err => {
+  //       console.warn('No se pudo cargar el script de diagnóstico:', err);
+  //     });
+  //   }
+  // }, []);
 
   // Work Packages eliminados - ya no se usan
   // Tareas, minutas, riesgos - MIGRADO A TasksContext
