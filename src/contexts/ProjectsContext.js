@@ -1,16 +1,54 @@
 /**
- * ProjectsContext - Gestión del estado de proyectos
+ * @fileoverview ProjectsContext - Gestión centralizada del estado de proyectos
  *
- * Este contexto maneja:
- * - Lista de proyectos
- * - Proyecto actual seleccionado
- * - Funciones helpers para trabajar con proyectos
+ * Este contexto proporciona gestión completa de proyectos incluyendo:
+ * - Lista global de proyectos
+ * - Proyecto actual seleccionado con persistencia en localStorage
+ * - Operaciones CRUD sobre proyectos
+ * - Funciones de filtrado y búsqueda
+ * - Lógica de selección automática con respaldos inteligentes
+ *
+ * @module contexts/ProjectsContext
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 
 const ProjectsContext = createContext(null);
 
+/**
+ * Hook para acceder al contexto de proyectos
+ *
+ * Proporciona acceso al estado global de proyectos y funciones de gestión.
+ * Debe usarse dentro de un ProjectsProvider.
+ *
+ * @returns {Object} Contexto de proyectos
+ * @returns {Array<Object>} return.projects - Lista de todos los proyectos
+ * @returns {string|null} return.currentProjectId - ID del proyecto actual seleccionado
+ * @returns {Function} return.setProjects - Setter para lista de proyectos
+ * @returns {Function} return.setCurrentProjectId - Setter para proyecto actual
+ * @returns {Function} return.getCurrentProject - Obtiene el proyecto actual completo
+ * @returns {Function} return.getActiveProjects - Filtra proyectos con status='active'
+ * @returns {Function} return.getProjectsByStatus - Filtra proyectos por status
+ * @returns {Function} return.updateProject - Actualiza un proyecto específico
+ * @returns {Function} return.addProject - Agrega un nuevo proyecto
+ * @returns {Function} return.removeProject - Elimina un proyecto
+ *
+ * @throws {Error} Si se usa fuera de ProjectsProvider
+ *
+ * @example
+ * const {
+ *   projects,
+ *   currentProjectId,
+ *   getCurrentProject,
+ *   updateProject
+ * } = useProjects();
+ *
+ * // Obtener proyecto actual
+ * const project = getCurrentProject();
+ *
+ * // Actualizar proyecto
+ * updateProject(projectId, { name: 'Nuevo nombre' });
+ */
 export const useProjects = () => {
   const context = useContext(ProjectsContext);
   if (!context) {
@@ -19,6 +57,27 @@ export const useProjects = () => {
   return context;
 };
 
+/**
+ * Provider de contexto para gestión de proyectos
+ *
+ * Envuelve la aplicación o parte de ella para proporcionar acceso global
+ * al estado de proyectos y funciones de gestión.
+ *
+ * Características:
+ * - Persistencia automática del proyecto seleccionado en localStorage
+ * - Selección inteligente de proyecto inicial (último usado → primer activo → primero disponible)
+ * - Corrección automática si el proyecto seleccionado no existe
+ * - Funciones helper memoizadas para optimización
+ *
+ * @component
+ * @param {Object} props
+ * @param {React.ReactNode} props.children - Componentes hijos que tendrán acceso al contexto
+ *
+ * @example
+ * <ProjectsProvider>
+ *   <App />
+ * </ProjectsProvider>
+ */
 export const ProjectsProvider = ({ children }) => {
   // ===== ESTADO =====
   const [projects, setProjects] = useState([]);
@@ -109,7 +168,15 @@ export const ProjectsProvider = ({ children }) => {
   // ===== FUNCIONES HELPERS =====
 
   /**
-   * Obtener proyecto actual
+   * Obtiene el objeto completo del proyecto actualmente seleccionado
+   *
+   * @returns {Object|null} Objeto de proyecto o null si no hay proyecto seleccionado
+   *
+   * @example
+   * const project = getCurrentProject();
+   * if (project) {
+   *   console.log(project.name, project.status);
+   * }
    */
   const getCurrentProject = useCallback(() => {
     if (!currentProjectId) return null;
@@ -117,21 +184,47 @@ export const ProjectsProvider = ({ children }) => {
   }, [projects, currentProjectId]);
 
   /**
-   * Obtener proyectos activos
+   * Obtiene todos los proyectos con status 'active'
+   *
+   * @returns {Array<Object>} Array de proyectos activos
+   *
+   * @example
+   * const activeProjects = getActiveProjects();
+   * console.log(`${activeProjects.length} proyectos activos`);
    */
   const getActiveProjects = useCallback(() => {
     return projects.filter(p => p.status === 'active');
   }, [projects]);
 
   /**
-   * Obtener proyectos por estado
+   * Filtra proyectos por status específico
+   *
+   * @param {string} status - Status a filtrar ('active', 'archived', 'completed', etc.)
+   * @returns {Array<Object>} Array de proyectos con el status especificado
+   *
+   * @example
+   * const archivedProjects = getProjectsByStatus('archived');
+   * const completedProjects = getProjectsByStatus('completed');
    */
   const getProjectsByStatus = useCallback((status) => {
     return projects.filter(p => p.status === status);
   }, [projects]);
 
   /**
-   * Actualizar un proyecto
+   * Actualiza propiedades de un proyecto específico
+   *
+   * Hace merge de las propiedades existentes con las nuevas.
+   * No modifica propiedades no especificadas en updates.
+   *
+   * @param {string} projectId - ID del proyecto a actualizar
+   * @param {Object} updates - Objeto con propiedades a actualizar
+   *
+   * @example
+   * // Actualizar nombre y presupuesto
+   * updateProject('project-123', {
+   *   name: 'Nuevo nombre',
+   *   budget: 150000
+   * });
    */
   const updateProject = useCallback((projectId, updates) => {
     setProjects(prev =>
@@ -140,14 +233,33 @@ export const ProjectsProvider = ({ children }) => {
   }, []);
 
   /**
-   * Agregar un proyecto
+   * Agrega un nuevo proyecto a la lista
+   *
+   * @param {Object} newProject - Objeto de proyecto completo con todas las propiedades
+   *
+   * @example
+   * addProject({
+   *   id: 'project-456',
+   *   name: 'Proyecto Nuevo',
+   *   status: 'active',
+   *   budget: 100000,
+   *   startDate: new Date()
+   * });
    */
   const addProject = useCallback((newProject) => {
     setProjects(prev => [...prev, newProject]);
   }, []);
 
   /**
-   * Eliminar un proyecto
+   * Elimina un proyecto de la lista
+   *
+   * Si el proyecto eliminado era el actual, selecciona automáticamente
+   * el primer proyecto restante o null si no quedan proyectos.
+   *
+   * @param {string} projectId - ID del proyecto a eliminar
+   *
+   * @example
+   * removeProject('project-123');
    */
   const removeProject = useCallback((projectId) => {
     setProjects(prev => prev.filter(p => p.id !== projectId));

@@ -1,12 +1,21 @@
 /**
- * TasksContext - Gestión del estado de tareas y minutas
+ * @fileoverview TasksContext - Gestión centralizada de tareas y elementos relacionados
  *
- * Este contexto maneja:
- * - Tareas por proyecto (cronograma)
- * - Minutas por proyecto
- * - Riesgos por proyecto
- * - Días laborables por proyecto
+ * Este contexto proporciona gestión completa de:
+ * - Tareas/cronograma por proyecto (gantt, hitos, dependencias)
+ * - Minutas de reuniones por proyecto
+ * - Riesgos identificados por proyecto
+ * - Configuración de días laborables por proyecto
  * - Logs de auditoría por proyecto
+ *
+ * Características:
+ * - Datos organizados por projectId para acceso eficiente
+ * - Validación automática de integridad de datos
+ * - Protección contra datos corruptos con fallbacks seguros
+ * - Funciones helper para proyecto actual
+ * - Integración automática con ProjectsContext
+ *
+ * @module contexts/TasksContext
  */
 
 import React, { createContext, useContext, useState, useCallback } from 'react';
@@ -14,6 +23,45 @@ import { useProjects } from './ProjectsContext';
 
 const TasksContext = createContext(null);
 
+/**
+ * Hook para acceder al contexto de tareas y elementos relacionados
+ *
+ * Proporciona acceso al estado global de tareas, minutas, riesgos y auditoría.
+ * Debe usarse dentro de un TasksProvider.
+ *
+ * @returns {Object} Contexto de tareas
+ * @returns {Object} return.tasksByProject - Tareas indexadas por projectId
+ * @returns {Object} return.minutasByProject - Minutas indexadas por projectId
+ * @returns {Object} return.risksByProject - Riesgos indexados por projectId
+ * @returns {Object} return.includeWeekendsByProject - Config días laborables por projectId
+ * @returns {Object} return.auditLogsByProject - Logs de auditoría por projectId
+ * @returns {Function} return.getCurrentProjectTasks - Obtiene tareas del proyecto actual
+ * @returns {Function} return.getCurrentProjectMinutas - Obtiene minutas del proyecto actual
+ * @returns {Function} return.getCurrentProjectRisks - Obtiene riesgos del proyecto actual
+ * @returns {Function} return.getCurrentProjectIncludeWeekends - Obtiene config días laborables
+ * @returns {Function} return.getCurrentProjectAuditLogs - Obtiene logs de auditoría
+ * @returns {Function} return.updateCurrentProjectTasks - Actualiza tareas del proyecto actual
+ * @returns {Function} return.updateCurrentProjectMinutas - Actualiza minutas del proyecto actual
+ * @returns {Function} return.updateCurrentProjectRisks - Actualiza riesgos del proyecto actual
+ * @returns {Function} return.updateCurrentProjectIncludeWeekends - Actualiza config días laborables
+ * @returns {Function} return.updateCurrentProjectAuditLogs - Actualiza logs de auditoría
+ * @returns {Function} return.importTasksToCurrentProject - Importa tareas masivamente
+ *
+ * @throws {Error} Si se usa fuera de TasksProvider
+ *
+ * @example
+ * const {
+ *   getCurrentProjectTasks,
+ *   getCurrentProjectRisks,
+ *   updateCurrentProjectTasks
+ * } = useTasks();
+ *
+ * // Obtener tareas del proyecto actual
+ * const tasks = getCurrentProjectTasks();
+ *
+ * // Actualizar tareas (validación automática)
+ * updateCurrentProjectTasks([...tasks, newTask]);
+ */
 export const useTasks = () => {
   const context = useContext(TasksContext);
   if (!context) {
@@ -22,6 +70,30 @@ export const useTasks = () => {
   return context;
 };
 
+/**
+ * Provider de contexto para gestión de tareas y elementos relacionados
+ *
+ * Envuelve la aplicación o parte de ella para proporcionar acceso global
+ * al estado de tareas, minutas, riesgos y auditoría.
+ *
+ * Debe estar envuelto por ProjectsProvider para funcionar correctamente.
+ *
+ * Características de seguridad:
+ * - Validación automática de tipos (previene datos corruptos)
+ * - Fallbacks seguros en caso de datos inválidos
+ * - Logs de advertencia para debugging
+ *
+ * @component
+ * @param {Object} props
+ * @param {React.ReactNode} props.children - Componentes hijos que tendrán acceso al contexto
+ *
+ * @example
+ * <ProjectsProvider>
+ *   <TasksProvider>
+ *     <App />
+ *   </TasksProvider>
+ * </ProjectsProvider>
+ */
 export const TasksProvider = ({ children }) => {
   // ===== ESTADO =====
   const [tasksByProject, setTasksByProject] = useState({});
