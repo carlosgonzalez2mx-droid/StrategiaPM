@@ -1,12 +1,23 @@
 import { useState, useEffect, useRef } from 'react';
 import supabaseService from '../services/SupabaseService';
 import { getUserChangePermissions } from '../constants/unifiedRoles';
+import useAuthUser from './useAuthUser';
 
 /**
  * Hook para obtener permisos de control de cambios del usuario actual
- * Lee de Supabase y calcula permisos basados en role + functional_role
+ * Refactorizado para usar useAuthUser como base
  */
 const useChangePermissions = () => {
+  // Hook base de autenticación
+  const {
+    currentUser,
+    organizationId,
+    isLoading: isAuthLoading,
+    isAuthenticated,
+    userEmail,
+    userId
+  } = useAuthUser();
+
   const [permissions, setPermissions] = useState({
     canCreate: false,
     canApprove: false,
@@ -26,13 +37,12 @@ const useChangePermissions = () => {
     orgRole: null,
     functionalRole: null
   });
-  
-  const [loading, setLoading] = useState(true);
+
+  const [loadingPermissions, setLoadingPermissions] = useState(true);
   const [error, setError] = useState(null);
-  
-  // Evitar loops infinitos
+
+  // Ref para evitar cargas duplicadas
   const isLoadingRef = useRef(false);
-  const lastUserEmail = useRef(null);
 
   useEffect(() => {
     const loadPermissions = async () => {
@@ -41,16 +51,18 @@ const useChangePermissions = () => {
         return;
       }
 
+      // Esperar a que useAuthUser termine de cargar
+      if (isAuthLoading) {
+        return;
+      }
+
       try {
         isLoadingRef.current = true;
-        setLoading(true);
+        setLoadingPermissions(true);
         setError(null);
-        
-        // Obtener usuario actual
-        const currentUser = supabaseService.getCurrentUser();
-        
-        if (!currentUser || !currentUser.email) {
-          // No hay usuario, permisos restrictivos
+
+        // Si no hay usuario autenticado, permisos restrictivos
+        if (!isAuthenticated || !userEmail) {
           setPermissions({
             canCreate: false,
             canApprove: false,
@@ -72,16 +84,26 @@ const useChangePermissions = () => {
           return;
         }
 
-        // Obtener organización actual
-        const orgId = supabaseService.getCurrentOrganization();
-        
-        if (!orgId) {
-          // No hay organización detectada, esperar
-          setTimeout(() => {
-            if (!isLoadingRef.current) {
-              loadPermissions();
-            }
-          }, 1000);
+        // Si no hay organización, esperar
+        if (!organizationId) {
+          setPermissions({
+            canCreate: false,
+            canApprove: false,
+            canReject: false,
+            canImplement: false,
+            canVoteInCCB: false,
+            canAssign: false,
+            canComment: false,
+            canViewAll: false,
+            approvalLimit: { cost: 0, schedule: 0 },
+            changeRole: null,
+            level: 'none',
+            userId: userId,
+            userName: currentUser?.user_metadata?.name || userEmail,
+            userEmail: userEmail,
+            orgRole: null,
+            functionalRole: null
+          });
           return;
         }
 
@@ -89,8 +111,8 @@ const useChangePermissions = () => {
         const { data: membership, error: membershipError } = await supabaseService.supabase
           .from('organization_members')
           .select('role, functional_role, user_id, status')
-          .eq('user_email', currentUser.email)
-          .eq('organization_id', orgId)
+          .eq('user_email', userEmail)
+          .eq('organization_id', organizationId)
           .eq('status', 'active')
           .maybeSingle();
 
@@ -143,50 +165,36 @@ const useChangePermissions = () => {
         console.error('Error inesperado en useChangePermissions:', error);
         setError('Error inesperado cargando permisos');
       } finally {
-        setLoading(false);
+        setLoadingPermissions(false);
         isLoadingRef.current = false;
       }
     };
 
-    // Ejecutar inmediatamente
+    // Cargar permisos cuando cambie el usuario o la organización
     loadPermissions();
-
-    // Configurar intervalo para detectar cambios de usuario
-    const interval = setInterval(() => {
-      const user = supabaseService.getCurrentUser();
-      const currentEmail = user?.email;
-      
-      // Solo re-ejecutar si el email cambió
-      if (currentEmail !== lastUserEmail.current) {
-        lastUserEmail.current = currentEmail;
-        loadPermissions();
-      }
-    }, 2000);
-
-    return () => {
-      clearInterval(interval);
-      isLoadingRef.current = false;
-    };
-  }, []);
+  }, [isAuthenticated, userEmail, organizationId, isAuthLoading, currentUser, userId]);
 
   /**
    * Verifica si el usuario puede aprobar un cambio específico
    */
   const canApproveSpecificChange = (costImpact, scheduleImpact) => {
     if (!permissions.canApprove) return false;
-    
+
     const cost = parseFloat(costImpact) || 0;
     const schedule = parseFloat(scheduleImpact) || 0;
-    
+
     const withinCostLimit = cost <= permissions.approvalLimit.cost;
     const withinScheduleLimit = schedule <= permissions.approvalLimit.schedule;
-    
+
     return withinCostLimit && withinScheduleLimit;
   };
 
-  return { 
-    permissions, 
-    loading, 
+  // Combinar estados de loading
+  const loading = isAuthLoading || loadingPermissions;
+
+  return {
+    permissions,
+    loading,
     error,
     canApproveSpecificChange
   };

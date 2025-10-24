@@ -1,13 +1,23 @@
 import { useState, useEffect, useRef } from 'react';
 import supabaseService from '../services/SupabaseService';
+import useAuthUser from './useAuthUser';
 
 /**
  * Hook para manejar permisos de usuario basado en roles
- * Versión mejorada con mejor manejo de timing y prevención de loops
+ * Refactorizado para usar useAuthUser como base
  */
 const usePermissions = () => {
+  // Hook base de autenticación
+  const {
+    currentUser,
+    organizationId,
+    isLoading: isAuthLoading,
+    isAuthenticated,
+    userEmail
+  } = useAuthUser();
+
   const [userRole, setUserRole] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingPermissions, setIsLoadingPermissions] = useState(true);
   const [permissions, setPermissions] = useState({
     canEdit: false,
     canDelete: false,
@@ -17,8 +27,7 @@ const usePermissions = () => {
     canExport: false
   });
 
-  // Usar useRef para evitar loops infinitos
-  const lastUserEmail = useRef(null);
+  // Ref para evitar cargas duplicadas
   const isLoadingRef = useRef(false);
 
   useEffect(() => {
@@ -29,14 +38,20 @@ const usePermissions = () => {
         return;
       }
 
+      // Esperar a que useAuthUser termine de cargar
+      if (isAuthLoading) {
+        console.log('⏳ usePermissions - Esperando autenticación...');
+        return;
+      }
+
       try {
         isLoadingRef.current = true;
-        setIsLoading(true);
-        
-        const currentUser = supabaseService.getCurrentUser();
-        console.log('🔐 usePermissions - Usuario actual:', currentUser?.email || 'No autenticado');
-        
-        if (!currentUser || !currentUser.email) {
+        setIsLoadingPermissions(true);
+
+        console.log('🔐 usePermissions - Usuario:', userEmail || 'No autenticado');
+
+        // Si no hay usuario autenticado, aplicar permisos restrictivos
+        if (!isAuthenticated || !userEmail) {
           console.log('❌ No hay usuario autenticado, aplicando permisos restrictivos');
           setUserRole(null);
           setPermissions({
@@ -50,71 +65,34 @@ const usePermissions = () => {
           return;
         }
 
-        const currentOrganizationId = supabaseService.getCurrentOrganization();
-        
-        if (!currentOrganizationId) {
+        // Si no hay organización, esperar
+        if (!organizationId) {
           console.log('⏳ Esperando detección de organización...');
-          
-          // VERIFICAR SI EL USUARIO EXISTE EN LA ORGANIZACIÓN
-          // Si no se puede detectar organización, verificar si el usuario fue eliminado
-          try {
-            const { data: userMemberships, error: membershipError } = await supabaseService.supabase
-              .from('organization_members')
-              .select('id, organization_id, status')
-              .eq('user_email', currentUser.email)
-              .eq('status', 'active');
-
-            if (membershipError) {
-              console.error('❌ Error verificando membresía:', membershipError);
-            } else if (!userMemberships || userMemberships.length === 0) {
-              console.log('🚨 USUARIO ELIMINADO DETECTADO - No tiene membresías activas');
-              console.log('🚨 Forzando cierre de sesión para:', currentUser.email);
-              
-              // FORZAR CIERRE DE SESIÓN
-              await supabaseService.supabase.auth.signOut();
-              
-              // Limpiar caché local
-              localStorage.clear();
-              sessionStorage.clear();
-              
-              // Recargar página para limpiar estado
-              window.location.reload();
-              return;
-            }
-          } catch (verifyError) {
-            console.error('❌ Error verificando membresía del usuario:', verifyError);
-          }
-          
-          // Si el usuario existe pero no se detecta organización, esperar un poco más
-          setTimeout(() => {
-            if (!isLoadingRef.current) {
-              loadUserRole();
-            }
-          }, 1000);
+          setUserRole(null);
+          setPermissions({
+            canEdit: false,
+            canDelete: false,
+            canInvite: false,
+            canManageUsers: false,
+            canArchive: false,
+            canExport: false
+          });
           return;
         }
 
         console.log('🔍 Buscando rol para:', {
-          email: currentUser.email,
-          organizationId: currentOrganizationId
-        });
-
-        // DIAGNÓSTICO: Verificar estado de autenticación antes de query
-        const authUser = await supabaseService.supabase.auth.getUser();
-        console.log('🔍 Estado de autenticación antes de query:', {
-          authUser: authUser.data.user?.email || 'No autenticado',
-          currentUserEmail: currentUser.email,
-          organizationId: currentOrganizationId
+          email: userEmail,
+          organizationId: organizationId
         });
 
         // Usar maybeSingle() en lugar de single() para evitar errores PGRST116
         const { data: membership, error } = await supabaseService.supabase
           .from('organization_members')
           .select('role, status')
-          .eq('user_email', currentUser.email)
-          .eq('organization_id', currentOrganizationId)
+          .eq('user_email', userEmail)
+          .eq('organization_id', organizationId)
           .eq('status', 'active')
-          .maybeSingle(); // Cambiado de .single() a .maybeSingle()
+          .maybeSingle();
 
         console.log('🔍 Resultado de query membership:', { membership, error });
 
@@ -166,35 +144,14 @@ const usePermissions = () => {
           canExport: false
         });
       } finally {
-        setIsLoading(false);
+        setIsLoadingPermissions(false);
         isLoadingRef.current = false;
       }
     };
 
-    // Ejecutar inmediatamente
+    // Cargar rol cuando cambie el usuario o la organización
     loadUserRole();
-
-    // Configurar intervalo SOLO para detectar cambios de usuario
-    const interval = setInterval(() => {
-      const user = supabaseService.getCurrentUser();
-      const currentEmail = user?.email;
-      
-      // SOLO re-ejecutar si el email cambió (cambio de usuario)
-      if (currentEmail !== lastUserEmail.current) {
-        console.log('🔄 Usuario cambió, recargando permisos...', {
-          anterior: lastUserEmail.current,
-          actual: currentEmail
-        });
-        lastUserEmail.current = currentEmail;
-        loadUserRole();
-      }
-    }, 2000);
-
-    return () => {
-      clearInterval(interval);
-      isLoadingRef.current = false;
-    };
-  }, []); // Sin dependencias para evitar loops
+  }, [isAuthenticated, userEmail, organizationId, isAuthLoading]);
 
   // Función para calcular permisos basado en el rol
   const calculatePermissions = (role) => {
@@ -240,6 +197,9 @@ const usePermissions = () => {
   };
 
   const isReadOnly = () => userRole === 'organization_member_read';
+
+  // Combinar estados de loading
+  const isLoading = isAuthLoading || isLoadingPermissions;
 
   return { permissions, isReadOnly, isLoading, userRole };
 };

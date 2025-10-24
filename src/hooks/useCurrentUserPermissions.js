@@ -3,28 +3,28 @@
 // ==========================================
 // Hook para obtener permisos del usuario actual
 // Elimina verificaciones duplicadas de isOwnerOrAdmin
-// V2: Integra sistema de mapeo de roles
+// V3: Refactorizado para usar useAuthUser como base
 
 import { useMemo } from 'react';
-import supabaseService from '../services/SupabaseService';
+import useAuthUser from './useAuthUser';
 import { useRoleMapping } from './useRoleMapping';
 import { ROLES } from '../constants/roles';
 
 /**
  * Hook para verificar permisos del usuario actual en la organización
- * Reemplaza las 6 verificaciones duplicadas de isOwnerOrAdmin
- * 
+ * Refactorizado para usar useAuthUser como base
+ *
  * @param {Array} members - Lista de miembros de la organización
  * @returns {Object} { currentUser, currentUserMembership, currentUserRole, isOwnerOrAdmin, isOwner, isAdmin, isMember, canInvite, canEditRoles, canRemoveMembers }
  */
 const useCurrentUserPermissions = (members = []) => {
+  // Hook base de autenticación
+  const { currentUser, userEmail, isAuthenticated } = useAuthUser();
   const { mapRole, hasPermission } = useRoleMapping();
-  
+
   return useMemo(() => {
-    // Obtener usuario actual de Supabase
-    const currentUser = supabaseService.getCurrentUser();
-    
-    if (!currentUser || !currentUser.email) {
+    // Verificar si hay usuario autenticado
+    if (!isAuthenticated || !userEmail) {
       return {
         currentUser: null,
         currentUserMembership: null,
@@ -42,7 +42,7 @@ const useCurrentUserPermissions = (members = []) => {
 
     // Buscar membresía del usuario actual
     const currentUserMembership = members.find(
-      m => m.user_email === currentUser.email
+      m => m.user_email === userEmail
     );
 
     if (!currentUserMembership) {
@@ -102,7 +102,7 @@ const useCurrentUserPermissions = (members = []) => {
       canRemoveMember: (targetMember) => {
         if (!hasPermission(mappedRole, 'canRemoveMembers')) return false;
         // No puede eliminarse a sí mismo
-        if (targetMember?.user_email === currentUser.email) return false;
+        if (targetMember?.user_email === userEmail) return false;
         // Owner puede eliminar a todos (excepto a sí mismo)
         if (isOwner) return true;
         // Admin no puede eliminar a owner ni a otros admins
@@ -111,7 +111,7 @@ const useCurrentUserPermissions = (members = []) => {
         return true;
       }
     };
-  }, [members]);
+  }, [members, currentUser, userEmail, isAuthenticated, mapRole, hasPermission]);
 };
 
 export default useCurrentUserPermissions;
