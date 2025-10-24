@@ -213,7 +213,7 @@ const FinancialManagement = ({
     const safePurchaseOrders = Array.isArray(purchaseOrders) ? purchaseOrders : [];
     const safeAdvances = Array.isArray(advances) ? advances : [];
     const safeInvoices = Array.isArray(invoices) ? invoices : [];
-    
+
     console.log('🔍 FINANCIAL METRICS DEBUG:', {
       purchaseOrdersType: typeof purchaseOrders,
       purchaseOrdersIsArray: Array.isArray(purchaseOrders),
@@ -225,7 +225,7 @@ const FinancialManagement = ({
       invoicesIsArray: Array.isArray(invoices),
       invoicesLength: safeInvoices.length
     });
-    
+
     const totalPO = safePurchaseOrders.reduce((sum, po) => sum + (po.totalAmount || 0), 0);
     const totalAdvances = safeAdvances.reduce((sum, adv) => sum + (adv.amount || 0), 0);
     const totalInvoices = safeInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
@@ -237,16 +237,16 @@ const FinancialManagement = ({
     const AC = totalInvoices; // Costo real incurrido
     const EV = paidInvoices; // Valor ganado (facturas pagadas)
     const PV = totalPO + totalAdvances; // Valor planificado (órdenes de compra + anticipos)
-    
+
     // Incluir contratos en las métricas
     const totalContracts = contracts.reduce((sum, contract) => sum + (contract.value || 0), 0);
     const activeContracts = contracts.filter(contract => contract.status === 'active').reduce((sum, contract) => sum + (contract.value || 0), 0);
-    
+
     const CV = EV - AC; // Cost Variance
     const SV = EV - PV; // Schedule Variance
     const CPI = AC > 0 ? EV / AC : 1; // Cost Performance Index
     const SPI = PV > 0 ? EV / PV : 1; // Schedule Performance Index
-    
+
     // Proyecciones PMBOK
     const ETC = BAC - EV; // Estimate to Complete
     const EAC = AC + ETC; // Estimate at Completion
@@ -264,7 +264,7 @@ const FinancialManagement = ({
       activeContracts,
       committedBudget: totalPO + totalAdvances + activeContracts,
       availableBudget: BAC - (totalPO + totalAdvances + activeContracts),
-      
+
       // Métricas EVM completas
       BAC,
       AC,
@@ -278,11 +278,11 @@ const FinancialManagement = ({
       EAC,
       VAC,
       TCPI,
-      
+
       // Porcentajes
       percentComplete: BAC > 0 ? (EV / BAC) * 100 : 0,
       percentSpent: BAC > 0 ? (AC / BAC) * 100 : 0,
-      
+
       // Reservas
       contingencyReserve: calculateContingencyReserve(),
       managementReserve: calculateManagementReserve(),
@@ -290,6 +290,64 @@ const FinancialManagement = ({
       totalProjectBudget: (currentProject?.budget || 0) + calculateContingencyReserve() + calculateManagementReserve()
     };
   }, [purchaseOrders, advances, invoices, contracts, currentProject, risks]);
+
+  // ===== MÉTRICAS DE VALOR ENTREGADO (PMBOK 7 - Value Principle) =====
+  const valueMetrics = useMemo(() => {
+    // Valor planificado del proyecto (valor de negocio esperado)
+    const plannedBusinessValue = currentProject?.plannedValue || 0;
+
+    // Calcular valor entregado basado en work packages completados
+    const safeWorkPackages = Array.isArray(workPackages) ? workPackages : [];
+    const deliveredValue = safeWorkPackages.reduce((sum, wp) => {
+      const businessValue = wp.businessValue || 0;
+      const percentComplete = wp.percentComplete || 0;
+      return sum + (businessValue * (percentComplete / 100));
+    }, 0);
+
+    // Value Efficiency Index (VEI) - Métrica PMBOK 7
+    // VEI = Valor Entregado / Costo Real
+    // VEI > 1 significa que se está entregando más valor del que se gasta
+    const VEI = financialMetrics.AC > 0 ? deliveredValue / financialMetrics.AC : 0;
+
+    // ROI Proyectado (Return on Investment)
+    // ROI = (Valor Total Esperado - Costo Estimado Final) / Costo Estimado Final
+    const projectedROI = financialMetrics.EAC > 0
+      ? ((plannedBusinessValue - financialMetrics.EAC) / financialMetrics.EAC) * 100
+      : 0;
+
+    // Brecha de valor (cuánto valor falta por entregar)
+    const valueGap = plannedBusinessValue - deliveredValue;
+
+    // Porcentaje de valor entregado
+    const valueDeliveryRate = plannedBusinessValue > 0
+      ? (deliveredValue / plannedBusinessValue) * 100
+      : 0;
+
+    // Cost-to-Value Ratio (cuánto cuesta generar cada unidad de valor)
+    const costToValueRatio = deliveredValue > 0
+      ? financialMetrics.AC / deliveredValue
+      : 0;
+
+    console.log('📊 VALUE METRICS DEBUG:', {
+      plannedBusinessValue,
+      deliveredValue,
+      VEI,
+      projectedROI,
+      valueGap,
+      valueDeliveryRate,
+      costToValueRatio
+    });
+
+    return {
+      plannedBusinessValue,
+      deliveredValue,
+      VEI,
+      projectedROI,
+      valueGap,
+      valueDeliveryRate,
+      costToValueRatio
+    };
+  }, [currentProject, workPackages, financialMetrics]);
 
   // Handlers para órdenes de compra
   const handleSavePO = () => {
@@ -817,6 +875,183 @@ const FinancialManagement = ({
             <div>
               <p><strong>Reserva de Gestión:</strong> 10% del presupuesto base + ajustes por complejidad</p>
               <p><strong>Riesgos de Alta Prioridad:</strong> {risks?.filter(r => r.status === 'active' && r.priority === 'high').length || 0} identificados</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ===== SECCIÓN DE ENTREGA DE VALOR (PMBOK 7 - Value Principle) ===== */}
+      <div className="bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50 rounded-2xl shadow-lg p-6 mb-6 border-l-4 border-indigo-500">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center">
+            <div className="bg-white/60 backdrop-blur rounded-xl p-2 mr-3">
+              <span className="text-2xl">🎯</span>
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-gray-800">Entrega de Valor (PMBOK 7)</h3>
+              <p className="text-sm text-gray-600">Alineación con Principio 4: Focus on Value</p>
+            </div>
+          </div>
+          <div className="bg-white/60 backdrop-blur rounded-lg px-3 py-1">
+            <span className="text-xs font-medium text-indigo-700">Value-Driven PM</span>
+          </div>
+        </div>
+
+        {/* Primera fila - Métricas principales de valor */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+          <div className="bg-white/80 backdrop-blur rounded-lg p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="text-xs text-gray-500 mb-1 flex items-center">
+                  Valor Planificado
+                  <span className="ml-1 text-blue-500 cursor-help" title="Valor de negocio total esperado del proyecto al completarse">❓</span>
+                </div>
+                <div className="text-2xl font-bold text-blue-800">
+                  ${(valueMetrics.plannedBusinessValue / 1000).toFixed(0)}K
+                </div>
+                <div className="text-xs text-gray-600 mt-1">Meta del proyecto</div>
+              </div>
+              <div className="text-blue-500 text-2xl">📊</div>
+            </div>
+          </div>
+
+          <div className="bg-white/80 backdrop-blur rounded-lg p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="text-xs text-gray-500 mb-1 flex items-center">
+                  Valor Entregado
+                  <span className="ml-1 text-green-500 cursor-help" title="Valor de negocio entregado hasta la fecha basado en completitud de work packages">❓</span>
+                </div>
+                <div className="text-2xl font-bold text-green-800">
+                  ${(valueMetrics.deliveredValue / 1000).toFixed(0)}K
+                </div>
+                <div className="text-xs text-gray-600 mt-1">
+                  {valueMetrics.valueDeliveryRate.toFixed(1)}% completado
+                </div>
+              </div>
+              <div className="text-green-500 text-2xl">✅</div>
+            </div>
+          </div>
+
+          <div className="bg-white/80 backdrop-blur rounded-lg p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="text-xs text-gray-500 mb-1 flex items-center">
+                  VEI (Value Efficiency)
+                  <span className="ml-1 text-purple-500 cursor-help" title="Value Efficiency Index: Valor Entregado ÷ Costo Real. VEI > 1 = Eficiente. Métrica PMBOK 7">❓</span>
+                </div>
+                <div className={`text-2xl font-bold ${
+                  valueMetrics.VEI >= 1.2 ? 'text-green-600' :
+                  valueMetrics.VEI >= 1.0 ? 'text-blue-600' :
+                  valueMetrics.VEI >= 0.8 ? 'text-yellow-600' :
+                  'text-red-600'
+                }`}>
+                  {valueMetrics.VEI.toFixed(2)}
+                </div>
+                <div className="text-xs text-gray-600 mt-1">
+                  {valueMetrics.VEI >= 1 ? '✅ Eficiente' : '⚠️ Ineficiente'}
+                </div>
+              </div>
+              <div className="text-purple-500 text-2xl">⚡</div>
+            </div>
+          </div>
+
+          <div className="bg-white/80 backdrop-blur rounded-lg p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="text-xs text-gray-500 mb-1 flex items-center">
+                  ROI Proyectado
+                  <span className="ml-1 text-orange-500 cursor-help" title="Return on Investment proyectado: (Valor Planificado - EAC) ÷ EAC × 100">❓</span>
+                </div>
+                <div className={`text-2xl font-bold ${
+                  valueMetrics.projectedROI >= 20 ? 'text-green-800' :
+                  valueMetrics.projectedROI >= 0 ? 'text-blue-800' :
+                  'text-red-800'
+                }`}>
+                  {valueMetrics.projectedROI.toFixed(1)}%
+                </div>
+                <div className="text-xs text-gray-600 mt-1">
+                  {valueMetrics.projectedROI >= 0 ? '📈 Positivo' : '📉 Negativo'}
+                </div>
+              </div>
+              <div className="text-orange-500 text-2xl">💎</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Segunda fila - Métricas complementarias */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white/80 backdrop-blur rounded-lg p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="text-xs text-gray-500 mb-1 flex items-center">
+                  Brecha de Valor
+                  <span className="ml-1 text-amber-500 cursor-help" title="Valor planificado - Valor entregado. Indica cuánto valor falta por entregar">❓</span>
+                </div>
+                <div className="text-xl font-bold text-amber-800">
+                  ${(valueMetrics.valueGap / 1000).toFixed(0)}K
+                </div>
+                <div className="text-xs text-gray-600 mt-1">Pendiente por entregar</div>
+              </div>
+              <div className="text-amber-500 text-xl">📏</div>
+            </div>
+          </div>
+
+          <div className="bg-white/80 backdrop-blur rounded-lg p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="text-xs text-gray-500 mb-1 flex items-center">
+                  Tasa de Entrega
+                  <span className="ml-1 text-teal-500 cursor-help" title="Porcentaje del valor planificado que ha sido entregado">❓</span>
+                </div>
+                <div className="text-xl font-bold text-teal-800">
+                  {valueMetrics.valueDeliveryRate.toFixed(1)}%
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                  <div
+                    className="bg-teal-600 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${Math.min(valueMetrics.valueDeliveryRate, 100)}%` }}
+                  ></div>
+                </div>
+              </div>
+              <div className="text-teal-500 text-xl">📈</div>
+            </div>
+          </div>
+
+          <div className="bg-white/80 backdrop-blur rounded-lg p-4 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <div className="text-xs text-gray-500 mb-1 flex items-center">
+                  Ratio Costo-Valor
+                  <span className="ml-1 text-cyan-500 cursor-help" title="Costo Real ÷ Valor Entregado. Cuánto cuesta generar cada unidad de valor. Menor es mejor">❓</span>
+                </div>
+                <div className="text-xl font-bold text-cyan-800">
+                  {valueMetrics.costToValueRatio > 0 ? valueMetrics.costToValueRatio.toFixed(2) : 'N/A'}
+                </div>
+                <div className="text-xs text-gray-600 mt-1">
+                  {valueMetrics.costToValueRatio < 1 ? '✅ Excelente' :
+                   valueMetrics.costToValueRatio < 1.5 ? '✓ Bueno' : '⚠️ Alto'}
+                </div>
+              </div>
+              <div className="text-cyan-500 text-xl">⚖️</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Explicación PMBOK 7 */}
+        <div className="mt-4 p-4 bg-white/60 backdrop-blur rounded-lg border border-indigo-200">
+          <h4 className="text-sm font-semibold text-indigo-800 mb-2 flex items-center">
+            <span className="mr-2">📚</span>
+            Alineación con PMBOK 7 - Principio de Valor
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-gray-700">
+            <div>
+              <p className="mb-1"><strong>✓ Enfoque en Resultados:</strong> Mide valor entregado, no solo tareas completadas</p>
+              <p className="mb-1"><strong>✓ Eficiencia de Valor:</strong> VEI mide cuánto valor se genera por cada unidad monetaria gastada</p>
+            </div>
+            <div>
+              <p className="mb-1"><strong>✓ ROI Transparente:</strong> Visibilidad del retorno de inversión esperado del proyecto</p>
+              <p className="mb-1"><strong>✓ Toma de Decisiones:</strong> Métricas que guían decisiones basadas en valor, no solo en costo</p>
             </div>
           </div>
         </div>

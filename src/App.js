@@ -1066,6 +1066,7 @@ function MainApp() {
       startDate: projectData.startDate,
       endDate: projectData.endDate,
       budget: projectData.budget,
+      plannedValue: projectData.plannedValue || 0, // PMBOK 7 - Valor de negocio esperado
       status: projectData.status,
       priority: projectData.priority,
       manager: projectData.manager,
@@ -1118,15 +1119,16 @@ function MainApp() {
     // Calcular progreso automático si no se proporciona explícitamente
     const autoProgress = updates.progress !== undefined ? updates.progress : calculateProjectProgress(projectId);
     
-    setProjects(prev => prev.map(project => 
-      project.id === projectId 
-        ? { 
+    setProjects(prev => prev.map(project =>
+      project.id === projectId
+        ? {
             id: project.id,
             name: updates.name || project.name,
             description: updates.description || project.description,
             startDate: updates.startDate || project.startDate,
             endDate: updates.endDate || project.endDate,
             budget: updates.budget || project.budget,
+            plannedValue: updates.plannedValue !== undefined ? updates.plannedValue : project.plannedValue,
             status: updates.status || project.status,
             priority: updates.priority || project.priority,
             manager: updates.manager || project.manager,
