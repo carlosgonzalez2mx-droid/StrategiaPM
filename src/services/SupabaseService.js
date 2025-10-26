@@ -1709,6 +1709,15 @@ class SupabaseService {
       // Liberar flag de guardado
       this.isSaving = false;
       console.log('🔓 Flag de guardado liberado');
+
+      // Disparar evento de fin de sincronización
+      const syncEndEvent = new CustomEvent('supabaseSynced', {
+        detail: {
+          timestamp: new Date().toISOString(),
+          message: 'Sincronización con Supabase completada'
+        }
+      });
+      window.dispatchEvent(syncEndEvent);
     }
   }
 
