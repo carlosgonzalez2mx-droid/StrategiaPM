@@ -28,7 +28,7 @@
     "build:analyze": "CI=false ESLINT_NO_DEV_ERRORS=true GENERATE_SOURCEMAP=false ANALYZE=true react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "prepare": "husky"
+    "postinstall": "husky install || true"
   },
   "eslintConfig": {
     "extends": [
