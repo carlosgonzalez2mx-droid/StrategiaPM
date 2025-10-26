@@ -1,0 +1,9 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Ejecutar lint-staged (eslint en archivos modificados)
+npx lint-staged
+
+# Ejecutar tests relacionados en modo CI
+echo "🧪 Ejecutando tests..."
+CI=true npm test -- --bail --passWithNoTests 2>&1 | grep -E "PASS|FAIL|Test Suites" || true

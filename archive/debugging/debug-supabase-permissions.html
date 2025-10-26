@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Supabase Permissions</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .log { background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .error { background: #ffebee; color: #c62828; }
+        .success { background: #e8f5e8; color: #2e7d32; }
+        .warning { background: #fff3e0; color: #ef6c00; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        input { padding: 8px; margin: 5px; width: 300px; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug Supabase Permissions</h1>
+    
+    <div>
+        <h3>1. Configuración de Supabase</h3>
+        <input type="text" id="supabaseUrl" placeholder="Supabase URL" value="https://oggpsrsssrrytrqoyyph.supabase.co">
+        <input type="text" id="supabaseKey" placeholder="Supabase Anon Key">
+        <button onclick="initSupabase()">Inicializar Supabase</button>
+    </div>
+
+    <div>
+        <h3>2. Autenticación</h3>
+        <input type="email" id="email" placeholder="Email" value="carlosgonzalez2mx@gmail.com">
+        <input type="password" id="password" placeholder="Password">
+        <button onclick="signIn()">Iniciar Sesión</button>
+        <button onclick="signOut()">Cerrar Sesión</button>
+    </div>
+
+    <div>
+        <h3>3. Verificar Permisos</h3>
+        <button onclick="checkUser()">Verificar Usuario</button>
+        <button onclick="checkOrganizations()">Verificar Organizaciones</button>
+        <button onclick="checkProjects()">Verificar Proyectos</button>
+        <button onclick="checkProjectsWithOrg()">Verificar Proyectos con Filtro</button>
+        <button onclick="checkAllData()">Verificar Todo</button>
+    </div>
+
+    <div id="logs"></div>
+
+    <script>
+        let supabase = null;
+        let currentUser = null;
+        let organizationId = null;
+
+        function log(message, type = 'log') {
+            const logsDiv = document.getElementById('logs');
+            const logDiv = document.createElement('div');
+            logDiv.className = `log ${type}`;
+            logDiv.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong> - ${message}`;
+            logsDiv.appendChild(logDiv);
+            console.log(message);
+        }
+
+        async function initSupabase() {
+            const url = document.getElementById('supabaseUrl').value;
+            const key = document.getElementById('supabaseKey').value;
+            
+            if (!url || !key) {
+                log('❌ URL y Key son requeridos', 'error');
+                return;
+            }
+
+            try {
+                supabase = window.supabase.createClient(url, key);
+                log('✅ Supabase inicializado correctamente', 'success');
+            } catch (error) {
+                log(`❌ Error inicializando Supabase: ${error.message}`, 'error');
+            }
+        }
+
+        async function signIn() {
+            if (!supabase) {
+                log('❌ Supabase no inicializado', 'error');
+                return;
+            }
+
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const { data, error } = await supabase.auth.signInWithPassword({
+                    email,
+                    password
+                });
+
+                if (error) {
+                    log(`❌ Error de autenticación: ${error.message}`, 'error');
+                    return;
+                }
+
+                currentUser = data.user;
+                log(`✅ Usuario autenticado: ${currentUser.email} (ID: ${currentUser.id})`, 'success');
+            } catch (error) {
+                log(`❌ Error inesperado: ${error.message}`, 'error');
+            }
+        }
+
+        async function signOut() {
+            if (!supabase) return;
+
+            try {
+                await supabase.auth.signOut();
+                currentUser = null;
+                organizationId = null;
+                log('✅ Sesión cerrada', 'success');
+            } catch (error) {
+                log(`❌ Error cerrando sesión: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkUser() {
+            if (!supabase) {
+                log('❌ Supabase no inicializado', 'error');
+                return;
+            }
+
+            try {
+                const { data: { user }, error } = await supabase.auth.getUser();
+                
+                if (error) {
+                    log(`❌ Error obteniendo usuario: ${error.message}`, 'error');
+                    return;
+                }
+
+                if (user) {
+                    log(`✅ Usuario actual: ${user.email} (ID: ${user.id})`, 'success');
+                    currentUser = user;
+                } else {
+                    log('⚠️ No hay usuario autenticado', 'warning');
+                }
+            } catch (error) {
+                log(`❌ Error inesperado: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkOrganizations() {
+            if (!supabase || !currentUser) {
+                log('❌ Supabase no inicializado o usuario no autenticado', 'error');
+                return;
+            }
+
+            try {
+                // Buscar organizaciones del usuario
+                const { data: orgs, error } = await supabase
+                    .from('organizations')
+                    .select('*')
+                    .eq('owner_id', currentUser.id);
+
+                if (error) {
+                    log(`❌ Error obteniendo organizaciones: ${error.message}`, 'error');
+                    return;
+                }
+
+                log(`✅ Organizaciones encontradas: ${orgs.length}`, 'success');
+                orgs.forEach(org => {
+                    log(`  - ${org.name} (ID: ${org.id})`, 'log');
+                });
+
+                if (orgs.length > 0) {
+                    organizationId = orgs[0].id;
+                    log(`✅ Usando organización: ${orgs[0].name} (ID: ${organizationId})`, 'success');
+                }
+            } catch (error) {
+                log(`❌ Error inesperado: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkProjects() {
+            if (!supabase || !currentUser) {
+                log('❌ Supabase no inicializado o usuario no autenticado', 'error');
+                return;
+            }
+
+            try {
+                // Intentar obtener TODOS los proyectos (sin filtro)
+                log('🔍 Intentando obtener TODOS los proyectos (sin filtro)...', 'warning');
+                const { data: allProjects, error: allError } = await supabase
+                    .from('projects')
+                    .select('*');
+
+                if (allError) {
+                    log(`❌ Error obteniendo todos los proyectos: ${allError.message} (Código: ${allError.code})`, 'error');
+                } else {
+                    log(`✅ Todos los proyectos encontrados: ${allProjects.length}`, 'success');
+                    allProjects.forEach(project => {
+                        log(`  - ${project.name} (Org: ${project.organization_id})`, 'log');
+                    });
+                }
+            } catch (error) {
+                log(`❌ Error inesperado: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkProjectsWithOrg() {
+            if (!supabase || !currentUser || !organizationId) {
+                log('❌ Supabase no inicializado, usuario no autenticado o sin organización', 'error');
+                return;
+            }
+
+            try {
+                // Intentar obtener proyectos de la organización
+                log(`🔍 Intentando obtener proyectos de la organización ${organizationId}...`, 'warning');
+                const { data: orgProjects, error: orgError } = await supabase
+                    .from('projects')
+                    .select('*')
+                    .eq('organization_id', organizationId);
+
+                if (orgError) {
+                    log(`❌ Error obteniendo proyectos de la organización: ${orgError.message} (Código: ${orgError.code})`, 'error');
+                } else {
+                    log(`✅ Proyectos de la organización encontrados: ${orgProjects.length}`, 'success');
+                    orgProjects.forEach(project => {
+                        log(`  - ${project.name} (ID: ${project.id})`, 'log');
+                    });
+                }
+            } catch (error) {
+                log(`❌ Error inesperado: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkAllData() {
+            log('🚀 Iniciando verificación completa...', 'log');
+            await checkUser();
+            await checkOrganizations();
+            await checkProjects();
+            await checkProjectsWithOrg();
+            log('✅ Verificación completa terminada', 'success');
+        }
+
+        // Auto-inicializar cuando se carga la página
+        window.onload = function() {
+            log('📋 Página cargada. Por favor, ingresa tu Supabase Anon Key y haz clic en "Inicializar Supabase"', 'warning');
+        };
+    </script>
+</body>
+</html>
