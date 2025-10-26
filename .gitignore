@@ -11,6 +11,7 @@ cleanup-*.js
 !eslintrc.js
 !tailwind.config.js
 !postcss.config.js
+!public/manifest.json
 desktop-app/
 electron-app/
 executable/
@@ -19,12 +20,14 @@ executable/
 !debug-simple.html
 !fix-user-role.html
 !fix-role-safari.html
+!public/index.html
 !transfer-projects.sql
 *.sql
 !transfer-projects.sql
 !transfer-projects-simple.sql
 *.md
 *.txt
+!public/robots.txt
 .DS_Store
 node_modules/
 
