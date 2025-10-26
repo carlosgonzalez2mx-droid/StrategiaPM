@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import useAuditLog from '../hooks/useAuditLog';
+import { validatePlannedValue, calculateDeliveredValue } from '../utils/businessValueCalculator';
 
 // ===== Utilidades de días laborables =====
 const toISO = (d) => {
@@ -293,16 +294,29 @@ const FinancialManagement = ({
 
   // ===== MÉTRICAS DE VALOR ENTREGADO (PMBOK 7 - Value Principle) =====
   const valueMetrics = useMemo(() => {
-    // Valor planificado del proyecto (valor de negocio esperado)
-    const plannedBusinessValue = currentProject?.plannedValue || 0;
+    // ✅ CAMBIO: Usar tareas del cronograma en vez de work packages
+    const safeTasks = Array.isArray(scheduleData?.tasks) ? scheduleData.tasks : [];
 
-    // Calcular valor entregado basado en work packages completados
-    const safeWorkPackages = Array.isArray(workPackages) ? workPackages : [];
-    const deliveredValue = safeWorkPackages.reduce((sum, wp) => {
-      const businessValue = wp.businessValue || 0;
-      const percentComplete = wp.percentComplete || 0;
-      return sum + (businessValue * (percentComplete / 100));
+    // Calcular valor planificado total de tareas
+    const totalPlannedValueFromTasks = safeTasks.reduce((sum, task) => {
+      return sum + (task.businessValue || 0);
     }, 0);
+
+    // Obtener plannedValue del proyecto (si existe)
+    const projectPlannedValue = currentProject?.plannedValue || 0;
+
+    // Usar el mayor entre plannedValue del proyecto o suma de tareas
+    const plannedBusinessValue = Math.max(projectPlannedValue, totalPlannedValueFromTasks);
+
+    // Calcular valor entregado basado en tareas completadas
+    const deliveredValue = safeTasks.reduce((sum, task) => {
+      const businessValue = task.businessValue || 0;
+      const progress = task.progress || 0;  // ✅ USAR progress (no percentComplete)
+      return sum + (businessValue * (progress / 100));
+    }, 0);
+
+    // Validar coherencia entre plannedValue y suma de tareas
+    const validation = validatePlannedValue(projectPlannedValue, safeTasks);
 
     // Value Efficiency Index (VEI) - Métrica PMBOK 7
     // VEI = Valor Entregado / Costo Real
@@ -345,9 +359,11 @@ const FinancialManagement = ({
       projectedROI,
       valueGap,
       valueDeliveryRate,
-      costToValueRatio
+      costToValueRatio,
+      validation,  // ✅ AÑADIDO: Validación de coherencia
+      totalPlannedValueFromTasks  // ✅ AÑADIDO: Total calculado desde tareas
     };
-  }, [currentProject, workPackages, financialMetrics]);
+  }, [scheduleData, currentProject, financialMetrics]);
 
   // Handlers para órdenes de compra
   const handleSavePO = () => {
@@ -896,6 +912,32 @@ const FinancialManagement = ({
             <span className="text-xs font-medium text-indigo-700">Value-Driven PM</span>
           </div>
         </div>
+
+        {/* Alerta de validación si hay discrepancia */}
+        {valueMetrics.validation && !valueMetrics.validation.isValid && (
+          <div className="mb-4 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                <span className="text-2xl">⚠️</span>
+              </div>
+              <div className="ml-3 flex-1">
+                <h3 className="text-sm font-medium text-yellow-800">
+                  Discrepancia en Valor Planificado
+                </h3>
+                <div className="mt-2 text-sm text-yellow-700">
+                  <p>
+                    El <strong>Valor Planificado del Proyecto</strong> (${(valueMetrics.validation.plannedValue / 1000).toFixed(0)}K)
+                    {' '}difiere de la <strong>suma de valores de tareas</strong> (${(valueMetrics.validation.totalTasksValue / 1000).toFixed(0)}K)
+                    {' '}en un <strong>{Math.abs(valueMetrics.validation.percentageDiff).toFixed(1)}%</strong>.
+                  </p>
+                  <p className="mt-1">
+                    💡 <em>Sugerencia: Recalcula los valores de negocio de las tareas en el Cronograma para que la suma coincida con el Valor Planificado.</em>
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Primera fila - Métricas principales de valor */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">

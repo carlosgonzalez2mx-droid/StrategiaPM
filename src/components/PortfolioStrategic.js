@@ -4,6 +4,7 @@ import ResourceList from './ResourceList';
 import ProjectArchive from './ProjectArchive';
 import WeeklyPlanningTab from './WeeklyPlanningTab';
 import NotificationBadge from './notifications/NotificationBadge';
+import { calculatePlannedValueFromIRR } from '../utils/businessValueCalculator';
 
 // Componente helper para mostrar errores
 const ErrorMessage = ({ error }) => {
@@ -502,6 +503,8 @@ const PortfolioStrategic = ({
       businessCase: '',
       irr: 0,
       roi: 0,
+      period: 3,
+      plannedValue: 0,
       kickoffDate: '',
       stakeholders: [],
       createdAt: new Date().toISOString(),
@@ -1250,6 +1253,14 @@ const PortfolioStrategic = ({
                       // Solo permitir números, punto decimal y vacío
                       if (inputValue === '' || /^\d*\.?\d*$/.test(inputValue)) {
                         const numValue = inputValue === '' ? '' : Number(inputValue);
+
+                        // Calcular automáticamente plannedValue con TIR
+                        const newPlannedValue = calculatePlannedValueFromIRR(
+                          editingProject.budget || 0,
+                          numValue || 0,
+                          editingProject.period || 3
+                        );
+
                         setEditingProject({
                       id: editingProject.id,
                       name: editingProject.name,
@@ -1264,7 +1275,10 @@ const PortfolioStrategic = ({
                       createdAt: editingProject.createdAt,
                       updatedAt: editingProject.updatedAt,
                       version: editingProject.version,
-                      progress: editingProject.progress, irr: numValue});
+                      progress: editingProject.progress,
+                      irr: numValue,
+                      period: editingProject.period || 3,
+                      plannedValue: newPlannedValue});
                         validateField('irr', numValue);
                       }
                     }}
@@ -1278,6 +1292,87 @@ const PortfolioStrategic = ({
                     step="0.01"
                   />
                   <ErrorMessage error={errors.irr} />
+                </div>
+
+                {/* Campo: Periodo del Proyecto */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Periodo del Proyecto (años)
+                  </label>
+                  <input
+                    type="number"
+                    className="w-full border rounded px-3 py-2 border-gray-300"
+                    value={editingProject?.period || 3}
+                    onChange={(e) => {
+                      const newPeriod = parseInt(e.target.value) || 3;
+
+                      // Recalcular plannedValue con nuevo periodo
+                      const newPlannedValue = calculatePlannedValueFromIRR(
+                        editingProject.budget || 0,
+                        editingProject.irr || 0,
+                        newPeriod
+                      );
+
+                      setEditingProject({
+                        ...editingProject,
+                        period: newPeriod,
+                        plannedValue: newPlannedValue
+                      });
+                    }}
+                    placeholder="Ej: 3"
+                    min="1"
+                    max="20"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Duración estimada del proyecto para cálculo de valor con TIR
+                  </p>
+                </div>
+
+                {/* Campo: Valor Planificado del Proyecto */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                    💰 Valor Planificado del Proyecto
+                    <span className="ml-1 text-blue-500 text-xs">
+                      (Auto-calculado)
+                    </span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      className="w-full border rounded px-3 py-2 border-gray-300 bg-gray-50"
+                      value={editingProject?.plannedValue || 0}
+                      onChange={(e) => {
+                        setEditingProject({
+                          ...editingProject,
+                          plannedValue: parseFloat(e.target.value) || 0
+                        });
+                      }}
+                      placeholder="Calculado automáticamente"
+                      min="0"
+                      step="10000"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const calculated = calculatePlannedValueFromIRR(
+                          editingProject.budget || 0,
+                          editingProject.irr || 0,
+                          editingProject.period || 3
+                        );
+                        setEditingProject({
+                          ...editingProject,
+                          plannedValue: calculated
+                        });
+                      }}
+                      className="absolute right-2 top-2 text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
+                      title="Recalcular automáticamente"
+                    >
+                      🔄 Auto
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Fórmula: ${(editingProject?.budget || 0).toLocaleString()} × (1 + {editingProject?.irr || 0}%)^{editingProject?.period || 3} = ${(editingProject?.plannedValue || 0).toLocaleString()}
+                  </p>
                 </div>
 
                 <div className="md:col-span-2">

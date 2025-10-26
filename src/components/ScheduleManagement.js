@@ -44,6 +44,13 @@ import {
   calculateProjectMetrics
 } from '../utils/scheduleCPM';
 
+// Importar utilidades de valor de negocio
+import {
+  calculateAllTasksBusinessValue,
+  calculateTaskBusinessValue,
+  getPriorityWeight
+} from '../utils/businessValueCalculator';
+
 // Importar utilidades de análisis de recursos
 import {
   analyzeResources,
@@ -230,6 +237,14 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
     switch (action) {
       case 'create':
         // Crear nueva tarea en cronograma
+        // Calcular businessValue automáticamente
+        const taskBusinessValue = calculateTaskBusinessValue(
+          data.cost || 0,
+          data.priority || 'medium',
+          projectData?.plannedValue || 0,
+          tasks
+        );
+
         const newTask = {
           id: data.id,
           wbsCode: data.wbs || `WP-${data.id}`,
@@ -242,6 +257,8 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
           successors: [],
           resources: [],
           cost: data.cost || 0,
+          priority: data.priority || 'medium',
+          businessValue: taskBusinessValue,
           isMilestone: false,
           isCritical: false,
           originalDuration: data.duration || 1, // Guardar duración original
@@ -282,7 +299,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                 id: task.id,
                 wbsCode: task.wbsCode,
                 name: task.name,
-                duration: data.startDate && data.endDate ? 
+                duration: data.startDate && data.endDate ?
                   Math.max(1, durationDaysInclusive(data.startDate, data.endDate, includeWeekends)) : task.duration,
                 startDate: data.startDate || task.startDate,
                 endDate: data.endDate || task.endDate,
@@ -290,6 +307,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                 predecessors: [...(task.predecessors || [])],
                 cost: data.cost !== undefined ? data.cost : task.cost,
                 priority: task.priority,
+                businessValue: task.businessValue || 0,
                 assignedTo: task.assignedTo,
                 isMilestone: task.isMilestone,
                 isCritical: task.isCritical,
@@ -492,9 +510,11 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
       tasks: tasksWithForcedDeps
     };
   }, [tasks, includeWeekends, tasks.length]);
+
   // CORRECCIÓN FINAL: Asegurar que todos los hitos tengan fecha inicio = fecha fin
   // Y APLICAR FECHAS CALCULADAS POR CPM COMO MS PROJECT
-  const tasksWithCPM = useMemo(() => {
+  // ✅ NUEVO: Calcular automáticamente businessValue para tareas con valor = 0
+  const tasksWithCPMOriginal = useMemo(() => {
     return cmpResult.tasks.map(task => {
       // CORRECCIÓN: Aplicar fechas calculadas por CPM como MS Project
       const taskWithCPMDates = {
@@ -502,7 +522,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         startDate: task.earlyStart, // Usar fecha calculada por CPM
         endDate: task.earlyFinish   // Usar fecha calculada por CPM
       };
-      
+
       if (task.isMilestone) {
         // DEBUG: Ver qué fechas tiene el hito
         console.log('🔍 HITO DETECTADO:', {
@@ -521,10 +541,72 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
           };
         }
       }
-      
+
       return taskWithCPMDates;
     });
   }, [cmpResult.tasks]);
+
+  // Calcular businessValue automáticamente para tareas con valor = 0 y reasignar tasksWithCPM
+  const tasksWithCPM = useMemo(() => {
+    // DEBUG: Verificar datos del proyecto
+    console.log('🔍 DEBUG businessValue - projectData:', {
+      exists: !!projectData,
+      plannedValue: projectData?.plannedValue,
+      tir: projectData?.tir,
+      budget: projectData?.budget,
+      allFields: projectData
+    });
+
+    // Si no hay proyecto o plannedValue, retornar tareas sin modificar
+    if (!projectData?.plannedValue) {
+      console.log('⚠️ No se puede calcular businessValue: falta plannedValue del proyecto');
+      return tasksWithCPMOriginal;
+    }
+
+    // Verificar si hay tareas con businessValue = 0 o undefined
+    const hasTasksWithoutValue = tasksWithCPMOriginal.some(task =>
+      !task.businessValue || task.businessValue === 0
+    );
+
+    if (!hasTasksWithoutValue) {
+      console.log('✅ Todas las tareas ya tienen businessValue calculado');
+      return tasksWithCPMOriginal;
+    }
+
+    console.log('🔄 Calculando businessValue automáticamente para tareas con valor = 0...');
+    console.log('📊 Datos del proyecto:', {
+      plannedValue: projectData.plannedValue,
+      tir: projectData.tir,
+      totalTasks: tasksWithCPMOriginal.length
+    });
+
+    // Calcular valores de negocio para todas las tareas
+    const calculatedTasksArray = calculateAllTasksBusinessValue(
+      tasksWithCPMOriginal,
+      projectData.plannedValue
+    );
+
+    // Crear un mapa de ID -> businessValue para acceso rápido
+    const calculatedValuesMap = new Map();
+    calculatedTasksArray.forEach(task => {
+      calculatedValuesMap.set(task.id, task.businessValue);
+    });
+
+    // Aplicar valores calculados solo a tareas con businessValue = 0
+    const tasksWithCalculatedValues = tasksWithCPMOriginal.map(task => {
+      if (!task.businessValue || task.businessValue === 0) {
+        const calculatedValue = calculatedValuesMap.get(task.id) || 0;
+        console.log(`💰 Tarea "${task.name}": businessValue calculado = $${calculatedValue.toFixed(2)}`);
+        return {
+          ...task,
+          businessValue: calculatedValue
+        };
+      }
+      return task;
+    });
+
+    return tasksWithCalculatedValues;
+  }, [tasksWithCPMOriginal, projectData?.plannedValue, projectData?.tir]);
 
   // CORRECCIÓN: Actualizar automáticamente las tareas con fechas calculadas por CPM
   useEffect(() => {
@@ -533,11 +615,11 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
       const needsUpdate = tasksWithCPM.some(task => {
         const currentTask = tasks.find(t => t.id === task.id);
         if (!currentTask) return false;
-        
-        return currentTask.startDate !== task.startDate || 
+
+        return currentTask.startDate !== task.startDate ||
                currentTask.endDate !== task.endDate;
       });
-      
+
       if (needsUpdate) {
         console.log('🔄 Actualizando tareas con fechas calculadas por CPM...');
         setTasks(tasksWithCPM);
@@ -1119,6 +1201,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
           progress: task.progress,
           predecessors: [...(task.predecessors || [])],
           cost: task.cost,
+          businessValue: task.businessValue || 0,  // ✅ PRESERVAR businessValue
           priority: task.priority,
           assignedTo: task.assignedTo,
           isMilestone: task.isMilestone,
@@ -2418,6 +2501,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         const predecessors = String(obj['predecessors'] || obj['predecesoras'] || '').split(',').map((s) => s.trim()).filter(Boolean);
         const resources = String(obj['resources'] || '').split(',').map((s) => s.trim()).filter(Boolean);
         const cost = Number.isFinite(Number(obj['cost'])) ? Number(obj['cost']) : 0;
+        const businessValue = Number.isFinite(Number(obj['businessvalue'] || obj['valor de negocio'])) ? Number(obj['businessvalue'] || obj['valor de negocio']) : 0;
         const isMilestone = String(obj['ismilestone']).toLowerCase() === 'true' || duration === 0;
         const status = obj['status'] || 'pending';
 
@@ -2433,6 +2517,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
           successors: [],
           resources,
           cost,
+          businessValue,
           isMilestone,
           isCritical: false,
           earlyStart: start,
@@ -2490,6 +2575,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
       }).join(', ') || '',
       Resources: task.resources.join(', '),
       Cost: task.cost,
+      BusinessValue: task.businessValue || 0,
       IsMilestone: task.isMilestone,
       IsCritical: task.isCritical,
       Status: task.status,
@@ -2539,7 +2625,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
 
     // Preparar datos del cronograma
     const scheduleData = [
-      ['#', 'Tarea', 'Duración', 'Inicio', 'Fin', 'Progreso (%)', 'Prioridad', 'Asignado', 'Costo', 'Predecesoras', 'Hito', 'Crítica', 'Ruta Crítica']
+      ['#', 'Tarea', 'Duración', 'Inicio', 'Fin', 'Progreso (%)', 'Prioridad', 'Asignado', 'Costo', 'Valor de Negocio', 'Predecesoras', 'Hito', 'Crítica', 'Ruta Crítica']
     ];
 
     tasksWithCPM.forEach((task, index) => {
@@ -2559,6 +2645,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         task.priority || 'Media',
         task.assignedTo || 'Sin asignar',
         task.cost || 0,
+        task.businessValue || 0,
         predecessorsText,
         task.isMilestone ? 'Sí' : 'No',
         task.isCritical ? 'Sí' : 'No',
@@ -2579,6 +2666,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
       { wch: 12 },  // Prioridad
       { wch: 20 },  // Asignado
       { wch: 12 },  // Costo
+      { wch: 15 },  // Valor de Negocio
       { wch: 30 },  // Predecesoras
       { wch: 8 },   // Hito
       { wch: 8 },   // Crítica
@@ -2739,6 +2827,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
     priority: 'medium',
     assignedTo: '',
     cost: 0,
+    businessValue: 0,  // ✅ NUEVO: Valor de negocio de la tarea
     selectedPredecessors: []
   });
 
@@ -3051,6 +3140,10 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         prioridad: headers.findIndex(h => h && h.toString().toLowerCase().includes('prioridad')),
         asignado: headers.findIndex(h => h && h.toString().toLowerCase().includes('asignado')),
         costo: headers.findIndex(h => h && h.toString().toLowerCase().includes('costo')),
+        businessValue: headers.findIndex(h => {
+          const headerLower = h?.toString().toLowerCase();
+          return headerLower?.includes('valor') && headerLower?.includes('negocio');
+        }),
         predecesoras: headers.findIndex(h => h && h.toString().toLowerCase().includes('predecesor')),
         hitos: headers.findIndex(h => h && h.toString().toLowerCase().includes('hito'))
       };
@@ -3134,6 +3227,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
           priority: sanitizeInput(row[columnMap.prioridad] || 'medium'),
           assignedTo: sanitizeInput(row[columnMap.asignado] || ''),
           cost: Math.max(0, parseFloat(row[columnMap.costo]) || 0), // Solo valores positivos
+          businessValue: Math.max(0, parseFloat(row[columnMap.businessValue]) || 0), // ✅ Valor de negocio
           predecessors: [],
           successors: [],
           isMilestone: isMilestone,
@@ -4247,6 +4341,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
           progress: task.progress,
           predecessors: [...(task.predecessors || [])],
           cost: task.cost,
+          businessValue: task.businessValue || 0,  // ✅ PRESERVAR businessValue
           priority: task.priority,
           assignedTo: task.assignedTo,
           isMilestone: task.isMilestone,
@@ -4323,8 +4418,11 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
           case 'cost':
             updatedTask.cost = parseFloat(newValue) || 0;
             break;
+          case 'businessValue':
+            updatedTask.businessValue = parseFloat(newValue) || 0;
+            break;
         }
-        
+
         return updatedTask;
       }
       return task;
@@ -4409,6 +4507,9 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
             break;
           case 'cost':
             updateData.cost = parseFloat(newValue) || 0;
+            break;
+          case 'businessValue':
+            updateData.business_value = parseFloat(newValue) || 0;
             break;
         }
 
@@ -4661,6 +4762,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         successors: newTaskData.selectedSuccessors.slice(),
         resources: [],
         cost: newTaskData.cost,
+        businessValue: newTaskData.businessValue || 0,  // ✅ NUEVO: Valor de negocio
       isMilestone: false,
       isCritical: false,
         originalDuration: newTaskData.duration, // Guardar duración original
@@ -5823,6 +5925,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                     <th className="border border-gray-300 px-2 py-1.5 text-left text-sm font-medium text-gray-700 w-16">Prioridad</th>
                     <th className="border border-gray-300 px-2 py-1.5 text-left text-sm font-medium text-gray-700 w-24">Asignado</th>
                     <th className="border border-gray-300 px-2 py-1.5 text-left text-sm font-medium text-gray-700 w-16">Costo</th>
+                    <th className="border border-gray-300 px-2 py-1.5 text-left text-sm font-medium text-gray-700 w-20">💰 Valor</th>
                     <th className="border border-gray-300 px-2 py-1.5 text-left text-sm font-medium text-gray-700 w-20">Predecesoras</th>
                   </tr>
                 </thead>
@@ -6145,7 +6248,31 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
         </div>
                         )}
                       </td>
-                      
+
+                      {/* Valor de Negocio */}
+                      <td className="border border-gray-300 px-2 py-1 bg-indigo-50">
+                        {editingCell?.taskId === task.id && editingCell?.field === 'businessValue' ? (
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={editingValue}
+                            onChange={(e) => setEditingValue(e.target.value)}
+                            onBlur={saveEdit}
+                            onKeyDown={handleKeyDown}
+                            className="w-full px-2 py-1 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            autoFocus
+                          />
+                        ) : (
+                          <div
+                            className="cursor-pointer hover:bg-indigo-100 px-2 py-1 rounded min-h-[24px] flex items-center"
+                            onClick={() => startEditing(task.id, 'businessValue', task.businessValue || 0)}
+                            title="Valor de negocio según PMBOK 7"
+                          >
+                            ${(task.businessValue || 0).toLocaleString()}
+                          </div>
+                        )}
+                      </td>
+
                       {/* Predecesoras */}
                       <td className="border border-gray-300 px-2 py-1">
                         {editingCell?.taskId === task.id && editingCell?.field === 'dependencies' ? (
@@ -6218,7 +6345,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
 
             {/* Resumen de la tabla */}
             <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
               <div>
                   <span className="font-medium text-gray-700">Total Tareas:</span>
                   <span className="ml-2 text-gray-600">{tasksWithCPM.length}</span>
@@ -6237,6 +6364,12 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                   <span className="font-medium text-gray-700">Costo Total:</span>
                   <span className="ml-2 text-gray-600">
                     ${tasksWithCPM.reduce((sum, task) => sum + task.cost, 0).toLocaleString()}
+                  </span>
+              </div>
+              <div>
+                  <span className="font-medium text-indigo-700">💰 Valor Total:</span>
+                  <span className="ml-2 text-indigo-600 font-semibold">
+                    ${tasksWithCPM.reduce((sum, task) => sum + (task.businessValue || 0), 0).toLocaleString()}
                   </span>
               </div>
             </div>
@@ -9697,16 +9830,8 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                       type="text"
                       value={newTaskData.name}
                       onChange={(e) => setNewTaskData(prev => ({
-                        name: e.target.value,
-                        duration: prev.duration,
-                        startDate: prev.startDate,
-                        endDate: prev.endDate,
-                        description: prev.description,
-                        priority: prev.priority,
-                        assignedTo: prev.assignedTo,
-                        cost: prev.cost,
-                        selectedPredecessors: [...(prev.selectedPredecessors || [])],
-                        selectedSuccessors: [...(prev.selectedSuccessors || [])]
+                        ...prev,
+                        name: e.target.value
                       }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       placeholder="Ingresa el nombre de la tarea"
@@ -9720,16 +9845,8 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                     <textarea
                       value={newTaskData.description}
                       onChange={(e) => setNewTaskData(prev => ({
-                        name: prev.name,
-                        duration: prev.duration,
-                        startDate: prev.startDate,
-                        endDate: prev.endDate,
-                        description: e.target.value,
-                        priority: prev.priority,
-                        assignedTo: prev.assignedTo,
-                        cost: prev.cost,
-                        selectedPredecessors: [...(prev.selectedPredecessors || [])],
-                        selectedSuccessors: [...(prev.selectedSuccessors || [])]
+                        ...prev,
+                        description: e.target.value
                       }))}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       rows="3"
@@ -9749,17 +9866,10 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                         onChange={(e) => {
                           const duration = parseInt(e.target.value) || 1;
                           const newEndDate = addDays(newTaskData.startDate, duration, includeWeekends);
-                          setNewTaskData(prev => ({ 
-                            name: prev.name,
+                          setNewTaskData(prev => ({
+                            ...prev,
                             duration: duration,
-                            startDate: prev.startDate,
-                            endDate: newEndDate,
-                            description: prev.description,
-                            priority: prev.priority,
-                            assignedTo: prev.assignedTo,
-                            cost: prev.cost,
-                            selectedPredecessors: [...(prev.selectedPredecessors || [])],
-                            selectedSuccessors: [...(prev.selectedSuccessors || [])]
+                            endDate: newEndDate
                           }));
                         }}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -9776,16 +9886,8 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                         step="0.01"
                         value={newTaskData.cost}
                         onChange={(e) => setNewTaskData(prev => ({
-                          name: prev.name,
-                          duration: prev.duration,
-                          startDate: prev.startDate,
-                          endDate: prev.endDate,
-                          description: prev.description,
-                          priority: prev.priority,
-                          assignedTo: prev.assignedTo,
-                          cost: parseFloat(e.target.value) || 0,
-                          selectedPredecessors: [...(prev.selectedPredecessors || [])],
-                          selectedSuccessors: [...(prev.selectedSuccessors || [])]
+                          ...prev,
+                          cost: parseFloat(e.target.value) || 0
                         }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
@@ -9803,17 +9905,10 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                         onChange={(e) => {
                           const newStartDate = e.target.value;
                           const newEndDate = addDays(newStartDate, newTaskData.duration, includeWeekends);
-                          setNewTaskData(prev => ({ 
-                            name: prev.name,
-                            duration: prev.duration,
+                          setNewTaskData(prev => ({
+                            ...prev,
                             startDate: newStartDate,
-                            endDate: newEndDate,
-                            description: prev.description,
-                            priority: prev.priority,
-                            assignedTo: prev.assignedTo,
-                            cost: prev.cost,
-                            selectedPredecessors: [...(prev.selectedPredecessors || [])],
-                            selectedSuccessors: [...(prev.selectedSuccessors || [])]
+                            endDate: newEndDate
                           }));
                         }}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -9830,17 +9925,10 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                         onChange={(e) => {
                           const newEndDate = e.target.value;
                           const newDuration = Math.ceil((new Date(newEndDate) - new Date(newTaskData.startDate)) / (1000 * 60 * 60 * 24));
-                          setNewTaskData(prev => ({ 
-                            name: prev.name,
+                          setNewTaskData(prev => ({
+                            ...prev,
                             duration: newDuration > 0 ? newDuration : 1,
-                            startDate: prev.startDate,
-                            endDate: newEndDate,
-                            description: prev.description,
-                            priority: prev.priority,
-                            assignedTo: prev.assignedTo,
-                            cost: prev.cost,
-                            selectedPredecessors: [...(prev.selectedPredecessors || [])],
-                            selectedSuccessors: [...(prev.selectedSuccessors || [])]
+                            endDate: newEndDate
                           }));
                         }}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -9856,16 +9944,8 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                       <select
                         value={newTaskData.priority}
                         onChange={(e) => setNewTaskData(prev => ({
-                          name: prev.name,
-                          duration: prev.duration,
-                          startDate: prev.startDate,
-                          endDate: prev.endDate,
-                          description: prev.description,
-                          priority: e.target.value,
-                          assignedTo: prev.assignedTo,
-                          cost: prev.cost,
-                          selectedPredecessors: [...(prev.selectedPredecessors || [])],
-                          selectedSuccessors: [...(prev.selectedSuccessors || [])]
+                          ...prev,
+                          priority: e.target.value
                         }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       >
@@ -9884,21 +9964,56 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                         type="text"
                         value={newTaskData.assignedTo}
                         onChange={(e) => setNewTaskData(prev => ({
-                          name: prev.name,
-                          duration: prev.duration,
-                          startDate: prev.startDate,
-                          endDate: prev.endDate,
-                          description: prev.description,
-                          priority: prev.priority,
-                          assignedTo: e.target.value,
-                          cost: prev.cost,
-                          selectedPredecessors: [...(prev.selectedPredecessors || [])],
-                          selectedSuccessors: [...(prev.selectedSuccessors || [])]
+                          ...prev,
+                          assignedTo: e.target.value
                         }))}
                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         placeholder="Nombre del responsable"
                       />
                     </div>
+                  </div>
+
+                  {/* Valor de Negocio (PMBOK 7) */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      💰 Valor de Negocio (USD)
+                    </label>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={newTaskData.businessValue}
+                        onChange={(e) => setNewTaskData(prev => ({
+                          ...prev,
+                          businessValue: parseFloat(e.target.value) || 0
+                        }))}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="Valor estimado"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const calculatedValue = calculateTaskBusinessValue(
+                            newTaskData.cost || 0,
+                            newTaskData.priority || 'medium',
+                            projectData?.plannedValue || 0,
+                            tasks
+                          );
+                          setNewTaskData(prev => ({
+                            ...prev,
+                            businessValue: calculatedValue
+                          }));
+                        }}
+                        className="px-4 py-2 bg-indigo-100 text-indigo-700 rounded-md hover:bg-indigo-200 transition-colors text-sm font-medium whitespace-nowrap"
+                        title="Calcular automáticamente basado en TIR, costo y prioridad"
+                      >
+                        🔄 Auto
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Se calcula automáticamente con base en TIR del proyecto, costo y prioridad de la tarea
+                    </p>
                   </div>
                 </div>
 
