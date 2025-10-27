@@ -6,6 +6,7 @@ import ScheduleWizard from './ai-scheduler/ScheduleWizard';
 import supabaseService from '../services/SupabaseService';
 import aiSchedulerService from '../services/AISchedulerService';
 import useAuditLog from '../hooks/useAuditLog';
+import useBusinessValueSync from '../hooks/useBusinessValueSync';
 
 // Importar constantes
 import { DAY, ROW_H, PADDING_TOP } from '../utils/scheduleConstants';
@@ -546,67 +547,17 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
     });
   }, [cmpResult.tasks]);
 
-  // Calcular businessValue automáticamente para tareas con valor = 0 y reasignar tasksWithCPM
-  const tasksWithCPM = useMemo(() => {
-    // DEBUG: Verificar datos del proyecto
-    console.log('🔍 DEBUG businessValue - projectData:', {
-      exists: !!projectData,
-      plannedValue: projectData?.plannedValue,
-      tir: projectData?.tir,
-      budget: projectData?.budget,
-      allFields: projectData
-    });
+  // ✅ NUEVO: Hook para cálculo automático y sincronización inteligente de businessValue
+  const {
+    tasksWithValue: tasksWithBusinessValue,
+    isSyncing: isBusinessValueSyncing,
+    lastSync: businessValueLastSync,
+    error: businessValueError,
+    recalculate: recalculateBusinessValue
+  } = useBusinessValueSync(tasksWithCPMOriginal, projectData, supabaseService, useSupabase);
 
-    // Si no hay proyecto o plannedValue, retornar tareas sin modificar
-    if (!projectData?.plannedValue) {
-      console.log('⚠️ No se puede calcular businessValue: falta plannedValue del proyecto');
-      return tasksWithCPMOriginal;
-    }
-
-    // Verificar si hay tareas con businessValue = 0 o undefined
-    const hasTasksWithoutValue = tasksWithCPMOriginal.some(task =>
-      !task.businessValue || task.businessValue === 0
-    );
-
-    if (!hasTasksWithoutValue) {
-      console.log('✅ Todas las tareas ya tienen businessValue calculado');
-      return tasksWithCPMOriginal;
-    }
-
-    console.log('🔄 Calculando businessValue automáticamente para tareas con valor = 0...');
-    console.log('📊 Datos del proyecto:', {
-      plannedValue: projectData.plannedValue,
-      tir: projectData.tir,
-      totalTasks: tasksWithCPMOriginal.length
-    });
-
-    // Calcular valores de negocio para todas las tareas
-    const calculatedTasksArray = calculateAllTasksBusinessValue(
-      tasksWithCPMOriginal,
-      projectData.plannedValue
-    );
-
-    // Crear un mapa de ID -> businessValue para acceso rápido
-    const calculatedValuesMap = new Map();
-    calculatedTasksArray.forEach(task => {
-      calculatedValuesMap.set(task.id, task.businessValue);
-    });
-
-    // Aplicar valores calculados solo a tareas con businessValue = 0
-    const tasksWithCalculatedValues = tasksWithCPMOriginal.map(task => {
-      if (!task.businessValue || task.businessValue === 0) {
-        const calculatedValue = calculatedValuesMap.get(task.id) || 0;
-        console.log(`💰 Tarea "${task.name}": businessValue calculado = $${calculatedValue.toFixed(2)}`);
-        return {
-          ...task,
-          businessValue: calculatedValue
-        };
-      }
-      return task;
-    });
-
-    return tasksWithCalculatedValues;
-  }, [tasksWithCPMOriginal, projectData?.plannedValue, projectData?.tir]);
+  // Usar las tareas con businessValue calculado
+  const tasksWithCPM = tasksWithBusinessValue;
 
   // CORRECCIÓN: Actualizar automáticamente las tareas con fechas calculadas por CPM
   useEffect(() => {
@@ -5906,6 +5857,25 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                   <span>📊</span>
                   <span>Descargar Excel</span>
               </button>
+
+              {/* Botón para recalcular valores de negocio */}
+              {projectData?.plannedValue && (
+                <button
+                  onClick={() => {
+                    console.log('🔄 Recalculando valores de negocio manualmente...');
+                    const recalculated = recalculateBusinessValue();
+                    if (recalculated && setTasks) {
+                      setTasks(recalculated);
+                    }
+                  }}
+                  className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center space-x-2"
+                  title="Recalcular valores de negocio de todas las tareas basado en TIR y costos"
+                  disabled={isBusinessValueSyncing}
+                >
+                  <span>{isBusinessValueSyncing ? '⏳' : '💰'}</span>
+                  <span>{isBusinessValueSyncing ? 'Sincronizando...' : 'Recalcular Valores'}</span>
+                </button>
+              )}
             </div>
           </div>
           
