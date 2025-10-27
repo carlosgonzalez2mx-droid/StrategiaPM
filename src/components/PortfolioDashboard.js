@@ -989,7 +989,14 @@ const PortfolioDashboard = ({
                       // Solo permitir números, punto decimal y vacío
                       if (inputValue === '' || /^\d*\.?\d*$/.test(inputValue)) {
                         const numValue = inputValue === '' ? '' : Number(inputValue);
+
+                        // Calcular plannedValue automáticamente
+                        const period = editingProject?.period || 3;
+                        const budget = editingProject?.budget || 0;
+                        const newPlannedValue = budget * Math.pow(1 + (numValue / 100), period);
+
                         updateProjectField('irr', numValue);
+                        updateProjectField('plannedValue', Math.round(newPlannedValue));
                         validateField('irr', numValue);
                       }
                     }}
@@ -1003,6 +1010,78 @@ const PortfolioDashboard = ({
                     step="0.01"
                   />
                   <ErrorMessage error={errors.irr} />
+                </div>
+
+                {/* Campo: Periodo del Proyecto */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Periodo del Proyecto (años)
+                  </label>
+                  <input
+                    type="number"
+                    className="w-full border rounded px-3 py-2 border-gray-300"
+                    value={editingProject?.period || 3}
+                    onChange={(e) => {
+                      const newPeriod = parseInt(e.target.value) || 3;
+
+                      // Recalcular plannedValue con nuevo periodo
+                      const budget = editingProject?.budget || 0;
+                      const irr = editingProject?.irr || 0;
+                      const newPlannedValue = budget * Math.pow(1 + (irr / 100), newPeriod);
+
+                      updateProjectField('period', newPeriod);
+                      updateProjectField('plannedValue', Math.round(newPlannedValue));
+                    }}
+                    placeholder="Ej: 3"
+                    min="1"
+                    max="20"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Duración estimada del proyecto para cálculo de valor con TIR
+                  </p>
+                </div>
+
+                {/* Campo: Valor Planificado del Proyecto - ANCHO COMPLETO */}
+                <div className="md:col-span-2 bg-blue-50 p-4 rounded-lg border-2 border-blue-200">
+                  <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                    💰 Valor Planificado del Proyecto (USD)
+                    <span className="ml-2 text-blue-600 text-xs font-semibold">
+                      (Auto-calculado con TIR)
+                    </span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      className="w-full border-2 rounded px-3 py-2 border-blue-300 bg-white text-lg font-semibold"
+                      value={editingProject?.plannedValue || 0}
+                      onChange={(e) => {
+                        updateProjectField('plannedValue', parseFloat(e.target.value) || 0);
+                      }}
+                      placeholder="Calculado automáticamente"
+                      min="0"
+                      step="10000"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const budget = editingProject?.budget || 0;
+                        const irr = editingProject?.irr || 0;
+                        const period = editingProject?.period || 3;
+                        const calculated = budget * Math.pow(1 + (irr / 100), period);
+                        updateProjectField('plannedValue', Math.round(calculated));
+                      }}
+                      className="absolute right-2 top-2 text-xs bg-blue-500 text-white px-3 py-1.5 rounded hover:bg-blue-600 font-medium"
+                      title="Recalcular automáticamente"
+                    >
+                      🔄 Recalcular
+                    </button>
+                  </div>
+                  <p className="text-xs text-blue-700 mt-2 font-medium">
+                    Fórmula: ${(editingProject?.budget || 0).toLocaleString()} × (1 + {editingProject?.irr || 0}%)^{editingProject?.period || 3} = <span className="text-green-600 font-bold">${(editingProject?.plannedValue || 0).toLocaleString()}</span>
+                  </p>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Este valor se distribuirá automáticamente entre todas las tareas del cronograma según su costo y prioridad.
+                  </p>
                 </div>
 
                 <div className="md:col-span-2">
