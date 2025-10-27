@@ -4613,15 +4613,39 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
           };
           updatedTask.predecessors = predecessorIds;
           updatedTask.successors = []; // Limpiar sucesoras
-          
+
           // Sincronizar dependencias bidireccionalmente (solo predecesoras)
           syncDependencies(taskId, predecessorIds, []);
-          
+
           return updatedTask;
         }
         return task;
       }));
-      
+
+      // ✅ FIX: Sincronizar con Supabase inmediatamente
+      if (useSupabase && projectData?.id) {
+        const updateData = {
+          predecessors: predecessorIds,
+          updated_at: new Date().toISOString()
+        };
+
+        supabaseService.supabase
+          .from('tasks')
+          .update(updateData)
+          .eq('id', taskId)
+          .eq('project_id', projectData.id)
+          .then(({ error }) => {
+            if (error) {
+              console.error('❌ Error actualizando predecesoras en Supabase:', error);
+            } else {
+              console.log('✅ Predecesoras actualizadas en Supabase exitosamente');
+            }
+          })
+          .catch(error => {
+            console.error('❌ Error inesperado actualizando predecesoras:', error);
+          });
+      }
+
       setEditingCell(null);
       setEditingValue('');
     } catch (error) {
@@ -5969,7 +5993,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                               insertTaskAtPosition(task.id, index);
                             }}
                             className="bg-green-500 hover:bg-green-600 text-white text-sm px-2 py-1 rounded-md shadow-sm transition-colors duration-200 flex items-center justify-center min-w-[32px]"
-                            title="Insertar fila después (como MS Project)"
+                            title="Insertar fila después"
                           >
                             ➕
                           </button>
@@ -5979,7 +6003,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                               deleteTask(task.id);
                             }}
                             className="bg-red-500 hover:bg-red-600 text-white text-sm px-2 py-1 rounded-md shadow-sm transition-colors duration-200 flex items-center justify-center min-w-[32px]"
-                            title="Eliminar tarea (como MS Project)"
+                            title="Eliminar tarea"
                           >
                             🗑️
                           </button>
@@ -6002,7 +6026,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                           <div
                             className="cursor-pointer hover:bg-gray-100 px-2 py-1 rounded min-h-[24px] flex items-center"
                             onClick={() => startEditing(task.id, 'name', task.name)}
-                            title="Click para editar nombre (como MS Project)"
+                            title="Click para editar nombre"
                           >
                             {task.name}
                         </div>
@@ -6044,7 +6068,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                           <div
                             className="cursor-pointer hover:bg-gray-100 px-2 py-1 rounded min-h-[24px] flex items-center"
                             onClick={() => startEditing(task.id, 'duration', task.duration)}
-                            title="Click para editar duración (como MS Project)"
+                            title="Click para editar duración"
                           >
                             {task.duration}d
                           </div>
@@ -6067,7 +6091,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                           <div
                             className="cursor-pointer hover:bg-gray-100 px-2 py-1 rounded min-h-[24px] flex items-center text-sm"
                             onClick={() => startEditing(task.id, 'startDate', task.startDate)}
-                            title="Click para editar fecha de inicio (como MS Project)"
+                            title="Click para editar fecha de inicio"
                           >
                             {task.startDate && task.startDate !== null && task.startDate !== undefined ? task.startDate.split('-').reverse().join('/') : ''}
                           </div>
@@ -6098,7 +6122,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                           <div
                             className="cursor-pointer hover:bg-gray-100 px-2 py-1 rounded min-h-[24px] flex items-center text-sm"
                             onClick={() => startEditing(task.id, 'endDate', task.endDate)}
-                            title="Click para editar fecha de fin (como MS Project)"
+                            title="Click para editar fecha de fin"
                           >
                             {task.isMilestone 
                               ? (task.startDate && task.startDate !== null && task.startDate !== undefined ? task.startDate.split('-').reverse().join('/') : '')
