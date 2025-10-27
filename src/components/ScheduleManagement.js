@@ -5811,32 +5811,32 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
               </div>
             </div>
             
-            <div className="flex space-x-2">
+            <div className="flex flex-wrap gap-2">
               <button
                   onClick={generateExampleExcel}
-                  className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 flex items-center space-x-2"
+                  className="bg-purple-600 text-white px-2 py-1.5 rounded text-xs hover:bg-purple-700 flex items-center space-x-1"
                   title="Descargar archivo Excel de ejemplo con hitos"
               >
                   <span>📋</span>
-                  <span>Descargar Ejemplo</span>
+                  <span>Ejemplo</span>
               </button>
               <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center space-x-2"
+                  className="bg-blue-600 text-white px-2 py-1.5 rounded text-xs hover:bg-blue-700 flex items-center space-x-1"
                   title="Importar cronograma desde Excel (reemplaza datos existentes)"
               >
                   <span>📊</span>
-                  <span>Importar Cronograma</span>
+                  <span>Importar</span>
               </button>
               <button
                   onClick={() => setShowAIWizard(true)}
-                  className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-4 py-2 rounded-lg hover:from-purple-700 hover:to-pink-700 flex items-center space-x-2 transition-all transform hover:scale-105"
+                  className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-2 py-1.5 rounded text-xs hover:from-purple-700 hover:to-pink-700 flex items-center space-x-1"
                   title="Generar cronograma automáticamente con Asistente de IA"
               >
                   <span>🤖</span>
-                  <span>Asistente de IA</span>
+                  <span>IA</span>
               </button>
-              
+
               {/* Input de archivo oculto */}
               <input
                 ref={fileInputRef}
@@ -5852,10 +5852,10 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
               />
               <button
                   onClick={exportScheduleToExcel}
-                  className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center space-x-2"
+                  className="bg-green-600 text-white px-2 py-1.5 rounded text-xs hover:bg-green-700 flex items-center space-x-1"
               >
                   <span>📊</span>
-                  <span>Descargar Excel</span>
+                  <span>Excel</span>
               </button>
 
               {/* Botón para recalcular valores de negocio */}
@@ -5868,35 +5868,35 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                       setTasks(recalculated);
                     }
                   }}
-                  className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center space-x-2"
+                  className="bg-indigo-600 text-white px-2 py-1.5 rounded text-xs hover:bg-indigo-700 flex items-center space-x-1"
                   title="Recalcular valores de negocio de todas las tareas basado en TIR y costos"
                   disabled={isBusinessValueSyncing}
                 >
                   <span>{isBusinessValueSyncing ? '⏳' : '💰'}</span>
-                  <span>{isBusinessValueSyncing ? 'Sincronizando...' : 'Recalcular Valores'}</span>
+                  <span className="whitespace-nowrap">{isBusinessValueSyncing ? 'Sync...' : 'Valores'}</span>
                 </button>
               )}
             </div>
           </div>
           
             {/* Tabla tipo Excel */}
-            <div className="overflow-x-auto overflow-y-auto max-h-[85vh] border border-gray-200 rounded-lg">
-              <table className="w-full border-collapse border border-gray-300">
-                <thead>
-                  <tr className="bg-gray-50">
-                    <th className="border border-gray-300 px-2 py-1.5 text-left text-sm font-medium text-gray-700 w-8">#</th>
-                    <th className="border border-gray-300 px-2 py-1.5 text-left text-sm font-medium text-gray-700 w-12">Acción</th>
-                    <th className="border border-gray-300 px-2 py-1.5 text-left text-sm font-medium text-gray-700 w-48">Tarea</th>
-                    <th className="border border-gray-300 px-2 py-1.5 text-left text-sm font-medium text-gray-700 w-12">🏹</th>
-                    <th className="border border-gray-300 px-2 py-1.5 text-left text-sm font-medium text-gray-700 w-16">Duración</th>
-                    <th className="border border-gray-300 px-2 py-1.5 text-left text-sm font-medium text-gray-700 w-24">Inicio</th>
-                    <th className="border border-gray-300 px-2 py-1.5 text-left text-sm font-medium text-gray-700 w-24">Fin</th>
-                    <th className="border border-gray-300 px-2 py-1.5 text-left text-sm font-medium text-gray-700 w-16">Progreso</th>
-                    <th className="border border-gray-300 px-2 py-1.5 text-left text-sm font-medium text-gray-700 w-16">Prioridad</th>
-                    <th className="border border-gray-300 px-2 py-1.5 text-left text-sm font-medium text-gray-700 w-24">Asignado</th>
-                    <th className="border border-gray-300 px-2 py-1.5 text-left text-sm font-medium text-gray-700 w-16">Costo</th>
-                    <th className="border border-gray-300 px-2 py-1.5 text-left text-sm font-medium text-gray-700 w-20">💰 Valor</th>
-                    <th className="border border-gray-300 px-2 py-1.5 text-left text-sm font-medium text-gray-700 w-20">Predecesoras</th>
+            <div className="overflow-y-auto max-h-[85vh] border border-gray-200 rounded-lg">
+              <table className="min-w-full border-collapse border border-gray-300 text-xs">
+                <thead className="sticky top-0 bg-gray-50 z-10">
+                  <tr>
+                    <th className="border border-gray-300 px-1 py-1 text-left text-xs font-medium text-gray-700" style={{width: '30px'}}>#</th>
+                    <th className="border border-gray-300 px-1 py-1 text-center text-xs font-medium text-gray-700" style={{width: '70px'}}>Acción</th>
+                    <th className="border border-gray-300 px-2 py-1 text-left text-xs font-medium text-gray-700" style={{minWidth: '150px'}}>Tarea</th>
+                    <th className="border border-gray-300 px-1 py-1 text-center text-xs font-medium text-gray-700" style={{width: '35px'}}>🏹</th>
+                    <th className="border border-gray-300 px-1 py-1 text-left text-xs font-medium text-gray-700" style={{width: '55px'}}>Duración</th>
+                    <th className="border border-gray-300 px-1 py-1 text-left text-xs font-medium text-gray-700" style={{width: '85px'}}>Inicio</th>
+                    <th className="border border-gray-300 px-1 py-1 text-left text-xs font-medium text-gray-700" style={{width: '85px'}}>Fin</th>
+                    <th className="border border-gray-300 px-1 py-1 text-left text-xs font-medium text-gray-700" style={{width: '80px'}}>Progreso</th>
+                    <th className="border border-gray-300 px-1 py-1 text-left text-xs font-medium text-gray-700" style={{width: '70px'}}>Prioridad</th>
+                    <th className="border border-gray-300 px-1 py-1 text-left text-xs font-medium text-gray-700" style={{width: '90px'}}>Asignado</th>
+                    <th className="border border-gray-300 px-1 py-1 text-left text-xs font-medium text-gray-700" style={{width: '70px'}}>Costo</th>
+                    <th className="border border-gray-300 px-1 py-1 text-left text-xs font-medium text-gray-700" style={{width: '70px'}}>💰 Valor</th>
+                    <th className="border border-gray-300 px-1 py-1 text-left text-xs font-medium text-gray-700" style={{width: '90px'}}>Predecesoras</th>
                   </tr>
                 </thead>
                 <tbody onKeyDown={handleKeyDown}>
