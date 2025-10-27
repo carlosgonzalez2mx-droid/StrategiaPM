@@ -883,6 +883,7 @@ class SupabaseService {
           progress: task.progress,
           priority: task.priority,
           cost: task.cost,
+          businessValue: task.business_value,  // ✅ FIX: Mapear business_value desde Supabase
           predecessors: task.predecessors,
           successors: task.successors,
           resources: task.resources,
