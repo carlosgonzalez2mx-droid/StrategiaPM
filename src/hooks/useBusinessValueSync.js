@@ -80,27 +80,42 @@ const useBusinessValueSync = (tasks, projectData, supabaseService, useSupabase =
     console.log(`   Tareas a sincronizar: ${tasksToSync.length}`);
 
     try {
-      // Preparar datos para batch update (upsert)
-      const tasksToUpsert = tasksToSync.map(task => ({
-        id: task.id,
-        project_id: projectData.id,
-        business_value: task.businessValue || 0,
-        updated_at: new Date().toISOString()
-      }));
+      console.log('💾 Iniciando sincronización de businessValue a Supabase...');
+      console.log(`   Total de tareas a sincronizar: ${tasksToSync.length}`);
 
-      // Batch update con upsert
-      const { error } = await supabaseService.supabase
-        .from('tasks')
-        .upsert(tasksToUpsert, {
-          onConflict: 'id',
-          returning: 'minimal' // No necesitamos los datos de vuelta, solo confirmar
-        });
+      // Actualizar cada tarea individualmente para evitar problemas con RLS
+      // RLS (Row-Level Security) puede bloquear UPSERT pero permitir UPDATE
+      let successCount = 0;
+      let errorCount = 0;
 
-      if (error) {
-        throw error;
+      for (const task of tasksToSync) {
+        try {
+          const { error } = await supabaseService.supabase
+            .from('tasks')
+            .update({
+              business_value: task.businessValue || 0,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', task.id)
+            .eq('project_id', projectData.id);
+
+          if (error) {
+            console.error(`❌ Error actualizando tarea ${task.id}:`, error);
+            errorCount++;
+          } else {
+            successCount++;
+          }
+        } catch (taskError) {
+          console.error(`❌ Error inesperado en tarea ${task.id}:`, taskError);
+          errorCount++;
+        }
       }
 
-      console.log('✅ businessValue sincronizado a Supabase exitosamente');
+      console.log(`✅ Sincronización completada: ${successCount} exitosas, ${errorCount} errores`);
+
+      if (errorCount > 0) {
+        throw new Error(`${errorCount} tareas no se pudieron sincronizar`);
+      }
 
     } catch (error) {
       console.error('❌ Error sincronizando businessValue a Supabase:', error);
