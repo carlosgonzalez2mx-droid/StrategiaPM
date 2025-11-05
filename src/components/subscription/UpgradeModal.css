@@ -1,0 +1,273 @@
+/* Overlay del Modal */
+.upgrade-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Contenido del Modal */
+.upgrade-modal-content {
+  background: white;
+  border-radius: 16px;
+  padding: 40px;
+  max-width: 800px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Botón de cerrar */
+.upgrade-modal-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: none;
+  border: none;
+  font-size: 32px;
+  color: #9CA3AF;
+  cursor: pointer;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.upgrade-modal-close:hover {
+  background-color: #F3F4F6;
+  color: #374151;
+}
+
+/* Icono de advertencia */
+.upgrade-modal-icon {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+/* Título y subtítulo */
+.upgrade-modal-title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #111827;
+  text-align: center;
+  margin: 0 0 12px 0;
+}
+
+.upgrade-modal-subtitle {
+  font-size: 16px;
+  color: #6B7280;
+  text-align: center;
+  margin: 0 0 32px 0;
+}
+
+/* Comparación de planes */
+.upgrade-plans-comparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+@media (max-width: 768px) {
+  .upgrade-plans-comparison {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Tarjetas de plan */
+.upgrade-plan-card {
+  border: 2px solid #E5E7EB;
+  border-radius: 12px;
+  padding: 24px;
+  transition: all 0.3s;
+}
+
+.upgrade-plan-current {
+  background-color: #F9FAFB;
+}
+
+.upgrade-plan-recommended {
+  border-color: #3B82F6;
+  background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%);
+  position: relative;
+  transform: scale(1.02);
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.15);
+}
+
+.upgrade-plan-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Header del plan */
+.upgrade-plan-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.upgrade-plan-header h3 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+/* Badge del plan */
+.upgrade-plan-badge {
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 12px;
+  background-color: #E5E7EB;
+  color: #4B5563;
+  font-weight: 600;
+}
+
+.upgrade-plan-badge-pro {
+  background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+  color: white;
+}
+
+/* Precio */
+.upgrade-plan-price {
+  font-size: 40px;
+  font-weight: 800;
+  color: #111827;
+  margin-bottom: 20px;
+}
+
+.upgrade-plan-price span {
+  font-size: 16px;
+  font-weight: 500;
+  color: #6B7280;
+}
+
+/* Lista de características */
+.upgrade-plan-features {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 20px 0;
+}
+
+.upgrade-plan-features li {
+  display: flex;
+  align-items: center;
+  padding: 12px 0;
+  font-size: 15px;
+  color: #374151;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.upgrade-plan-features li:last-child {
+  border-bottom: none;
+}
+
+.upgrade-feature-icon {
+  margin-right: 12px;
+  font-size: 18px;
+  width: 24px;
+  text-align: center;
+}
+
+.upgrade-feature-included .upgrade-feature-icon {
+  color: #10B981;
+  font-weight: bold;
+}
+
+.upgrade-feature-limited {
+  opacity: 0.6;
+}
+
+/* Botones */
+.upgrade-btn-primary {
+  width: 100%;
+  padding: 14px 24px;
+  background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.upgrade-btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+}
+
+.upgrade-btn-primary:active {
+  transform: translateY(0);
+}
+
+.upgrade-btn-secondary {
+  width: 100%;
+  padding: 14px 24px;
+  background: white;
+  color: #6B7280;
+  border: 2px solid #E5E7EB;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 16px;
+}
+
+.upgrade-btn-secondary:hover {
+  border-color: #D1D5DB;
+  background-color: #F9FAFB;
+}
+
+/* Footer */
+.upgrade-modal-footer {
+  text-align: center;
+  font-size: 14px;
+  color: #6B7280;
+  margin: 24px 0 8px 0;
+}
+
+.upgrade-modal-footer a {
+  color: #3B82F6;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.upgrade-modal-footer a:hover {
+  text-decoration: underline;
+}
