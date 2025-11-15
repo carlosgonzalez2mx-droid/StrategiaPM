@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, startTransition } from 'react';
 import supabaseService from '../services/SupabaseService';
 
 // Definición de roles y permisos del sistema
@@ -121,8 +121,15 @@ export const AuthProvider = ({ children }) => {
     try {
       console.log('🔐 Inicializando autenticación...');
 
-      // 1. Inicializar SupabaseService
-      await supabaseService.initialize();
+      // 1. Inicializar SupabaseService con timeout de 10 segundos
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Timeout: La conexión a Supabase tardó demasiado')), 10000)
+      );
+
+      await Promise.race([
+        supabaseService.initialize(),
+        timeoutPromise
+      ]);
 
       // 2. Verificar si hay usuario autenticado en Supabase
       const supabaseUser = supabaseService.getCurrentUser();
@@ -139,10 +146,13 @@ export const AuthProvider = ({ children }) => {
           try {
             const userData = JSON.parse(savedUser);
             console.log('📦 Usuario recuperado de localStorage:', userData.email);
-            setUser(userData);
-            setIsAuthenticated(true);
-            setPermissions(ROLE_PERMISSIONS[userData.role]?.permissions || []);
-            setOrganizationId(userData.organizationId || null);
+            // Actualizar estado (batched para 1 solo re-render)
+            startTransition(() => {
+              setUser(userData);
+              setIsAuthenticated(true);
+              setPermissions(ROLE_PERMISSIONS[userData.role]?.permissions || []);
+              setOrganizationId(userData.organizationId || null);
+            });
           } catch (error) {
             console.error('❌ Error parseando usuario de localStorage:', error);
             localStorage.removeItem('strategiapm_user');
@@ -262,11 +272,13 @@ export const AuthProvider = ({ children }) => {
         lastLogin: new Date().toISOString()
       };
 
-      // Actualizar estado
-      setUser(userData);
-      setIsAuthenticated(true);
-      setPermissions(ROLE_PERMISSIONS[userRole]?.permissions || []);
-      setOrganizationId(orgId);
+      // Actualizar estado (batched para 1 solo re-render)
+      startTransition(() => {
+        setUser(userData);
+        setIsAuthenticated(true);
+        setPermissions(ROLE_PERMISSIONS[userRole]?.permissions || []);
+        setOrganizationId(orgId);
+      });
 
       // Guardar en localStorage para persistencia
       localStorage.setItem('strategiapm_user', JSON.stringify(userData));
@@ -327,11 +339,13 @@ export const AuthProvider = ({ children }) => {
         console.warn('⚠️ Error en logout de Supabase:', result.error);
       }
 
-      // 2. Limpiar estado local
-      setUser(null);
-      setIsAuthenticated(false);
-      setPermissions([]);
-      setOrganizationId(null);
+      // 2. Limpiar estado local (batched para 1 solo re-render)
+      startTransition(() => {
+        setUser(null);
+        setIsAuthenticated(false);
+        setPermissions([]);
+        setOrganizationId(null);
+      });
 
       // 3. Limpiar localStorage - Usuario
       localStorage.removeItem('strategiapm_user');

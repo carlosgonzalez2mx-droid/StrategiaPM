@@ -156,7 +156,15 @@ class SubscriptionService {
       };
     } catch (error) {
       console.error('Error verificando límite de proyectos:', error);
-      return { allowed: true }; // En caso de error, permitir (fail-safe)
+      // SEGURIDAD: En caso de error, denegar operación (fail-closed)
+      // Esto previene bypass de límites si Supabase está caído
+      return {
+        allowed: false,
+        reason: 'verification_error',
+        message: 'No se pudo verificar los límites de tu plan. Intenta nuevamente en unos momentos.',
+        suggestion: 'Si el problema persiste, contacta soporte.',
+        error: error.message
+      };
     }
   }
 
@@ -219,7 +227,15 @@ class SubscriptionService {
       };
     } catch (error) {
       console.error('Error verificando límite de usuarios:', error);
-      return { allowed: true }; // En caso de error, permitir (fail-safe)
+      // SEGURIDAD: En caso de error, denegar operación (fail-closed)
+      // Esto previene bypass de límites si Supabase está caído
+      return {
+        allowed: false,
+        reason: 'verification_error',
+        message: 'No se pudo verificar los límites de tu plan. Intenta nuevamente en unos momentos.',
+        suggestion: 'Si el problema persiste, contacta soporte.',
+        error: error.message
+      };
     }
   }
 
@@ -445,7 +461,16 @@ class SubscriptionService {
       return { allowed: true };
     } catch (error) {
       console.error('Error verificando permisos de edición:', error);
-      return { allowed: true }; // En caso de error, permitir (fail-safe)
+      // SEGURIDAD: En caso de error, denegar edición (fail-closed)
+      // Esto previene bypass de límites si Supabase está caído
+      return {
+        allowed: false,
+        reason: 'verification_error',
+        message: 'No se pudo verificar los permisos de tu plan. Intenta nuevamente en unos momentos.',
+        suggestion: 'Si el problema persiste, contacta soporte.',
+        error: error.message,
+        isReadOnlyMode: true
+      };
     }
   }
 
