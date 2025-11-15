@@ -28,6 +28,9 @@ executable/
 *.md
 !README.md
 !DEPLOYMENT.md
+!vercel-env-setup.md
+!stripe-setup.md
+!PR_DESCRIPTION.md
 *.txt
 !public/robots.txt
 .DS_Store
