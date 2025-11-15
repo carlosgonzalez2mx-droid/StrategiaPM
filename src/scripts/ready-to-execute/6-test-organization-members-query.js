@@ -6,9 +6,13 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-// Configuración de Supabase (usar las mismas variables de entorno)
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || 'https://oggpsrsssrrytrqoyyph.supabase.co';
-const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nZ3BzcnNzc3JyeXRycW95eXBoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ0NzQwMDAsImV4cCI6MjA1MDA1MDAwMH0.placeholder';
+// Configuración de Supabase desde variables de entorno
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error('❌ Missing Supabase configuration in .env file');
+}
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 

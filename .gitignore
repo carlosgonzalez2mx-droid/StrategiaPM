@@ -26,6 +26,8 @@ executable/
 !transfer-projects.sql
 !transfer-projects-simple.sql
 *.md
+!README.md
+!DEPLOYMENT.md
 *.txt
 !public/robots.txt
 .DS_Store
