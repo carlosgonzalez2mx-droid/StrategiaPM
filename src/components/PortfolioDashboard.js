@@ -1,8 +1,24 @@
-import React, { useMemo, useState } from 'react';
+/**
+ * PortfolioDashboard.js
+ *
+ * Componente que muestra la lista de proyectos en formato de tabla/dashboard.
+ * Se usa dentro del TAB "Lista de Proyectos" en PortfolioStrategic.
+ *
+ * Contiene su propio modal de creación/edición de proyectos que se abre desde:
+ * - Botón "Nuevo Proyecto" en la barra superior
+ * - Botón "Editar" (✏️) en cada fila de proyecto
+ *
+ * NOTA: Este componente es diferente de PortfolioStrategic que tiene su propio modal
+ * para crear proyectos desde la vista Overview.
+ */
+
+import React, { useMemo, useState, useEffect } from 'react';
 import PortfolioCharts from './PortfolioCharts';
 import CorporateAlerts from './CorporateAlerts';
 import FileManager from './FileManager';
 import usePermissions from '../hooks/usePermissions';
+import subscriptionService from '../services/SubscriptionService';
+import supabaseService from '../services/SupabaseService';
 
 // Componente para mostrar errores de validación
 const ErrorMessage = ({ error }) => {
@@ -10,9 +26,9 @@ const ErrorMessage = ({ error }) => {
   return <p className="text-red-500 text-xs mt-1">{error}</p>;
 };
 
-const PortfolioDashboard = ({ 
-  projects, 
-  currentProjectId, 
+const PortfolioDashboard = ({
+  projects,
+  currentProjectId,
   setCurrentProjectId,
   portfolioMetrics, // Nuevo prop para métricas actualizadas
   workPackages, // Nuevo prop para work packages
@@ -27,17 +43,70 @@ const PortfolioDashboard = ({
   archiveProject,
   includeWeekendsByProject,
   setIncludeWeekendsByProject,
-  getCurrentProjectIncludeWeekends
+  getCurrentProjectIncludeWeekends,
+  triggerNewProject = false, // Nueva prop para abrir modal externamente
+  onNewProjectTriggered // Callback para notificar que se procesó el trigger
 }) => {
   const [showFileManager, setShowFileManager] = useState(false);
   const [selectedProjectForFiles, setSelectedProjectForFiles] = useState(null);
   const [showProjectModal, setShowProjectModal] = useState(false);
-  const [editingProject, setEditingProject] = useState(null);
+  const [editingProject, setEditingProjectInternal] = useState(null);
   const [errors, setErrors] = useState({});
-  
+  const [organizationId, setOrganizationId] = useState(null);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [subscriptionLimit, setSubscriptionLimit] = useState(null);
+
+  // Wrapper para setEditingProject que siempre usa patrón callback
+  // Esto previene el bug de campos que se borran al editar
+  const setEditingProject = (updater) => {
+    if (typeof updater === 'function') {
+      // Ya es una función, usar directamente
+      setEditingProjectInternal(updater);
+    } else {
+      // Es un objeto, convertir a función callback que preserve estado anterior
+      setEditingProjectInternal(prev => {
+        // Si es null (resetear), usar directamente
+        if (updater === null) return null;
+        // Si no hay estado previo, usar el nuevo objeto
+        if (!prev) return updater;
+        // Merge: preservar prev y sobrescribir con updater
+        return { ...prev, ...updater };
+      });
+    }
+  };
+
   // Hook de permisos
   const { permissions, isReadOnly, isLoading: permissionsLoading } = usePermissions();
-  
+
+  // Función para ordenar proyectos: primero números (ascendente), luego letras (A-Z)
+  const sortProjects = (projectList) => {
+    return [...projectList].sort((a, b) => {
+      const nameA = a.name.trim();
+      const nameB = b.name.trim();
+
+      const startsWithNumberA = /^\d/.test(nameA);
+      const startsWithNumberB = /^\d/.test(nameB);
+
+      // Si ambos inician con número, ordenar numéricamente
+      if (startsWithNumberA && startsWithNumberB) {
+        const numA = parseInt(nameA.match(/^\d+/)[0]);
+        const numB = parseInt(nameB.match(/^\d+/)[0]);
+        if (numA !== numB) return numA - numB;
+        // Si los números son iguales, ordenar alfabéticamente el resto
+        return nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
+      }
+
+      // Si solo A inicia con número, A va primero
+      if (startsWithNumberA) return -1;
+
+      // Si solo B inicia con número, B va primero
+      if (startsWithNumberB) return 1;
+
+      // Si ambos inician con letra, ordenar alfabéticamente (A-Z)
+      return nameA.localeCompare(nameB, 'es', { sensitivity: 'base' });
+    });
+  };
+
   const getPriorityColor = (priority) => {
     switch(priority) {
       case 'high': return 'bg-red-100 text-red-800 border-red-200';
@@ -195,44 +264,87 @@ const PortfolioDashboard = ({
     setShowProjectModal(true);
   };
 
+  // useEffect para manejar trigger externo de nuevo proyecto
+  React.useEffect(() => {
+    if (triggerNewProject) {
+      handleNewProject();
+      // Notificar al padre que se procesó el trigger
+      if (onNewProjectTriggered) {
+        onNewProjectTriggered();
+      }
+    }
+  }, [triggerNewProject, onNewProjectTriggered]);
+
+  // useEffect para obtener organizationId desde SupabaseService
+  useEffect(() => {
+    const fetchOrganizationId = () => {
+      try {
+        // Obtener desde SupabaseService (fuente principal)
+        const orgId = supabaseService.getCurrentOrganization();
+
+        if (orgId) {
+          setOrganizationId(orgId);
+          console.log('✅ PortfolioDashboard - Organization ID cargado:', orgId);
+        } else {
+          console.warn('⚠️ PortfolioDashboard - No se encontró organization ID');
+        }
+      } catch (error) {
+        console.error('❌ Error obteniendo organizationId:', error);
+      }
+    };
+
+    // Intentar obtener inmediatamente
+    fetchOrganizationId();
+
+    // Si no se encuentra, reintentar después de 1 segundo
+    const timer = setTimeout(() => {
+      if (!organizationId) {
+        console.log('🔄 PortfolioDashboard - Reintentando obtener organization ID...');
+        fetchOrganizationId();
+      }
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
   // Función para guardar proyecto
-  const handleSaveProject = () => {
+  const handleSaveProject = async () => {
     // Limpiar errores previos
     setErrors({});
-    
+
     // Validar todos los campos obligatorios
     const newErrors = {};
-    
+
     if (!editingProject.name || editingProject.name.trim().length < 3) {
       newErrors.name = 'El nombre debe tener al menos 3 caracteres';
     }
-    
+
     if (!editingProject.manager || editingProject.manager.trim().length < 2) {
       newErrors.manager = 'El manager debe tener al menos 2 caracteres';
     }
-    
+
     if (!editingProject.sponsor || editingProject.sponsor.trim().length < 2) {
       newErrors.sponsor = 'El sponsor debe tener al menos 2 caracteres';
     }
-    
+
     if (!editingProject.startDate) {
       newErrors.startDate = 'La fecha de inicio es requerida';
     }
-    
+
     if (!editingProject.endDate) {
       newErrors.endDate = 'La fecha de fin es requerida';
     } else if (editingProject.startDate && editingProject.endDate <= editingProject.startDate) {
       newErrors.endDate = 'La fecha de fin debe ser posterior a la fecha de inicio';
     }
-    
+
     if (!editingProject.budget || editingProject.budget <= 0) {
       newErrors.budget = 'El presupuesto debe ser mayor a 0';
     }
-    
+
     if (editingProject.irr && (editingProject.irr < 0 || editingProject.irr > 100)) {
       newErrors.irr = 'La TIR debe estar entre 0% y 100%';
     }
-    
+
     // Si hay errores, mostrarlos y no guardar
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -240,7 +352,30 @@ const PortfolioDashboard = ({
       alert(`❌ No se puede guardar el proyecto. Hay ${Object.keys(newErrors).length} errores de validación.`);
       return;
     }
-    
+
+    // Validar límites de suscripción si es un proyecto nuevo
+    if (!editingProject.id && organizationId) {
+      console.log('🔍 Validando límites de suscripción para organizationId:', organizationId);
+      try {
+        const canCreate = await subscriptionService.canCreateProject(organizationId);
+        console.log('📊 Resultado de validación:', canCreate);
+
+        if (!canCreate.allowed) {
+          console.warn('⛔ Límite alcanzado - Mostrando modal de upgrade');
+          // Guardar información del límite para mostrar en el modal
+          setSubscriptionLimit(canCreate);
+          setShowUpgradeModal(true);
+          return;
+        }
+        console.log('✅ Validación pasada - Puede crear proyecto');
+      } catch (error) {
+        console.error('❌ Error verificando límites de suscripción:', error);
+        // Continuar con la creación en caso de error (fail-safe)
+      }
+    } else {
+      console.warn('⚠️ No se validó suscripción - editingProject.id:', editingProject.id, 'organizationId:', organizationId);
+    }
+
     // Si no hay errores, proceder a guardar
     try {
       if (editingProject.id) {
@@ -252,7 +387,7 @@ const PortfolioDashboard = ({
         createProject(editingProject);
         alert('✅ Proyecto creado exitosamente');
       }
-      
+
       setShowProjectModal(false);
       setEditingProject(null);
       setErrors({});
@@ -411,7 +546,7 @@ const PortfolioDashboard = ({
           </div>
         ) : (
           <div className="space-y-3">
-            {projects.map((project) => (
+            {sortProjects(projects).map((project) => (
               <div
                 key={project.id}
                 className={`border rounded-lg p-4 transition-all duration-200 cursor-pointer hover:shadow-md ${
@@ -614,43 +749,10 @@ const PortfolioDashboard = ({
                   <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del Proyecto *</label>
                   <input
                     type="text"
-                    className={`w-full border rounded px-3 py-2 ${errors.name ? 'border-red-500' : 'border-gray-300'}`}
+                    className={`w-full border rounded px-3 py-2 ${errors.name ? 'border-red-500' : 'border-red-300'}`}
                     value={editingProject?.name || ''}
                     onChange={(e) => {
-                      setEditingProject({
-                      id: editingProject.id,
-                      name: editingProject.name,
-                      manager: editingProject.manager,
-                      sponsor: editingProject.sponsor,
-                      priority: editingProject.priority,
-                      status: editingProject.status,
-                      startDate: editingProject.startDate,
-                      endDate: editingProject.endDate,
-                      budget: editingProject.budget,
-                      irr: editingProject.irr,
-                      description: editingProject.description,
-                      objectives: editingProject.objectives,
-                      scope: editingProject.scope,
-                      deliverables: editingProject.deliverables,
-                      assumptions: editingProject.assumptions,
-                      constraints: editingProject.constraints,
-                      dependencies: editingProject.dependencies,
-                      risks: editingProject.risks,
-                      stakeholders: editingProject.stakeholders,
-                      team: editingProject.team,
-                      resources: editingProject.resources,
-                      timeline: editingProject.timeline,
-                      milestones: editingProject.milestones,
-                      successCriteria: editingProject.successCriteria,
-                      qualityStandards: editingProject.qualityStandards,
-                      communicationPlan: editingProject.communicationPlan,
-                      riskManagement: editingProject.riskManagement,
-                      changeManagement: editingProject.changeManagement,
-                      lessonsLearned: editingProject.lessonsLearned,
-                      createdAt: editingProject.createdAt,
-                      updatedAt: editingProject.updatedAt,
-                      version: editingProject.version,
-                      progress: editingProject.progress, name: e.target.value});
+                      updateProjectField('name', e.target.value);
                       validateField('name', e.target.value);
                     }}
                     onBlur={(e) => validateField('name', e.target.value)}
@@ -666,40 +768,7 @@ const PortfolioDashboard = ({
                     className={`w-full border rounded px-3 py-2 ${errors.manager ? 'border-red-500' : 'border-gray-300'}`}
                     value={editingProject?.manager || ''}
                     onChange={(e) => {
-                      setEditingProject({
-                      id: editingProject.id,
-                      name: editingProject.name,
-                      manager: editingProject.manager,
-                      sponsor: editingProject.sponsor,
-                      priority: editingProject.priority,
-                      status: editingProject.status,
-                      startDate: editingProject.startDate,
-                      endDate: editingProject.endDate,
-                      budget: editingProject.budget,
-                      irr: editingProject.irr,
-                      description: editingProject.description,
-                      objectives: editingProject.objectives,
-                      scope: editingProject.scope,
-                      deliverables: editingProject.deliverables,
-                      assumptions: editingProject.assumptions,
-                      constraints: editingProject.constraints,
-                      dependencies: editingProject.dependencies,
-                      risks: editingProject.risks,
-                      stakeholders: editingProject.stakeholders,
-                      team: editingProject.team,
-                      resources: editingProject.resources,
-                      timeline: editingProject.timeline,
-                      milestones: editingProject.milestones,
-                      successCriteria: editingProject.successCriteria,
-                      qualityStandards: editingProject.qualityStandards,
-                      communicationPlan: editingProject.communicationPlan,
-                      riskManagement: editingProject.riskManagement,
-                      changeManagement: editingProject.changeManagement,
-                      lessonsLearned: editingProject.lessonsLearned,
-                      createdAt: editingProject.createdAt,
-                      updatedAt: editingProject.updatedAt,
-                      version: editingProject.version,
-                      progress: editingProject.progress, manager: e.target.value});
+                      updateProjectField('manager', e.target.value);
                       validateField('manager', e.target.value);
                     }}
                     onBlur={(e) => validateField('manager', e.target.value)}
@@ -729,40 +798,7 @@ const PortfolioDashboard = ({
                   <select
                     className="w-full border rounded px-3 py-2"
                     value={editingProject?.priority || 'medium'}
-                    onChange={(e) => setEditingProject({
-                      id: editingProject.id,
-                      name: editingProject.name,
-                      manager: editingProject.manager,
-                      sponsor: editingProject.sponsor,
-                      priority: editingProject.priority,
-                      status: editingProject.status,
-                      startDate: editingProject.startDate,
-                      endDate: editingProject.endDate,
-                      budget: editingProject.budget,
-                      irr: editingProject.irr,
-                      description: editingProject.description,
-                      objectives: editingProject.objectives,
-                      scope: editingProject.scope,
-                      deliverables: editingProject.deliverables,
-                      assumptions: editingProject.assumptions,
-                      constraints: editingProject.constraints,
-                      dependencies: editingProject.dependencies,
-                      risks: editingProject.risks,
-                      stakeholders: editingProject.stakeholders,
-                      team: editingProject.team,
-                      resources: editingProject.resources,
-                      timeline: editingProject.timeline,
-                      milestones: editingProject.milestones,
-                      successCriteria: editingProject.successCriteria,
-                      qualityStandards: editingProject.qualityStandards,
-                      communicationPlan: editingProject.communicationPlan,
-                      riskManagement: editingProject.riskManagement,
-                      changeManagement: editingProject.changeManagement,
-                      lessonsLearned: editingProject.lessonsLearned,
-                      createdAt: editingProject.createdAt,
-                      updatedAt: editingProject.updatedAt,
-                      version: editingProject.version,
-                      progress: editingProject.progress, priority: e.target.value})}
+                    onChange={(e) => updateProjectField('priority', e.target.value)}
                   >
                     <option value="low">Baja</option>
                     <option value="medium">Media</option>
@@ -775,46 +811,13 @@ const PortfolioDashboard = ({
                   <select
                     className="w-full border rounded px-3 py-2"
                     value={editingProject?.status || 'inactive'}
-                    onChange={(e) => setEditingProject({
-                      id: editingProject.id,
-                      name: editingProject.name,
-                      manager: editingProject.manager,
-                      sponsor: editingProject.sponsor,
-                      priority: editingProject.priority,
-                      status: editingProject.status,
-                      startDate: editingProject.startDate,
-                      endDate: editingProject.endDate,
-                      budget: editingProject.budget,
-                      irr: editingProject.irr,
-                      description: editingProject.description,
-                      objectives: editingProject.objectives,
-                      scope: editingProject.scope,
-                      deliverables: editingProject.deliverables,
-                      assumptions: editingProject.assumptions,
-                      constraints: editingProject.constraints,
-                      dependencies: editingProject.dependencies,
-                      risks: editingProject.risks,
-                      stakeholders: editingProject.stakeholders,
-                      team: editingProject.team,
-                      resources: editingProject.resources,
-                      timeline: editingProject.timeline,
-                      milestones: editingProject.milestones,
-                      successCriteria: editingProject.successCriteria,
-                      qualityStandards: editingProject.qualityStandards,
-                      communicationPlan: editingProject.communicationPlan,
-                      riskManagement: editingProject.riskManagement,
-                      changeManagement: editingProject.changeManagement,
-                      lessonsLearned: editingProject.lessonsLearned,
-                      createdAt: editingProject.createdAt,
-                      updatedAt: editingProject.updatedAt,
-                      version: editingProject.version,
-                      progress: editingProject.progress, status: e.target.value})}
+                    onChange={(e) => updateProjectField('status', e.target.value)}
                   >
                     <option value="inactive">⚫ Inactivo</option>
                     <option value="active">🟢 Activo</option>
                   </select>
                   <p className="text-xs text-gray-500 mt-1">
-                    <strong>Por defecto:</strong> Los proyectos nuevos y duplicados aparecen como "Inactivos" 
+                    <strong>Por defecto:</strong> Los proyectos nuevos y duplicados aparecen como "Inactivos"
                     para revisión. Solo los proyectos "Activos" suman al dashboard consolidado y aparecen en Gestión de Proyectos.
                   </p>
                 </div>
@@ -826,40 +829,7 @@ const PortfolioDashboard = ({
                     className={`w-full border rounded px-3 py-2 ${errors.startDate ? 'border-red-500' : 'border-gray-300'}`}
                     value={editingProject?.startDate || ''}
                     onChange={(e) => {
-                      setEditingProject({
-                      id: editingProject.id,
-                      name: editingProject.name,
-                      manager: editingProject.manager,
-                      sponsor: editingProject.sponsor,
-                      priority: editingProject.priority,
-                      status: editingProject.status,
-                      startDate: editingProject.startDate,
-                      endDate: editingProject.endDate,
-                      budget: editingProject.budget,
-                      irr: editingProject.irr,
-                      description: editingProject.description,
-                      objectives: editingProject.objectives,
-                      scope: editingProject.scope,
-                      deliverables: editingProject.deliverables,
-                      assumptions: editingProject.assumptions,
-                      constraints: editingProject.constraints,
-                      dependencies: editingProject.dependencies,
-                      risks: editingProject.risks,
-                      stakeholders: editingProject.stakeholders,
-                      team: editingProject.team,
-                      resources: editingProject.resources,
-                      timeline: editingProject.timeline,
-                      milestones: editingProject.milestones,
-                      successCriteria: editingProject.successCriteria,
-                      qualityStandards: editingProject.qualityStandards,
-                      communicationPlan: editingProject.communicationPlan,
-                      riskManagement: editingProject.riskManagement,
-                      changeManagement: editingProject.changeManagement,
-                      lessonsLearned: editingProject.lessonsLearned,
-                      createdAt: editingProject.createdAt,
-                      updatedAt: editingProject.updatedAt,
-                      version: editingProject.version,
-                      progress: editingProject.progress, startDate: e.target.value});
+                      updateProjectField('startDate', e.target.value);
                       validateField('startDate', e.target.value);
                       // Revalidar fecha fin si ya existe
                       if (editingProject?.endDate) {
@@ -878,40 +848,7 @@ const PortfolioDashboard = ({
                     className={`w-full border rounded px-3 py-2 ${errors.endDate ? 'border-red-500' : 'border-gray-300'}`}
                     value={editingProject?.endDate || ''}
                     onChange={(e) => {
-                      setEditingProject({
-                      id: editingProject.id,
-                      name: editingProject.name,
-                      manager: editingProject.manager,
-                      sponsor: editingProject.sponsor,
-                      priority: editingProject.priority,
-                      status: editingProject.status,
-                      startDate: editingProject.startDate,
-                      endDate: editingProject.endDate,
-                      budget: editingProject.budget,
-                      irr: editingProject.irr,
-                      description: editingProject.description,
-                      objectives: editingProject.objectives,
-                      scope: editingProject.scope,
-                      deliverables: editingProject.deliverables,
-                      assumptions: editingProject.assumptions,
-                      constraints: editingProject.constraints,
-                      dependencies: editingProject.dependencies,
-                      risks: editingProject.risks,
-                      stakeholders: editingProject.stakeholders,
-                      team: editingProject.team,
-                      resources: editingProject.resources,
-                      timeline: editingProject.timeline,
-                      milestones: editingProject.milestones,
-                      successCriteria: editingProject.successCriteria,
-                      qualityStandards: editingProject.qualityStandards,
-                      communicationPlan: editingProject.communicationPlan,
-                      riskManagement: editingProject.riskManagement,
-                      changeManagement: editingProject.changeManagement,
-                      lessonsLearned: editingProject.lessonsLearned,
-                      createdAt: editingProject.createdAt,
-                      updatedAt: editingProject.updatedAt,
-                      version: editingProject.version,
-                      progress: editingProject.progress, endDate: e.target.value});
+                      updateProjectField('endDate', e.target.value);
                       validateField('endDate', e.target.value);
                     }}
                     onBlur={(e) => validateField('endDate', e.target.value)}
@@ -931,40 +868,7 @@ const PortfolioDashboard = ({
                       // Solo permitir números y vacío
                       if (inputValue === '' || /^\d+$/.test(inputValue)) {
                         const numValue = inputValue === '' ? '' : Number(inputValue);
-                        setEditingProject({
-                      id: editingProject.id,
-                      name: editingProject.name,
-                      manager: editingProject.manager,
-                      sponsor: editingProject.sponsor,
-                      priority: editingProject.priority,
-                      status: editingProject.status,
-                      startDate: editingProject.startDate,
-                      endDate: editingProject.endDate,
-                      budget: editingProject.budget,
-                      irr: editingProject.irr,
-                      description: editingProject.description,
-                      objectives: editingProject.objectives,
-                      scope: editingProject.scope,
-                      deliverables: editingProject.deliverables,
-                      assumptions: editingProject.assumptions,
-                      constraints: editingProject.constraints,
-                      dependencies: editingProject.dependencies,
-                      risks: editingProject.risks,
-                      stakeholders: editingProject.stakeholders,
-                      team: editingProject.team,
-                      resources: editingProject.resources,
-                      timeline: editingProject.timeline,
-                      milestones: editingProject.milestones,
-                      successCriteria: editingProject.successCriteria,
-                      qualityStandards: editingProject.qualityStandards,
-                      communicationPlan: editingProject.communicationPlan,
-                      riskManagement: editingProject.riskManagement,
-                      changeManagement: editingProject.changeManagement,
-                      lessonsLearned: editingProject.lessonsLearned,
-                      createdAt: editingProject.createdAt,
-                      updatedAt: editingProject.updatedAt,
-                      version: editingProject.version,
-                      progress: editingProject.progress, budget: numValue});
+                        updateProjectField('budget', numValue);
                         validateField('budget', numValue);
                       }
                     }}
@@ -1090,40 +994,7 @@ const PortfolioDashboard = ({
                     className="w-full border rounded px-3 py-2"
                     rows="3"
                     value={editingProject?.description || ''}
-                    onChange={(e) => setEditingProject({
-                      id: editingProject.id,
-                      name: editingProject.name,
-                      manager: editingProject.manager,
-                      sponsor: editingProject.sponsor,
-                      priority: editingProject.priority,
-                      status: editingProject.status,
-                      startDate: editingProject.startDate,
-                      endDate: editingProject.endDate,
-                      budget: editingProject.budget,
-                      irr: editingProject.irr,
-                      description: editingProject.description,
-                      objectives: editingProject.objectives,
-                      scope: editingProject.scope,
-                      deliverables: editingProject.deliverables,
-                      assumptions: editingProject.assumptions,
-                      constraints: editingProject.constraints,
-                      dependencies: editingProject.dependencies,
-                      risks: editingProject.risks,
-                      stakeholders: editingProject.stakeholders,
-                      team: editingProject.team,
-                      resources: editingProject.resources,
-                      timeline: editingProject.timeline,
-                      milestones: editingProject.milestones,
-                      successCriteria: editingProject.successCriteria,
-                      qualityStandards: editingProject.qualityStandards,
-                      communicationPlan: editingProject.communicationPlan,
-                      riskManagement: editingProject.riskManagement,
-                      changeManagement: editingProject.changeManagement,
-                      lessonsLearned: editingProject.lessonsLearned,
-                      createdAt: editingProject.createdAt,
-                      updatedAt: editingProject.updatedAt,
-                      version: editingProject.version,
-                      progress: editingProject.progress, description: e.target.value})}
+                    onChange={(e) => updateProjectField('description', e.target.value)}
                     placeholder="Descripción detallada del proyecto"
                   />
                 </div>
@@ -1171,6 +1042,64 @@ const PortfolioDashboard = ({
                   }`}
                 >
                   Guardar Proyecto {Object.keys(errors).length > 0 && `(${Object.keys(errors).length} errores)`}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Upgrade cuando se alcanza el límite */}
+      {showUpgradeModal && subscriptionLimit && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-[10000] flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+            <div className="p-6">
+              <div className="flex items-center justify-center mb-4">
+                <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center">
+                  <span className="text-4xl">⚠️</span>
+                </div>
+              </div>
+
+              <h2 className="text-xl font-bold text-center mb-2">Límite Alcanzado</h2>
+              <p className="text-gray-600 text-center mb-4">{subscriptionLimit.message}</p>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm font-medium text-gray-700">Proyectos actuales:</span>
+                  <span className="text-sm font-bold text-blue-600">
+                    {subscriptionLimit.currentCount} / {subscriptionLimit.maxCount}
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-blue-600 h-2 rounded-full"
+                    style={{ width: `${(subscriptionLimit.currentCount / subscriptionLimit.maxCount) * 100}%` }}
+                  ></div>
+                </div>
+              </div>
+
+              <p className="text-sm text-gray-600 text-center mb-6">{subscriptionLimit.suggestion}</p>
+
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => {
+                    setShowUpgradeModal(false);
+                    setSubscriptionLimit(null);
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => {
+                    // TODO: Redirigir a página de planes/upgrade
+                    alert('🚀 Función de upgrade en desarrollo. Aquí se redigiría a la página de planes.');
+                    setShowUpgradeModal(false);
+                    setSubscriptionLimit(null);
+                  }}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  Ver Planes
                 </button>
               </div>
             </div>

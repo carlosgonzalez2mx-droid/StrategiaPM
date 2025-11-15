@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import useAuditLog from '../hooks/useAuditLog';
 import useChangeIntegration from '../hooks/useChangeIntegration';
 import useChangeManagement from '../hooks/useChangeManagement';
+import subscriptionService from '../services/SubscriptionService';
 import { getRequiredApprover } from '../utils/changeAuthority';
 import { getFunctionalRoleLabel } from '../constants/unifiedRoles';
 import CCBPanel from './change-management/CCBPanel';
@@ -32,7 +33,8 @@ const ChangeManagement = ({
   const [showCCBPanel, setShowCCBPanel] = useState(false);
   const [showImpactAnalysis, setShowImpactAnalysis] = useState(false);
   const [showAlternatives, setShowAlternatives] = useState(false);
-  
+  const [isReadOnlyMode, setIsReadOnlyMode] = useState(false);
+
   const { addAuditEvent } = useAuditLog(currentProjectId);
   const { applyChangeToProject } = useChangeIntegration(currentProjectId, onUpdateProject);
 
@@ -56,10 +58,26 @@ const ChangeManagement = ({
   } = useChangeManagement(currentProjectId);
 
   // Obtener proyecto actual
-  const currentProject = useMemo(() => 
+  const currentProject = useMemo(() =>
     projects?.find(p => p.id === currentProjectId),
     [projects, currentProjectId]
   );
+
+  // Verificar modo read-only al cargar
+  useEffect(() => {
+    const checkReadOnlyMode = async () => {
+      if (currentProject?.organizationId) {
+        try {
+          const editPermission = await subscriptionService.canEdit(currentProject.organizationId);
+          setIsReadOnlyMode(!editPermission.allowed);
+        } catch (error) {
+          console.error('[READ-ONLY MODE] Error verificando permisos:', error);
+          setIsReadOnlyMode(false);
+        }
+      }
+    };
+    checkReadOnlyMode();
+  }, [currentProject?.organizationId]);
 
   // Verificar que haya proyecto seleccionado
   useEffect(() => {
@@ -567,13 +585,13 @@ const ChangeManagement = ({
               
               <button
                 onClick={() => setShowChangeForm(true)}
-                disabled={!canCreate()}
+                disabled={!canCreate() || isReadOnlyMode}
                 className={`px-8 py-4 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1 font-semibold border ${
-                  canCreate() 
-                    ? 'bg-white text-purple-700 hover:bg-purple-50 border-purple-200' 
+                  canCreate() && !isReadOnlyMode
+                    ? 'bg-white text-purple-700 hover:bg-purple-50 border-purple-200'
                     : 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
                 }`}
-                title={!canCreate() ? 'No tienes permisos para crear cambios' : ''}
+                title={isReadOnlyMode ? 'No disponible (modo solo lectura)' : !canCreate() ? 'No tienes permisos para crear cambios' : ''}
               >
                 📝 Solicitar Cambio
               </button>

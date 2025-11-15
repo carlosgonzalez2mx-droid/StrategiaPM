@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import useAuditLog from '../hooks/useAuditLog';
 import supabaseService from '../services/SupabaseService';
+import subscriptionService from '../services/SubscriptionService';
 import { FUNCTIONAL_ROLES, FUNCTIONAL_ROLE_LABELS } from '../constants/unifiedRoles';
 import { ROLES, ROLE_LABELS, ROLE_OPTIONS, mapLegacyRole } from '../constants/roles';
 import useOrganizationId from '../hooks/useOrganizationId';
@@ -8,6 +9,7 @@ import useCurrentUserPermissions from '../hooks/useCurrentUserPermissions';
 import useInviteModal from '../hooks/useInviteModal';
 import { debugLog, debugError, debugSuccess } from '../utils/debugLog';
 import InvitationModal from './InvitationModal';
+import UpgradeModal from './subscription/UpgradeModal';
 
 const OrganizationMembers = ({ 
   currentProject, 
@@ -41,6 +43,8 @@ const OrganizationMembers = ({
   const [newRole, setNewRole] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgradeModalData, setUpgradeModalData] = useState({});
 
   // Estados para roles funcionales
   const [editingMemberRole, setEditingMemberRole] = useState(null);
@@ -161,11 +165,34 @@ const OrganizationMembers = ({
   const inviteMember = async (e) => {
     e.preventDefault();
     if (!inviteEmail || !organizationId) return;
-    
+
     // VERIFICAR PERMISOS: Usar hook de permisos
     if (!canInvite) {
       alert('❌ No tienes permisos para invitar miembros. Solo owners y administradores pueden realizar esta acción.');
       return;
+    }
+
+    // VERIFICAR LÍMITES DE SUSCRIPCIÓN
+    try {
+      const canAdd = await subscriptionService.canAddUser(organizationId);
+      if (!canAdd.allowed) {
+        // Obtener estadísticas de uso para el modal
+        const stats = await subscriptionService.getUsageStats(organizationId);
+        const portfolioData = localStorage.getItem('strategiapm_portfolio_data');
+        const portfolio = portfolioData ? JSON.parse(portfolioData) : {};
+
+        setUpgradeModalData({
+          limitType: 'user',
+          currentPlan: portfolio?.organization?.subscriptionPlan || 'free',
+          currentCount: stats.currentUsers,
+          maxCount: stats.maxUsers
+        });
+        setShowUpgradeModal(true);
+        return;
+      }
+    } catch (limitError) {
+      console.error('Error verificando límites:', limitError);
+      // En caso de error, permitir continuar (fail-safe)
     }
 
     try {
@@ -1238,6 +1265,21 @@ Solo así verá que ya no tiene acceso a la organización.`;
         isOpen={showInvitationModal}
         onClose={() => setShowInvitationModal(false)}
         invitation={lastInvitation}
+      />
+
+      {/* Modal de Upgrade */}
+      <UpgradeModal
+        isOpen={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        limitType={upgradeModalData.limitType}
+        currentPlan={upgradeModalData.currentPlan}
+        currentCount={upgradeModalData.currentCount}
+        maxCount={upgradeModalData.maxCount}
+        organizationId={organizationId}
+        onUpgradeSuccess={() => {
+          // Recargar miembros después de actualizar
+          loadOrganizationMembers();
+        }}
       />
     </div>
   );

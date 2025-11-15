@@ -439,25 +439,6 @@ const WeeklyPlanningTab = ({
       doc.text(`Período: ${formatDate(dateRange.start)} - ${formatDate(dateRange.end)}`, pageWidth / 2, yPosition, { align: 'center' });
       yPosition += 20;
 
-      // Resumen semana pasada
-      if (previousWeekData) {
-        doc.setFontSize(14);
-        doc.setFont(undefined, 'bold');
-        doc.text('Resumen Semana Pasada', 20, yPosition);
-        yPosition += 10;
-
-        doc.setFontSize(10);
-        doc.setFont(undefined, 'normal');
-        doc.text(`Tareas Completadas: ${previousWeekData.completedTasks}`, 20, yPosition);
-        yPosition += 5;
-        doc.text(`Tareas Pendientes: ${previousWeekData.pendingTasks}`, 20, yPosition);
-        yPosition += 5;
-        doc.text(`Tareas Vencidas: ${previousWeekData.overdueTasks}`, 20, yPosition);
-        yPosition += 5;
-        doc.text(`Cumplimiento: ${getCompletionPercentage()}%`, 20, yPosition);
-        yPosition += 15;
-      }
-
       // Tareas por proyecto
       doc.setFontSize(14);
       doc.setFont(undefined, 'bold');
@@ -517,13 +498,18 @@ const WeeklyPlanningTab = ({
               doc.addPage();
               yPosition = 20;
             }
-            
+
+            // Dibujar checkbox
+            doc.setDrawColor(220, 38, 38); // Color rojo para tareas vencidas
+            doc.setLineWidth(0.3);
+            doc.rect(30, yPosition - 3, 3, 3); // Recuadro de 3x3mm
+
             doc.setFontSize(9);
             doc.setFont(undefined, 'normal');
             doc.setTextColor(0, 0, 0);
-            doc.text(`• ${task.name} (${task.type})`, 30, yPosition);
+            doc.text(`${task.name} (${task.type})`, 35, yPosition);
             yPosition += 4;
-            doc.text(`  Vence: ${formatDate(task.endDate)}`, 30, yPosition);
+            doc.text(`  Vence: ${formatDate(task.endDate)}`, 35, yPosition);
             yPosition += 4;
           });
           yPosition += 5;
@@ -543,16 +529,21 @@ const WeeklyPlanningTab = ({
               doc.addPage();
               yPosition = 20;
             }
-            
+
+            // Dibujar checkbox
+            doc.setDrawColor(59, 130, 246); // Color azul para tareas de la semana
+            doc.setLineWidth(0.3);
+            doc.rect(30, yPosition - 3, 3, 3); // Recuadro de 3x3mm
+
             doc.setFontSize(9);
             doc.setFont(undefined, 'normal');
             doc.setTextColor(0, 0, 0);
-            doc.text(`• ${task.name} (${task.type})`, 30, yPosition);
+            doc.text(`${task.name} (${task.type})`, 35, yPosition);
             yPosition += 4;
-            doc.text(`  Vence: ${formatDate(task.endDate)}`, 30, yPosition);
+            doc.text(`  Vence: ${formatDate(task.endDate)}`, 35, yPosition);
             if (task.description) {
               yPosition += 4;
-              doc.text(`  Responsable: ${task.description}`, 30, yPosition);
+              doc.text(`  Responsable: ${task.description}`, 35, yPosition);
             }
             yPosition += 4;
           });
@@ -629,76 +620,6 @@ const WeeklyPlanningTab = ({
           <span className="text-red-800">{error}</span>
         </div>
       )} */}
-
-      {/* Resumen de Cumplimiento Semana Pasada */}
-      {previousWeekData && !isLoading && (
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-            <TrendingUp className="mr-2 h-5 w-5 text-green-600" />
-            Cumplimiento Semana Pasada ({formatDate(previousWeekRange.start)} - {formatDate(previousWeekRange.end)})
-          </h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-green-50 p-4 rounded-lg">
-              <div className="flex items-center">
-                <CheckCircle className="h-8 w-8 text-green-600 mr-3" />
-                <div>
-                  <p className="text-sm font-medium text-green-800">Completadas</p>
-                  <p className="text-2xl font-bold text-green-900">{previousWeekData.completedTasks}</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-orange-50 p-4 rounded-lg">
-              <div className="flex items-center">
-                <Clock className="h-8 w-8 text-orange-600 mr-3" />
-                <div>
-                  <p className="text-sm font-medium text-orange-800">Pendientes</p>
-                  <p className="text-2xl font-bold text-orange-900">{previousWeekData.pendingTasks}</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-red-50 p-4 rounded-lg">
-              <div className="flex items-center">
-                <AlertCircle className="h-8 w-8 text-red-600 mr-3" />
-                <div>
-                  <p className="text-sm font-medium text-red-800">Vencidas</p>
-                  <p className="text-2xl font-bold text-red-900">{previousWeekData.overdueTasks}</p>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <div className="flex items-center">
-                <TrendingUp className="h-8 w-8 text-blue-600 mr-3" />
-                <div>
-                  <p className="text-sm font-medium text-blue-800">Cumplimiento</p>
-                  <p className="text-2xl font-bold text-blue-900">{getCompletionPercentage()}%</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Detalle por proyecto */}
-          <div className="space-y-3">
-            <h4 className="font-medium text-gray-900">Detalle por Proyecto:</h4>
-            {Object.values(previousWeekData.byProject).map((project, index) => (
-              <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <span className="font-medium text-gray-900">{project.projectName}</span>
-                <div className="flex items-center space-x-4">
-                  <span className="text-sm text-green-600">✓ {project.completed}</span>
-                  <span className="text-sm text-orange-600">⏱ {project.pending}</span>
-                  <span className="text-sm text-red-600">⚠ {project.overdue}</span>
-                  <span className="text-sm font-medium text-gray-700">
-                    {project.total > 0 ? Math.round((project.completed / project.total) * 100) : 0}%
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Lista de Tareas por Proyecto */}
       <div className="space-y-6">

@@ -8,10 +8,12 @@
  * - Archivo: Proyectos archivados
  * - Planeación Semanal: Planificación semanal
  *
- * Creación de proyectos:
- * - El botón "Crear Primer Proyecto" (cuando no hay proyectos) cambia al tab
- *   "Lista de Proyectos" y abre el modal de PortfolioDashboard.
- * - Todas las operaciones de creación/edición usan el modal de PortfolioDashboard.
+ * Contiene su propio modal de creación/edición de proyectos que se abre desde:
+ * - Botón "Crear Primer Proyecto" (cuando no hay proyectos)
+ * - Botón "Nuevo Proyecto" en el tab Overview
+ *
+ * NOTA: El tab "Lista de Proyectos" renderiza el componente PortfolioDashboard
+ * que tiene su propio modal independiente.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -23,6 +25,16 @@ import NotificationBadge from './notifications/NotificationBadge';
 import UsageIndicator from './subscription/UsageIndicator';
 import { calculatePlannedValueFromIRR } from '../utils/businessValueCalculator';
 
+// Componente helper para mostrar errores
+const ErrorMessage = ({ error }) => {
+  if (!error) return null;
+  return (
+    <div className="text-red-600 text-xs mt-1 flex items-center">
+      <span className="mr-1">⚠️</span>
+      {error}
+    </div>
+  );
+};
 
 const PortfolioStrategic = ({ 
   projects, 
@@ -92,6 +104,12 @@ const PortfolioStrategic = ({
     }
   }, []);
 
+  // Debug: mostrar errores en consola cuando cambien
+  React.useEffect(() => {
+    if (Object.keys(errors).length > 0) {
+      console.log('❌ Errores de validación:', errors);
+    }
+  }, [errors]);
 
   // 🚀 NUEVO: Escuchar eventos de actualización de tareas de minutas
   useEffect(() => {
@@ -550,7 +568,7 @@ const PortfolioStrategic = ({
               updateProject={updateProject}
               deleteProject={deleteProject}
               duplicateProject={handleDuplicateProject}
-              archiveProject={handleArchiveProject}
+              archiveProject={archiveProject}
               includeWeekendsByProject={includeWeekendsByProject}
               setIncludeWeekendsByProject={setIncludeWeekendsByProject}
               getCurrentProjectIncludeWeekends={getCurrentProjectIncludeWeekends}
@@ -860,6 +878,427 @@ const PortfolioStrategic = ({
           )}
         </div>
       </div>
+
+      {/* Modal para Crear/Editar Proyecto */}
+      {console.log('🎭 Renderizando modal - showNewProjectModal:', showNewProjectModal)}
+              {showNewProjectModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-[9999] flex items-center justify-center p-4">
+            {console.log('🎭 Modal renderizado - editingProject:', editingProject)}
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-bold">
+                  {editingProject?.id ? 'Editar Proyecto' : 'Nuevo Proyecto'}
+                </h2>
+                <button
+                  onClick={() => {
+                    setShowNewProjectModal(false);
+                    setEditingProject(null);
+                  }}
+                  className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del Proyecto *</label>
+                  <input
+                    type="text"
+                    className={`w-full border rounded px-3 py-2 ${errors.name ? 'border-red-500' : 'border-gray-300'}`}
+                    value={editingProject?.name || ''}
+                    onChange={(e) => {
+                      setEditingProject({
+                      id: editingProject.id,
+                      name: editingProject.name,
+                      description: editingProject.description,
+                      startDate: editingProject.startDate,
+                      endDate: editingProject.endDate,
+                      budget: editingProject.budget,
+                      status: editingProject.status,
+                      priority: editingProject.priority,
+                      manager: editingProject.manager,
+                      team: editingProject.team,
+                      createdAt: editingProject.createdAt,
+                      updatedAt: editingProject.updatedAt,
+                      version: editingProject.version,
+                      progress: editingProject.progress, name: e.target.value});
+                      validateField('name', e.target.value);
+                    }}
+                    onBlur={(e) => validateField('name', e.target.value)}
+                    placeholder="Nombre del proyecto"
+                  />
+                  <ErrorMessage error={errors.name} />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Manager *</label>
+                  <input
+                    type="text"
+                    className={`w-full border rounded px-3 py-2 ${errors.manager ? 'border-red-500' : 'border-gray-300'}`}
+                    value={editingProject?.manager || ''}
+                    onChange={(e) => {
+                      setEditingProject({
+                      id: editingProject.id,
+                      name: editingProject.name,
+                      description: editingProject.description,
+                      startDate: editingProject.startDate,
+                      endDate: editingProject.endDate,
+                      budget: editingProject.budget,
+                      status: editingProject.status,
+                      priority: editingProject.priority,
+                      manager: editingProject.manager,
+                      team: editingProject.team,
+                      createdAt: editingProject.createdAt,
+                      updatedAt: editingProject.updatedAt,
+                      version: editingProject.version,
+                      progress: editingProject.progress, manager: e.target.value});
+                      validateField('manager', e.target.value);
+                    }}
+                    onBlur={(e) => validateField('manager', e.target.value)}
+                    placeholder="Gerente del proyecto"
+                  />
+                  <ErrorMessage error={errors.manager} />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Sponsor *</label>
+                  <input
+                    type="text"
+                    className={`w-full border rounded px-3 py-2 ${errors.sponsor ? 'border-red-500' : 'border-gray-300'}`}
+                    value={editingProject?.sponsor || ''}
+                    onChange={(e) => {
+                      setEditingProject({
+                      id: editingProject.id,
+                      name: editingProject.name,
+                      description: editingProject.description,
+                      startDate: editingProject.startDate,
+                      endDate: editingProject.endDate,
+                      budget: editingProject.budget,
+                      status: editingProject.status,
+                      priority: editingProject.priority,
+                      manager: editingProject.manager,
+                      team: editingProject.team,
+                      createdAt: editingProject.createdAt,
+                      updatedAt: editingProject.updatedAt,
+                      version: editingProject.version,
+                      progress: editingProject.progress, sponsor: e.target.value});
+                      validateField('sponsor', e.target.value);
+                    }}
+                    onBlur={(e) => validateField('sponsor', e.target.value)}
+                    placeholder="Patrocinador del proyecto"
+                  />
+                  <ErrorMessage error={errors.sponsor} />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Prioridad</label>
+                  <select
+                    className="w-full border rounded px-3 py-2"
+                    value={editingProject?.priority || 'medium'}
+                    onChange={(e) => updateProjectField('priority', e.target.value)}
+                  >
+                    <option value="low">Baja</option>
+                    <option value="medium">Media</option>
+                    <option value="high">Alta</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Estado del Proyecto *</label>
+                  <select
+                    className="w-full border rounded px-3 py-2"
+                    value={editingProject?.status || 'inactive'}
+                    onChange={(e) => updateProjectField('status', e.target.value)}
+                  >
+                    <option value="inactive">⚫ Inactivo</option>
+                    <option value="active">🟢 Activo</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    <strong>Por defecto:</strong> Los proyectos nuevos y duplicados aparecen como "Inactivos"
+                    para revisión. Solo los proyectos "Activos" suman al dashboard consolidado y aparecen en Gestión de Proyectos.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Inicio *</label>
+                  <input
+                    type="date"
+                    className={`w-full border rounded px-3 py-2 ${errors.startDate ? 'border-red-500' : 'border-gray-300'}`}
+                    value={editingProject?.startDate || ''}
+                    onChange={(e) => {
+                      setEditingProject({
+                      id: editingProject.id,
+                      name: editingProject.name,
+                      description: editingProject.description,
+                      startDate: editingProject.startDate,
+                      endDate: editingProject.endDate,
+                      budget: editingProject.budget,
+                      status: editingProject.status,
+                      priority: editingProject.priority,
+                      manager: editingProject.manager,
+                      team: editingProject.team,
+                      createdAt: editingProject.createdAt,
+                      updatedAt: editingProject.updatedAt,
+                      version: editingProject.version,
+                      progress: editingProject.progress, startDate: e.target.value});
+                      validateField('startDate', e.target.value);
+                      // Revalidar fecha fin si ya existe
+                      if (editingProject?.endDate) {
+                        validateField('endDate', editingProject.endDate);
+                      }
+                    }}
+                    onBlur={(e) => validateField('startDate', e.target.value)}
+                  />
+                  <ErrorMessage error={errors.startDate} />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Fin *</label>
+                  <input
+                    type="date"
+                    className={`w-full border rounded px-3 py-2 ${errors.endDate ? 'border-red-500' : 'border-gray-300'}`}
+                    value={editingProject?.endDate || ''}
+                    onChange={(e) => {
+                      setEditingProject({
+                      id: editingProject.id,
+                      name: editingProject.name,
+                      description: editingProject.description,
+                      startDate: editingProject.startDate,
+                      endDate: editingProject.endDate,
+                      budget: editingProject.budget,
+                      status: editingProject.status,
+                      priority: editingProject.priority,
+                      manager: editingProject.manager,
+                      team: editingProject.team,
+                      createdAt: editingProject.createdAt,
+                      updatedAt: editingProject.updatedAt,
+                      version: editingProject.version,
+                      progress: editingProject.progress, endDate: e.target.value});
+                      validateField('endDate', e.target.value);
+                    }}
+                    onBlur={(e) => validateField('endDate', e.target.value)}
+                  />
+                  <ErrorMessage error={errors.endDate} />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Presupuesto (USD) *</label>
+                  <input
+                    type="number"
+                    className={`w-full border rounded px-3 py-2 ${errors.budget ? 'border-red-500' : 'border-gray-300'}`}
+                    value={editingProject?.budget || ''}
+                    onChange={(e) => {
+                      const inputValue = e.target.value;
+                      // Solo permitir números y vacío
+                      if (inputValue === '' || /^\d+$/.test(inputValue)) {
+                        const numValue = inputValue === '' ? '' : Number(inputValue);
+                        setEditingProject({
+                      id: editingProject.id,
+                      name: editingProject.name,
+                      description: editingProject.description,
+                      startDate: editingProject.startDate,
+                      endDate: editingProject.endDate,
+                      budget: editingProject.budget,
+                      status: editingProject.status,
+                      priority: editingProject.priority,
+                      manager: editingProject.manager,
+                      team: editingProject.team,
+                      createdAt: editingProject.createdAt,
+                      updatedAt: editingProject.updatedAt,
+                      version: editingProject.version,
+                      progress: editingProject.progress, budget: numValue});
+                        validateField('budget', numValue);
+                      }
+                    }}
+                    onBlur={(e) => {
+                      const value = e.target.value === '' ? '' : Number(e.target.value);
+                      validateField('budget', value);
+                    }}
+                    placeholder="Presupuesto en USD (ej: 100000)"
+                    min="0"
+                  />
+                  <ErrorMessage error={errors.budget} />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">TIR (%)</label>
+                  <input
+                    type="number"
+                    className={`w-full border rounded px-3 py-2 ${errors.irr ? 'border-red-500' : 'border-gray-300'}`}
+                    value={editingProject?.irr || ''}
+                    onChange={(e) => {
+                      const inputValue = e.target.value;
+                      // Solo permitir números, punto decimal y vacío
+                      if (inputValue === '' || /^\d*\.?\d*$/.test(inputValue)) {
+                        const numValue = inputValue === '' ? '' : Number(inputValue);
+
+                        // Calcular automáticamente plannedValue con TIR
+                        const newPlannedValue = calculatePlannedValueFromIRR(
+                          editingProject.budget || 0,
+                          numValue || 0,
+                          editingProject.period || 3
+                        );
+
+                        updateProjectField('irr', numValue);
+                        updateProjectField('plannedValue', newPlannedValue);
+                        validateField('irr', numValue);
+                      }
+                    }}
+                    onBlur={(e) => {
+                      const value = e.target.value === '' ? '' : Number(e.target.value);
+                      validateField('irr', value);
+                    }}
+                    placeholder="Tasa Interna de Retorno (ej: 15.5)"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                  />
+                  <ErrorMessage error={errors.irr} />
+                </div>
+
+                {/* Campo: Periodo del Proyecto */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Periodo del Proyecto (años)
+                  </label>
+                  <input
+                    type="number"
+                    className="w-full border rounded px-3 py-2 border-gray-300"
+                    value={editingProject?.period || 3}
+                    onChange={(e) => {
+                      const newPeriod = parseInt(e.target.value) || 3;
+
+                      // Recalcular plannedValue con nuevo periodo
+                      const newPlannedValue = calculatePlannedValueFromIRR(
+                        editingProject.budget || 0,
+                        editingProject.irr || 0,
+                        newPeriod
+                      );
+
+                      setEditingProject({
+                        ...editingProject,
+                        period: newPeriod,
+                        plannedValue: newPlannedValue
+                      });
+                    }}
+                    placeholder="Ej: 3"
+                    min="1"
+                    max="20"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Duración estimada del proyecto para cálculo de valor con TIR
+                  </p>
+                </div>
+
+                {/* Campo: Valor Planificado del Proyecto */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1 flex items-center">
+                    💰 Valor Planificado del Proyecto
+                    <span className="ml-1 text-blue-500 text-xs">
+                      (Auto-calculado)
+                    </span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      className="w-full border rounded px-3 py-2 border-gray-300 bg-gray-50"
+                      value={editingProject?.plannedValue || 0}
+                      onChange={(e) => {
+                        setEditingProject({
+                          ...editingProject,
+                          plannedValue: parseFloat(e.target.value) || 0
+                        });
+                      }}
+                      placeholder="Calculado automáticamente"
+                      min="0"
+                      step="10000"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const calculated = calculatePlannedValueFromIRR(
+                          editingProject.budget || 0,
+                          editingProject.irr || 0,
+                          editingProject.period || 3
+                        );
+                        setEditingProject({
+                          ...editingProject,
+                          plannedValue: calculated
+                        });
+                      }}
+                      className="absolute right-2 top-2 text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
+                      title="Recalcular automáticamente"
+                    >
+                      🔄 Auto
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Fórmula: ${(editingProject?.budget || 0).toLocaleString()} × (1 + {editingProject?.irr || 0}%)^{editingProject?.period || 3} = ${(editingProject?.plannedValue || 0).toLocaleString()}
+                  </p>
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                  <textarea
+                    className="w-full border rounded px-3 py-2"
+                    rows="3"
+                    value={editingProject?.description || ''}
+                    onChange={(e) => updateProjectField('description', e.target.value)}
+                    placeholder="Descripción detallada del proyecto"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Objetivo del Proyecto</label>
+                  <textarea
+                    className="w-full border rounded px-3 py-2"
+                    rows="3"
+                    value={editingProject?.objective || ''}
+                    onChange={(e) => updateProjectField('objective', e.target.value)}
+                    placeholder="¿Qué se busca lograr con este proyecto?"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Caso de Negocio</label>
+                  <textarea
+                    className="w-full border rounded px-3 py-2"
+                    rows="3"
+                    value={editingProject?.businessCase || ''}
+                    onChange={(e) => updateProjectField('businessCase', e.target.value)}
+                    placeholder="Justificación del proyecto desde el punto de vista del negocio"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  onClick={() => {
+                    setShowNewProjectModal(false);
+                    setEditingProject(null);
+                  }}
+                  className="px-4 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSaveProject}
+                  disabled={Object.keys(errors).length > 0}
+                  className={`px-4 py-2 rounded transition-colors ${
+                    Object.keys(errors).length > 0
+                      ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                  }`}
+                >
+                  Guardar Proyecto {Object.keys(errors).length > 0 && `(${Object.keys(errors).length} errores)`}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal de Detalles de Proyecto Archivado */}
       {showArchivedDetails && selectedArchivedProject && (

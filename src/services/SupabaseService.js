@@ -105,7 +105,14 @@ class SupabaseService {
             id,
             name,
             owner_id,
-            created_at
+            created_at,
+            subscription_plan,
+            subscription_status,
+            subscription_start_date,
+            subscription_end_date,
+            trial_ends_at,
+            max_projects,
+            max_users
           )
         `)
         .eq('user_email', emailToUse)
@@ -129,7 +136,24 @@ class SupabaseService {
         name: membership.organizations.name,
         role: membership.role,
         owner_id: membership.organizations.owner_id,
-        membership_id: membership.id
+        created_at: membership.organizations.created_at,
+        membership_id: membership.id,
+        // Campos de suscripción
+        subscriptionPlan: membership.organizations.subscription_plan || 'free',
+        subscriptionStatus: membership.organizations.subscription_status || 'active',
+        subscriptionStartDate: membership.organizations.subscription_start_date,
+        subscriptionEndDate: membership.organizations.subscription_end_date,
+        trialEndsAt: membership.organizations.trial_ends_at,
+        maxProjects: membership.organizations.max_projects,
+        maxUsers: membership.organizations.max_users,
+        // Mantener snake_case para compatibilidad
+        subscription_plan: membership.organizations.subscription_plan,
+        subscription_status: membership.organizations.subscription_status,
+        subscription_start_date: membership.organizations.subscription_start_date,
+        subscription_end_date: membership.organizations.subscription_end_date,
+        trial_ends_at: membership.organizations.trial_ends_at,
+        max_projects: membership.organizations.max_projects,
+        max_users: membership.organizations.max_users
       };
       
       console.log('✅ Organización detectada:', orgData.name);
@@ -319,7 +343,9 @@ class SupabaseService {
           data: {
             name: name,
             role: 'user'
-          }
+          },
+          emailRedirectTo: undefined,
+          shouldCreateUser: true
         }
       });
 
@@ -335,44 +361,41 @@ class SupabaseService {
       authUser = data.user;
       console.log('✅ Usuario creado en auth.users:', authUser.id);
 
-      // PASO 2: Crear usuario en tabla users con manejo robusto de errores
+      // PASO 2: Crear usuario en tabla users DIRECTAMENTE (sin esperar trigger)
+      console.log('📝 Creando usuario en tabla users...');
+
       try {
-        const { error: userError } = await this.supabase
+        // Crear usuario directamente sin esperar al trigger
+        const { data: insertedUser, error: insertError } = await this.supabase
           .from('users')
           .insert({
             id: authUser.id,
             email: authUser.email,
             name: name,
             role: 'user'
-          });
+          })
+          .select()
+          .single();
 
-        if (userError) {
-          // Si es error de duplicado, verificar si ya existe
-          if (userError.code === '23505') {
-            console.log('ℹ️ Usuario ya existe en tabla users, verificando...');
-            const { data: existingUser } = await this.supabase
-              .from('users')
-              .select('id')
-              .eq('id', authUser.id)
-              .single();
-            
-            if (existingUser) {
-              console.log('✅ Usuario ya existe en tabla users');
-              userCreated = true;
-            } else {
-              throw new Error('Error de duplicado pero usuario no encontrado');
-            }
+        if (insertError) {
+          // Si es error de duplicado (23505), está bien, significa que ya existe
+          if (insertError.code === '23505') {
+            console.log('ℹ️ Usuario ya existe en tabla users (posiblemente creado por trigger)');
+            userCreated = true;
           } else {
-            throw userError;
+            // Cualquier otro error es crítico
+            console.error('❌ Error crítico creando usuario:', insertError);
+            throw insertError;
           }
         } else {
-          console.log('✅ Usuario creado en tabla users');
+          console.log('✅ Usuario creado en tabla users:', insertedUser.email);
           userCreated = true;
         }
+
       } catch (userError) {
-        console.error('❌ Error crítico creando usuario en tabla users:', userError);
-        
-        // ROLLBACK: Eliminar usuario de auth.users si falla la creación en users
+        console.error('❌ Error verificando/creando usuario en tabla users:', userError);
+
+        // ROLLBACK: Eliminar usuario de auth.users si falla completamente
         try {
           console.log('🔄 Iniciando rollback - eliminando usuario de auth.users...');
           await this.supabase.auth.admin.deleteUser(authUser.id);
@@ -380,37 +403,91 @@ class SupabaseService {
         } catch (rollbackError) {
           console.error('❌ Error en rollback:', rollbackError);
         }
-        
+
         throw new Error(`Error creando usuario en tabla users: ${userError.message}`);
       }
 
-      // PASO 3: Crear organización para el usuario
-      try {
-        const { data: orgData, error: orgError } = await this.supabase
-          .from('organizations')
-          .insert({
-            name: `${name}'s Organization`,
-            owner_id: authUser.id
-          })
-          .select('id')
-          .single();
+      // PASO 3: Verificar invitaciones pendientes ANTES de crear organización
+      console.log('🔍 Verificando invitaciones pendientes antes de crear organización...');
+      const { data: pendingInvites } = await this.supabase
+        .from('organization_members')
+        .select('id')
+        .eq('user_email', email)
+        .eq('status', 'pending');
 
-        if (orgError) {
-          console.warn('⚠️ Error creando organización:', orgError);
-          // No es crítico, el usuario puede ser invitado a una organización existente
-        } else {
-          console.log('✅ Organización creada:', orgData.id);
-          this.organizationId = orgData.id;
-          organizationCreated = true;
-        }
-      } catch (orgError) {
-        console.warn('⚠️ Error no crítico creando organización:', orgError);
+      const hasPendingInvitations = pendingInvites && pendingInvites.length > 0;
+
+      if (hasPendingInvitations) {
+        console.log(`✅ Usuario tiene ${pendingInvites.length} invitación(es) pendiente(s) - NO se creará organización propia`);
       }
 
-      // PASO 4: Configurar usuario actual
+      // PASO 4: Crear organización SOLO si NO hay invitaciones pendientes
+      if (!hasPendingInvitations) {
+        try {
+          console.log('🏢 Creando organización con plan FREE para nuevo usuario...');
+
+          // Calcular fecha de fin de trial (14 días desde ahora)
+          const trialEndsAt = new Date();
+          trialEndsAt.setDate(trialEndsAt.getDate() + 14);
+
+          const { data: orgData, error: orgError } = await this.supabase
+            .from('organizations')
+            .insert({
+              name: `${name}'s Organization`,
+              owner_id: authUser.id,
+              subscription_plan: 'free',
+              subscription_status: 'active',
+              subscription_start_date: new Date().toISOString(),
+              trial_ends_at: trialEndsAt.toISOString(),
+              max_projects: 1,
+              max_users: 3
+            })
+            .select('id')
+            .single();
+
+          if (orgError) {
+            console.warn('⚠️ Error creando organización:', orgError);
+            // No es crítico, el usuario puede ser invitado a una organización existente
+          } else {
+            console.log('✅ Organización creada con plan FREE:', orgData.id);
+            this.organizationId = orgData.id;
+            organizationCreated = true;
+
+            // PASO 4.1: Crear membresía del owner en su nueva organización
+            try {
+              console.log('👥 Creando membresía del owner en la organización...');
+              const { data: memberData, error: memberError } = await this.supabase
+                .from('organization_members')
+                .insert({
+                  organization_id: orgData.id,
+                  user_id: authUser.id,
+                  user_email: email,
+                  role: 'owner',
+                  status: 'active'
+                })
+                .select()
+                .single();
+
+              if (memberError) {
+                console.error('❌ Error creando membresía:', memberError);
+              } else {
+                console.log('✅ Membresía creada exitosamente:', memberData.id);
+              }
+            } catch (memberError) {
+              console.error('❌ Error no crítico creando membresía:', memberError);
+            }
+          }
+        } catch (orgError) {
+          console.warn('⚠️ Error no crítico creando organización:', orgError);
+        }
+      } else {
+        console.log('ℹ️ Omitiendo creación de organización - usuario será agregado a organización(es) existente(s)');
+      }
+
+      // PASO 5: Configurar usuario actual
       this.currentUser = authUser;
-      
-      // PASO 5: Activar invitaciones pendientes
+
+      // PASO 6: Activar invitaciones pendientes (si existen)
       const invitationResult = await this.activatePendingInvitations(email, authUser.id);
       
       console.log('🎉 Registro completado exitosamente');
@@ -599,8 +676,9 @@ class SupabaseService {
       // 3. LIMPIAR COMPLETAMENTE EL LOCALSTORAGE
       const keysToRemove = [
         'currentProjectId',
-        'useSupabase', 
+        'useSupabase',
         'portfolioData',
+        'mi-dashboard-portfolio',  // Datos del FilePersistenceService
         'supabase.auth.token',
         'sb-localhost-auth-token',
         'sb-auth-token'
@@ -622,6 +700,30 @@ class SupabaseService {
         sessionStorage.removeItem(key);
         console.log(`🗑️ Eliminado sessionStorage: ${key}`);
       });
+
+      // 4.1. LIMPIAR INDEXEDDB (datos persistentes de proyectos)
+      try {
+        console.log('🗑️ Limpiando IndexedDB...');
+
+        // Eliminar base de datos principal de FilePersistenceService
+        const deleteMainDB = indexedDB.deleteDatabase('MiDashboardDB');
+        deleteMainDB.onsuccess = () => {
+          console.log('✅ IndexedDB "MiDashboardDB" eliminada');
+        };
+        deleteMainDB.onerror = () => {
+          console.warn('⚠️ No se pudo eliminar IndexedDB "MiDashboardDB"');
+        };
+
+        // También limpiar otras posibles DBs relacionadas
+        const deleteLocalforage = indexedDB.deleteDatabase('localforage');
+        deleteLocalforage.onsuccess = () => {
+          console.log('✅ IndexedDB "localforage" eliminada');
+        };
+
+      } catch (idbError) {
+        console.warn('⚠️ Error limpiando IndexedDB:', idbError);
+        // No es crítico, continuar con el logout
+      }
 
       // 5. VERIFICAR QUE NO HAY USUARIO ACTUAL
       const currentUser = await this.supabase.auth.getUser();
@@ -2140,12 +2242,29 @@ class SupabaseService {
         return { success: false, error: 'No autenticado' };
       }
 
-      // Generar nombre único para el archivo
+      // Sanitizar el nombre del archivo (remover caracteres especiales pero mantener el nombre original)
+      const sanitizeFileName = (name) => {
+        // Separar nombre y extensión
+        const parts = name.split('.');
+        const extension = parts.pop();
+        const baseName = parts.join('.');
+
+        // Limpiar el nombre base: remover caracteres especiales, mantener espacios, guiones y guiones bajos
+        const cleanName = baseName
+          .normalize('NFD') // Normalizar caracteres acentuados
+          .replace(/[\u0300-\u036f]/g, '') // Remover acentos
+          .replace(/[^\w\s.-]/g, '') // Mantener solo letras, números, espacios, puntos, guiones
+          .replace(/\s+/g, '-') // Reemplazar espacios por guiones
+          .substring(0, 100); // Limitar longitud
+
+        return `${cleanName}.${extension}`;
+      };
+
+      // Usar el nombre original sanitizado + timestamp para evitar colisiones
       const timestamp = Date.now();
-      const randomId = Math.random().toString(36).substr(2, 9);
-      const fileExtension = file.name.split('.').pop();
-      const fileName = `${timestamp}-${randomId}.${fileExtension}`;
-      
+      const sanitizedName = sanitizeFileName(file.name);
+      const fileName = `${timestamp}-${sanitizedName}`;
+
       // Ruta en el bucket: organizationId/projectId/category/filename
       const filePath = `${this.organizationId}/${projectId}/${category}/${fileName}`;
 
@@ -2179,7 +2298,7 @@ class SupabaseService {
         .getPublicUrl(filePath);
 
       const fileRecord = {
-        id: `file-${timestamp}-${randomId}`,
+        id: `file-${timestamp}-${Math.random().toString(36).substr(2, 9)}`,
         projectId,
         category,
         fileName: file.name,
@@ -2192,6 +2311,7 @@ class SupabaseService {
         organizationId: this.organizationId,
         storagePath: filePath,
         publicUrl: publicData.publicUrl,
+        description: metadata.description || '', // Agregar descripción al nivel superior
         metadata: {
           ...metadata,
           storageProvider: 'supabase',
@@ -2446,10 +2566,16 @@ class SupabaseService {
           id: `file-${file.name.split('.')[0]}`,
           projectId,
           fileName: originalFileName, // Usar nombre original en lugar del nombre técnico
+          originalName: originalFileName, // Agregar originalName también
           fileSize: fileSize,
+          mimeType: file.metadata?.mimeType || 'application/octet-stream',
           uploadDate: uploadDate,
           storagePath: filePath,
           publicUrl: publicData.publicUrl,
+          description: file.metadata?.description || '', // ✅ AGREGAR DESCRIPCIÓN
+          relatedItemId: file.metadata?.relatedItemId || null,
+          category: file.metadata?.category || 'general',
+          uploadedBy: file.metadata?.uploadedBy || 'Usuario',
           metadata: {
             storageProvider: 'supabase',
             bucket: 'project-files',

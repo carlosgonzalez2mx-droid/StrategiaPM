@@ -1,10 +1,12 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import useFileStorage from '../hooks/useFileStorage';
 import usePermissions from '../hooks/usePermissions';
+import subscriptionService from '../services/SubscriptionService';
 
-const FileManager = ({ 
-  projectId, 
-  category = 'general', 
+const FileManager = ({
+  projectId,
+  organizationId = null, // Para verificar límites del plan
+  category = 'general',
   relatedItemId = null,
   onFileUploaded = null,
   showUploadArea = true,
@@ -32,9 +34,26 @@ const FileManager = ({
   const [selectedCategory, setSelectedCategory] = useState(category);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadDescription, setUploadDescription] = useState('');
-  
+  const [isReadOnlyMode, setIsReadOnlyMode] = useState(false);
+
+  // Verificar modo read-only
+  useEffect(() => {
+    const checkReadOnlyMode = async () => {
+      if (organizationId) {
+        try {
+          const editPermission = await subscriptionService.canEdit(organizationId);
+          setIsReadOnlyMode(!editPermission.allowed);
+        } catch (error) {
+          console.error('[READ-ONLY MODE] Error verificando permisos:', error);
+          setIsReadOnlyMode(false);
+        }
+      }
+    };
+    checkReadOnlyMode();
+  }, [organizationId]);
+
   // Determinar si se puede mostrar área de subida basado en permisos
-  const canUploadFiles = showUploadArea && permissions.canEdit;
+  const canUploadFiles = showUploadArea && permissions.canEdit && !isReadOnlyMode;
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' o 'list'
   const fileInputRef = useRef(null);

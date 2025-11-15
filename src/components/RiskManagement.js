@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import FileManager from './FileManager';
 import useAuditLog from '../hooks/useAuditLog';
+import subscriptionService from '../services/SubscriptionService';
 // import { useProjectContext } from '../src/contexts/ProjectContext';
 // import { RiskCalculationService } from '../src/services/riskCalculationService';
 import {
@@ -66,7 +67,8 @@ const RiskManagement = ({
   const [editingRisk, setEditingRisk] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showFileManager, setShowFileManager] = useState(false);
-  
+  const [isReadOnlyMode, setIsReadOnlyMode] = useState(false);
+
   const fileInputRef = useRef(null);
 
   // Hook de auditoría
@@ -153,6 +155,22 @@ const RiskManagement = ({
 
   // Obtener proyecto actual
   const currentProject = projects?.find(p => p.id === currentProjectId);
+
+  // Verificar modo read-only
+  useEffect(() => {
+    const checkReadOnlyMode = async () => {
+      if (currentProject?.organizationId) {
+        try {
+          const editPermission = await subscriptionService.canEdit(currentProject.organizationId);
+          setIsReadOnlyMode(!editPermission.allowed);
+        } catch (error) {
+          console.error('[READ-ONLY MODE] Error verificando permisos:', error);
+          setIsReadOnlyMode(false);
+        }
+      }
+    };
+    checkReadOnlyMode();
+  }, [currentProject?.organizationId]);
 
   // Función para calcular reserva de contingencia basada en riesgos activos
   const calculateContingencyReserve = () => {
@@ -634,7 +652,13 @@ Las reservas se han actualizado en el proyecto y se reflejarán en todos los mó
             <h3 className="text-lg font-semibold">Gestión de Riesgos</h3>
             <button
               onClick={handleAddRisk}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center space-x-2"
+              disabled={isReadOnlyMode}
+              className={`px-4 py-2 rounded-lg flex items-center space-x-2 ${
+                isReadOnlyMode
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-green-600 text-white hover:bg-green-700'
+              }`}
+              title={isReadOnlyMode ? "No disponible (modo solo lectura)" : "Crear nuevo riesgo"}
             >
               <Plus size={16} />
               <span>Nuevo Riesgo</span>

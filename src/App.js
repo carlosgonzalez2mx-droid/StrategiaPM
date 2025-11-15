@@ -33,6 +33,8 @@ import SupabaseAuth from './components/SupabaseAuth';
 import SplashScreen from './components/SplashScreen';
 import LoadingFallback from './components/LoadingFallback';
 import ErrorBoundary from './components/ErrorBoundary';
+import TrialStatusBanner from './components/subscription/TrialStatusBanner';
+import OverLimitBanner from './components/subscription/OverLimitBanner';
 
 // Componentes grandes con lazy loading (code splitting)
 const ConsolidatedDashboard = lazy(() => import('./components/ConsolidatedDashboard'));
@@ -52,6 +54,11 @@ const ProjectArchive = lazy(() => import('./components/ProjectArchive'));
 const BackupManager = lazy(() => import('./components/BackupManager'));
 const OrganizationMembers = lazy(() => import('./components/OrganizationMembers'));
 const UserManagement = lazy(() => import('./components/UserManagement'));
+const UpgradeModal = lazy(() => import('./components/subscription/UpgradeModal'));
+
+// Subscription Components (lazy loading)
+const SubscriptionSuccess = lazy(() => import('./components/subscription/SubscriptionSuccess'));
+const SubscriptionCancelled = lazy(() => import('./components/subscription/SubscriptionCancelled'));
 
 // Super Admin Components (lazy loading)
 const SuperAdminRoute = lazy(() => import('./components/admin/SuperAdminRoute'));
@@ -208,8 +215,13 @@ function MainApp() {
   // Sistema de auto-guardado con debouncing
   const debouncedSave = useCallback(
     debounce(async (dataToSave) => {
+      console.log('🔍 DEBUG - debouncedSave ejecutándose');
+      console.log('   useSupabase:', useSupabase);
+      console.log('   isAuthenticated:', supabaseService.isAuthenticated());
+
       if (!useSupabase || !supabaseService.isAuthenticated()) {
         console.log('⏭️ Saltando guardado - No autenticado o Supabase deshabilitado');
+        console.log('   Razón: useSupabase =', useSupabase, ', isAuthenticated =', supabaseService.isAuthenticated());
         return;
       }
       
@@ -446,22 +458,31 @@ function MainApp() {
             console.log('🔍 Cargando datos desde Supabase...');
             const savedData = await supabaseService.loadPortfolioData();
             console.log('🔍 Resultado de loadPortfolioData():', savedData);
-            
-            if (!savedData || !savedData.organization) {
-              console.warn('⚠️ No se pudieron cargar datos desde Supabase');
+
+            if (!savedData) {
+              console.warn('⚠️ Error cargando datos desde Supabase');
               console.warn('⚠️ Continuando con datos locales...');
-              // Usar fallback a IndexedDB/localStorage
+              // Solo deshabilitar si hay ERROR real, no si es usuario nuevo sin datos
+              setUseSupabase(false);
+            } else if (!savedData.organization) {
+              console.error('❌ Usuario autenticado pero sin organización');
+              console.error('❌ Esto no debería suceder - verificar RLS y membresías');
               setUseSupabase(false);
             } else {
-              console.log('📂 Datos encontrados en Supabase, cargando...');
-              
-              // Usar datos de Supabase
-              if (savedData.organization) {
-                console.log('✅ Datos sincronizados desde Supabase');
-              }
+              // Usuario tiene organización - puede o no tener proyectos
+              console.log('✅ Organización detectada en Supabase:', savedData.organization.name);
+              console.log('📂 Proyectos encontrados:', savedData.projects?.length || 0);
+
+              // MANTENER useSupabase = true incluso si no hay proyectos (usuario nuevo)
+              // Esto permite guardar nuevos proyectos que se creen
+
+              // Usar datos de Supabase si existen
               if (savedData.projects && Array.isArray(savedData.projects) && savedData.projects.length > 0) {
                 console.log('📂 Cargando proyectos desde Supabase:', savedData.projects.length);
                 setProjects(savedData.projects);
+              } else {
+                console.log('📂 Usuario nuevo sin proyectos - listo para crear el primero');
+                setProjects([]); // Usuario nuevo comienza con array vacío
               }
               if (savedData.currentProjectId) {
                 setCurrentProjectId(savedData.currentProjectId);
@@ -841,7 +862,10 @@ function MainApp() {
         isSavingRef.current = true;
         
         console.log('💾 Guardando datos con throttling...');
-        
+        console.log('🔍 DEBUG - Estado antes de guardar:');
+        console.log('   useSupabase:', useSupabase);
+        console.log('   isAuthenticated:', supabaseService.isAuthenticated());
+
         // Guardar usando Supabase si está disponible, sino usar localStorage
         if (useSupabase && supabaseService.isAuthenticated()) {
           console.log('💾 Guardando en Supabase...');
@@ -851,6 +875,8 @@ function MainApp() {
           }
           console.log('✅ Datos guardados en Supabase');
         } else {
+          console.log('⏭️ NO guardando en Supabase - Usando localStorage');
+          console.log('   Razón: useSupabase =', useSupabase, ', isAuthenticated =', supabaseService.isAuthenticated());
           // Fallback: usar localStorage y archivo local
           try {
             localStorage.setItem('mi-dashboard-portfolio', JSON.stringify(dataToSave));
@@ -1236,13 +1262,15 @@ function MainApp() {
   };
 
   // ===== ESTADOS DE INTERFAZ =====
-  
+
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showSchedule, setShowSchedule] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [reportingDate, setReportingDate] = useState(new Date().toISOString().split('T')[0]);
   const [showHelp, setShowHelp] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [organizationId, setOrganizationId] = useState(null);
   // Función para determinar la sección inicial basada en permisos
   const getInitialSection = () => {
     // Usuarios de solo lectura: iniciar en 'executive' (Dashboard Ejecutivo)
@@ -1260,20 +1288,33 @@ function MainApp() {
     setIsSidebarCollapsed(true); // Colapsar sidebar automáticamente
   };
 
+  // Obtener organizationId cuando se autentique
+  useEffect(() => {
+    const loadOrganizationId = async () => {
+      if (useSupabase && supabaseService.isAuthenticated()) {
+        const orgId = await supabaseService.getCurrentOrganization();
+        if (orgId) {
+          setOrganizationId(orgId);
+        }
+      }
+    };
+    loadOrganizationId();
+  }, [useSupabase, user]);
+
   // Redirección automática para usuarios de solo lectura
   useEffect(() => {
     // Solo ejecutar cuando los permisos ya se cargaron
     if (!permissionsLoading && userRole) {
       const currentSection = activeSection;
       const isReadOnlyUser = isReadOnly();
-      
+
       console.log('🔍 Verificando redirección automática:', {
         userRole,
         isReadOnlyUser,
         currentSection,
         permissionsLoading
       });
-      
+
       // Solo redirigir usuarios de solo lectura desde secciones restringidas
       if (isReadOnlyUser && (currentSection === 'portfolio' || currentSection === 'user-management')) {
         console.log('🔄 Redirigiendo usuario de solo lectura de', currentSection, 'a Dashboard Ejecutivo');
@@ -1358,48 +1399,12 @@ function MainApp() {
   }
 
   // Si no hay proyectos, mostrar mensaje de bienvenida
+  // PERO seguir renderizando la interfaz normal para que el usuario pueda crear proyectos
+  // desde el PortfolioStrategic que tiene el flujo completo de creación
   if (!currentProject && projects.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
-        <div className="text-center max-w-md mx-auto p-8">
-          <div className="text-6xl mb-6">📁</div>
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">
-            ¡Bienvenido al Sistema de Gestión de Proyectos!
-          </h2>
-          <p className="text-gray-600 mb-8 text-lg">
-            Comienza creando tu primer proyecto para gestionar cronogramas, riesgos, presupuestos y más.
-          </p>
-          <button
-            onClick={() => {
-              // Crear un proyecto básico
-              const newProject = {
-                id: `proj-${Date.now()}`,
-                name: 'Mi Primer Proyecto',
-                description: 'Proyecto inicial para familiarizarse con el sistema',
-                status: 'active',
-                priority: 'medium',
-                startDate: new Date().toISOString().split('T')[0],
-                endDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                budget: 100000,
-                contingencyReserve: 10000,
-                managementReserve: 5000,
-                manager: user?.email || 'Usuario',
-                sponsor: 'Organización',
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-                version: '1.0.0',
-                progress: 0
-              };
-              setProjects([newProject]);
-              setCurrentProjectId(newProject.id);
-            }}
-            className="bg-blue-600 text-white px-8 py-4 rounded-lg hover:bg-blue-700 text-lg font-semibold shadow-lg transition-colors"
-          >
-            ➕ Crear Mi Primer Proyecto
-          </button>
-        </div>
-      </div>
-    );
+    // No hacer return aquí - dejar que se renderice la interfaz normal
+    // El PortfolioStrategic manejará la pantalla vacía con su propio mensaje
+    console.log('👋 Usuario nuevo sin proyectos - mostrando interfaz de portfolio');
   }
 
   return (
@@ -1432,9 +1437,9 @@ function MainApp() {
       <FileStatusIndicator />
       <AutoSaveIndicator />
       <BackupManager onRestoreData={importData} />
-      
+
       <div className="flex">
-        <Sidebar 
+        <Sidebar
           activeSection={activeSection}
           onSectionChange={handleSectionChange}
           projects={projects}
@@ -1444,9 +1449,24 @@ function MainApp() {
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         />
-        
+
         <main className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-80 lg:ml-72'}`}>
           <div className={`transition-all duration-300 ${isSidebarCollapsed ? 'p-4' : 'p-6'}`}>
+            {/* Over Limit Banner (priority - must show first) */}
+            {useSupabase && organizationId && (
+              <OverLimitBanner
+                organizationId={organizationId}
+                onUpgradeClick={() => setShowUpgradeModal(true)}
+              />
+            )}
+
+            {/* Trial Status Banner */}
+            {useSupabase && organizationId && (
+              <TrialStatusBanner
+                organizationId={organizationId}
+                onUpgradeClick={() => setShowUpgradeModal(true)}
+              />
+            )}
             {/* Dashboard Ejecutivo */}
             {activeSection === 'executive' && (
               <ConsolidatedDashboard 
@@ -1556,6 +1576,22 @@ function MainApp() {
           </div>
         </main>
         </div>
+
+      {/* Upgrade Modal */}
+      {showUpgradeModal && organizationId && (
+        <Suspense fallback={<div>Cargando...</div>}>
+          <UpgradeModal
+            isOpen={showUpgradeModal}
+            onClose={() => setShowUpgradeModal(false)}
+            organizationId={organizationId}
+            onUpgradeSuccess={() => {
+              setShowUpgradeModal(false);
+              // Recargar datos para reflejar el nuevo plan
+              window.location.reload();
+            }}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }
@@ -1573,6 +1609,10 @@ function App() {
                   <ErrorBoundary>
                     <Suspense fallback={<LoadingFallback message="Cargando aplicación..." />}>
                       <Routes>
+                        {/* Rutas de Suscripción */}
+                        <Route path="/subscription/success" element={<SubscriptionSuccess />} />
+                        <Route path="/subscription/cancelled" element={<SubscriptionCancelled />} />
+
                         {/* Rutas de Super-Admin */}
                         <Route
                           path="/admin"

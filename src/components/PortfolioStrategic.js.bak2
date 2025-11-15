@@ -8,10 +8,12 @@
  * - Archivo: Proyectos archivados
  * - Planeación Semanal: Planificación semanal
  *
- * Creación de proyectos:
- * - El botón "Crear Primer Proyecto" (cuando no hay proyectos) cambia al tab
- *   "Lista de Proyectos" y abre el modal de PortfolioDashboard.
- * - Todas las operaciones de creación/edición usan el modal de PortfolioDashboard.
+ * Contiene su propio modal de creación/edición de proyectos que se abre desde:
+ * - Botón "Crear Primer Proyecto" (cuando no hay proyectos)
+ * - Botón "Nuevo Proyecto" en el tab Overview
+ *
+ * NOTA: El tab "Lista de Proyectos" renderiza el componente PortfolioDashboard
+ * que tiene su propio modal independiente.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -23,6 +25,16 @@ import NotificationBadge from './notifications/NotificationBadge';
 import UsageIndicator from './subscription/UsageIndicator';
 import { calculatePlannedValueFromIRR } from '../utils/businessValueCalculator';
 
+// Componente helper para mostrar errores
+const ErrorMessage = ({ error }) => {
+  if (!error) return null;
+  return (
+    <div className="text-red-600 text-xs mt-1 flex items-center">
+      <span className="mr-1">⚠️</span>
+      {error}
+    </div>
+  );
+};
 
 const PortfolioStrategic = ({ 
   projects, 
@@ -92,6 +104,12 @@ const PortfolioStrategic = ({
     }
   }, []);
 
+  // Debug: mostrar errores en consola cuando cambien
+  React.useEffect(() => {
+    if (Object.keys(errors).length > 0) {
+      console.log('❌ Errores de validación:', errors);
+    }
+  }, [errors]);
 
   // 🚀 NUEVO: Escuchar eventos de actualización de tareas de minutas
   useEffect(() => {
@@ -550,7 +568,7 @@ const PortfolioStrategic = ({
               updateProject={updateProject}
               deleteProject={deleteProject}
               duplicateProject={handleDuplicateProject}
-              archiveProject={handleArchiveProject}
+              archiveProject={archiveProject}
               includeWeekendsByProject={includeWeekendsByProject}
               setIncludeWeekendsByProject={setIncludeWeekendsByProject}
               getCurrentProjectIncludeWeekends={getCurrentProjectIncludeWeekends}
@@ -860,6 +878,7 @@ const PortfolioStrategic = ({
           )}
         </div>
       </div>
+
 
       {/* Modal de Detalles de Proyecto Archivado */}
       {showArchivedDetails && selectedArchivedProject && (

@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import useAuditLog from '../hooks/useAuditLog';
+import subscriptionService from '../services/SubscriptionService';
 import { validatePlannedValue, calculateDeliveredValue } from '../utils/businessValueCalculator';
 
 // ===== Utilidades de días laborables =====
@@ -114,9 +115,30 @@ const FinancialManagement = ({
   const [showContractModal, setShowContractModal] = useState(false);
   const [editingContract, setEditingContract] = useState(null);
 
+  // Estado para modo read-only (cuando se exceden límites del plan)
+  const [isReadOnlyMode, setIsReadOnlyMode] = useState(false);
 
   // Hook de auditoría
   const { logFinancialEvent } = useAuditLog(currentProject?.id, useSupabase);
+
+  // Verificar modo read-only al cargar (cuando se exceden límites del plan)
+  useEffect(() => {
+    const checkReadOnlyMode = async () => {
+      if (useSupabase && currentProject?.organizationId) {
+        try {
+          const editPermission = await subscriptionService.canEdit(currentProject.organizationId);
+          setIsReadOnlyMode(!editPermission.allowed);
+          if (!editPermission.allowed) {
+            console.warn('[READ-ONLY MODE] Edición financiera deshabilitada:', editPermission.message);
+          }
+        } catch (error) {
+          console.error('[READ-ONLY MODE] Error verificando permisos:', error);
+          setIsReadOnlyMode(false);
+        }
+      }
+    };
+    checkReadOnlyMode();
+  }, [useSupabase, currentProject?.organizationId]);
 
   // Función para sincronizar con cronograma
   const syncWithSchedule = (scheduleUpdates) => {
@@ -1122,7 +1144,13 @@ const FinancialManagement = ({
                 });
                 setShowPOModal(true);
               }}
-              className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700"
+              disabled={isReadOnlyMode}
+              className={`px-3 py-1 rounded text-sm ${
+                isReadOnlyMode
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
+              title={isReadOnlyMode ? "No disponible (modo solo lectura)" : "Crear nueva orden de compra"}
             >
               + Nueva
             </button>
@@ -1194,7 +1222,13 @@ const FinancialManagement = ({
                 setEditingAdvance({});
                 setShowAdvanceModal(true);
               }}
-              className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
+              disabled={isReadOnlyMode}
+              className={`px-3 py-1 rounded text-sm ${
+                isReadOnlyMode
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-green-600 text-white hover:bg-green-700'
+              }`}
+              title={isReadOnlyMode ? "No disponible (modo solo lectura)" : "Crear nuevo anticipo"}
             >
               + Nuevo
             </button>
@@ -1245,7 +1279,13 @@ const FinancialManagement = ({
                 setEditingInvoice({});
                 setShowInvoiceModal(true);
               }}
-              className="bg-purple-600 text-white px-3 py-1 rounded text-sm hover:bg-purple-700"
+              disabled={isReadOnlyMode}
+              className={`px-3 py-1 rounded text-sm ${
+                isReadOnlyMode
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-purple-600 text-white hover:bg-purple-700'
+              }`}
+              title={isReadOnlyMode ? "No disponible (modo solo lectura)" : "Crear nueva factura"}
             >
               + Nueva
             </button>

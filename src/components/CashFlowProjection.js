@@ -909,8 +909,8 @@ const CashFlowProjection = ({
                 <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
                   <tr>
                     <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mes</th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gasto Planificado</th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gasto Comprometido (OCs)</th>
+                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gasto Planificado</th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gasto Real</th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Saldo Acumulado</th>
                     <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
@@ -935,10 +935,10 @@ const CashFlowProjection = ({
                         <div className="text-sm text-gray-500">Mes {month.month}</div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-orange-600 font-medium">{formatCurrency(month.revenue)}</div>
+                        <div className="text-blue-600 font-medium">{formatCurrency(month.expenses)}</div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-blue-600 font-medium">{formatCurrency(month.expenses)}</div>
+                        <div className="text-orange-600 font-medium">{formatCurrency(month.revenue)}</div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-red-600 font-medium">{formatCurrency(month.realExpenses)}</div>
@@ -950,9 +950,9 @@ const CashFlowProjection = ({
                       </td>
                       <td className="px-6 py-4">
                         <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          month.cumulativeBalance > 0 
-                            ? 'bg-green-100 text-green-800' 
-                            : month.cumulativeBalance < 0 
+                          month.cumulativeBalance > 0
+                            ? 'bg-green-100 text-green-800'
+                            : month.cumulativeBalance < 0
                             ? 'bg-red-100 text-red-800'
                             : 'bg-gray-100 text-gray-800'
                         }`}>

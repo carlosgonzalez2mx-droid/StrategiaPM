@@ -94,8 +94,58 @@ const useFileStorage = (projectId) => {
 
       if (savedFiles) {
         const parsedFiles = JSON.parse(savedFiles);
-        setFiles(Array.isArray(parsedFiles) ? parsedFiles : []);
-        console.log(`📂 ${parsedFiles.length} archivos cargados desde localStorage`);
+
+        // Migrar nombres de archivos antiguos automáticamente
+        const migratedFiles = parsedFiles.map(file => {
+          // 1. Si hay originalName en metadata, tiene máxima prioridad
+          if (file.metadata?.originalName && file.fileName !== file.metadata.originalName) {
+            console.log(`🔄 Migrando desde metadata: ${file.fileName} → ${file.metadata.originalName}`);
+            return {
+              ...file,
+              fileName: file.metadata.originalName,
+              originalName: file.metadata.originalName
+            };
+          }
+
+          // 2. Si tiene originalName directamente pero fileName es diferente, corregir
+          if (file.originalName && file.fileName !== file.originalName) {
+            console.log(`🔄 Corrigiendo con originalName: ${file.fileName} → ${file.originalName}`);
+            return {
+              ...file,
+              fileName: file.originalName
+            };
+          }
+
+          // 3. Si tiene storagePath, intentar extraer el nombre original de ahí
+          if (file.storagePath) {
+            const pathParts = file.storagePath.split('/');
+            const storageFileName = pathParts[pathParts.length - 1];
+
+            // Intentar extraer nombre original (formato: timestamp-nombre-original.ext)
+            const timestampMatch = storageFileName.match(/^\d+-(.+)$/);
+            if (timestampMatch && timestampMatch[1] !== file.fileName) {
+              console.log(`🔄 Extrayendo de storagePath: ${file.fileName} → ${timestampMatch[1]}`);
+              return {
+                ...file,
+                fileName: timestampMatch[1],
+                originalName: timestampMatch[1]
+              };
+            }
+          }
+
+          // Si ya está correcto o no se pudo migrar, mantenerlo
+          return file;
+        });
+
+        setFiles(Array.isArray(migratedFiles) ? migratedFiles : []);
+
+        // Si hubo cambios, guardar la versión migrada
+        if (JSON.stringify(parsedFiles) !== JSON.stringify(migratedFiles)) {
+          localStorage.setItem(key, JSON.stringify(migratedFiles));
+          console.log(`✨ Nombres de archivos migrados automáticamente`);
+        }
+
+        console.log(`📂 ${migratedFiles.length} archivos cargados desde localStorage`);
       } else {
         setFiles([]);
       }
@@ -136,14 +186,38 @@ const useFileStorage = (projectId) => {
 
         if (success) {
           // Convertir archivos de Supabase al formato esperado
-          const convertedFiles = supabaseFiles.map(file => ({
-            ...file,
-            mimeType: file.metadata?.mimeType || 'application/octet-stream',
-            description: file.metadata?.description || '',
-            relatedItemId: file.metadata?.relatedItemId || null,
-            content: file.publicUrl,
-            fileExtension: file.fileName.split('.').pop()?.toLowerCase() || ''
-          }));
+          const convertedFiles = supabaseFiles.map(file => {
+            // Intentar extraer el nombre original del storagePath si fileName no lo tiene
+            let displayName = file.fileName;
+
+            // Si el fileName parece ser un ID (timestamp-randomId.ext), extraer el nombre del storagePath
+            if (file.storagePath && /^\d+-[a-z0-9]+\.[a-z]+$/i.test(file.fileName)) {
+              const pathParts = file.storagePath.split('/');
+              const storageFileName = pathParts[pathParts.length - 1];
+
+              // Intentar extraer el nombre original (formato: timestamp-nombre-original.ext)
+              const match = storageFileName.match(/^\d+-(.+)$/);
+              if (match) {
+                displayName = match[1]; // Usar el nombre después del timestamp
+              }
+            }
+
+            // Si hay originalName en metadata, usarlo (tiene prioridad)
+            if (file.metadata?.originalName) {
+              displayName = file.metadata.originalName;
+            }
+
+            return {
+              ...file,
+              fileName: displayName,
+              originalName: displayName,
+              mimeType: file.metadata?.mimeType || 'application/octet-stream',
+              description: file.metadata?.description || '',
+              relatedItemId: file.metadata?.relatedItemId || null,
+              content: file.publicUrl,
+              fileExtension: displayName.split('.').pop()?.toLowerCase() || ''
+            };
+          });
 
           setFiles(convertedFiles);
           console.log(`✅ ${convertedFiles.length} archivos cargados desde Supabase`);

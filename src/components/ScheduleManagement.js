@@ -4,6 +4,7 @@ import MinutaModal from './MinutaModal';
 import EditMinutaModal from './EditMinutaModal';
 import ScheduleWizard from './ai-scheduler/ScheduleWizard';
 import supabaseService from '../services/SupabaseService';
+import subscriptionService from '../services/SubscriptionService';
 import aiSchedulerService from '../services/AISchedulerService';
 import useAuditLog from '../hooks/useAuditLog';
 import useBusinessValueSync from '../hooks/useBusinessValueSync';
@@ -382,11 +383,33 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
   // Estados para el Asistente Inteligente de Cronogramas
   const [showAIWizard, setShowAIWizard] = useState(false);
 
+  // Estado para modo read-only (cuando se exceden límites del plan)
+  const [isReadOnlyMode, setIsReadOnlyMode] = useState(false);
+
   // Hook de auditoría para minutas
   const { logMinutaTaskCreated, logMinutaTaskUpdated, addAuditEvent } = useAuditLog(
     projectData?.id,
     useSupabase
   );
+
+  // Verificar modo read-only al cargar (cuando se exceden límites del plan)
+  useEffect(() => {
+    const checkReadOnlyMode = async () => {
+      if (useSupabase && projectData?.organizationId) {
+        try {
+          const editPermission = await subscriptionService.canEdit(projectData.organizationId);
+          setIsReadOnlyMode(!editPermission.allowed);
+          if (!editPermission.allowed) {
+            console.warn('[READ-ONLY MODE] Edición deshabilitada:', editPermission.message);
+          }
+        } catch (error) {
+          console.error('[READ-ONLY MODE] Error verificando permisos:', error);
+          setIsReadOnlyMode(false); // En caso de error, permitir edición (fail-safe)
+        }
+      }
+    };
+    checkReadOnlyMode();
+  }, [useSupabase, projectData?.organizationId]);
 
   // Estados del diagrama de red (preservados para evitar errores)
   const [networkLayout, setNetworkLayout] = useState('hierarchical');
@@ -3323,9 +3346,19 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
   };
 
   // FUNCIÓN CORREGIDA: Insertar tarea inmediatamente después de la fila seleccionada
-  const insertTaskAtPosition = (insertAfterTaskId, visualIndex = null) => {
+  const insertTaskAtPosition = async (insertAfterTaskId, visualIndex = null) => {
     console.log('🚀 AGREGANDO TAREA - Insertando después de:', insertAfterTaskId, 'en índice visual:', visualIndex);
-    
+
+    // VALIDAR: Verificar si está en modo read-only
+    if (useSupabase && projectData?.organizationId) {
+      const editPermission = await subscriptionService.canEdit(projectData.organizationId);
+      if (!editPermission.allowed) {
+        alert(`❌ No puedes insertar tareas\n\n${editPermission.message}\n\n${editPermission.suggestion}`);
+        console.warn('[READ-ONLY MODE] No se puede insertar tarea:', editPermission);
+        return;
+      }
+    }
+
     // Encontrar la tarea de referencia
     const referenceTask = tasks.find(task => task.id === insertAfterTaskId);
     if (!referenceTask) {
@@ -3520,6 +3553,11 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
 
   // NUEVAS FUNCIONES PARA VISTA TABLA
   const startEditing = (taskId, field, currentValue) => {
+    // Bloquear edición si está en modo read-only
+    if (isReadOnlyMode) {
+      console.warn('[READ-ONLY MODE] No se puede editar en modo solo lectura');
+      return;
+    }
     setEditingCell({ taskId, field });
     
     // Para fechas, asegurar que esté en formato ISO para el input
@@ -4047,9 +4085,19 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
   };
 
   // FUNCIÓN SIMPLIFICADA: Agregar tarea al final del cronograma
-  const addTaskAtEnd = () => {
+  const addTaskAtEnd = async () => {
     console.log('🚀 AGREGANDO TAREA AL FINAL');
-    
+
+    // VALIDAR: Verificar si está en modo read-only
+    if (useSupabase && projectData?.organizationId) {
+      const editPermission = await subscriptionService.canEdit(projectData.organizationId);
+      if (!editPermission.allowed) {
+        alert(`❌ No puedes agregar tareas\n\n${editPermission.message}\n\n${editPermission.suggestion}`);
+        console.warn('[READ-ONLY MODE] No se puede agregar tarea:', editPermission);
+        return;
+      }
+    }
+
     // Calcular fechas basadas en la última tarea
     let newStartDate = toISO(new Date());
     let newEndDate = addDays(newStartDate, 5, includeWeekends);
@@ -5715,12 +5763,16 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                 {/* Botones de vista organizados profesionalmente */}
                 <div className="flex flex-wrap justify-center lg:justify-end gap-2">
               <button
-                    onClick={() => setViewMode('gantt')}
+                    onClick={() => !isReadOnlyMode && setViewMode('gantt')}
+                    disabled={isReadOnlyMode}
                     className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-300 flex items-center space-x-2 ${
-                      viewMode === 'gantt' 
-                        ? 'bg-indigo-600 text-white shadow-md hover:shadow-lg' 
-                        : 'bg-white text-gray-600 hover:bg-indigo-50 hover:text-indigo-700 border border-gray-300 hover:border-indigo-300'
+                      isReadOnlyMode
+                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed border border-gray-300'
+                        : viewMode === 'gantt'
+                          ? 'bg-indigo-600 text-white shadow-md hover:shadow-lg'
+                          : 'bg-white text-gray-600 hover:bg-indigo-50 hover:text-indigo-700 border border-gray-300 hover:border-indigo-300'
                     }`}
+                    title={isReadOnlyMode ? "Vista Gantt no disponible (modo solo lectura)" : "Vista Gantt"}
                   >
                     <span>📊</span>
                     <span>Gantt</span>
@@ -5729,23 +5781,27 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
               <button
                     onClick={() => setViewMode('excel')}
                     className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-300 flex items-center space-x-2 ${
-                      viewMode === 'excel' 
-                        ? 'bg-indigo-600 text-white shadow-md hover:shadow-lg' 
+                      viewMode === 'excel'
+                        ? 'bg-indigo-600 text-white shadow-md hover:shadow-lg'
                         : 'bg-white text-gray-600 hover:bg-indigo-50 hover:text-indigo-700 border border-gray-300 hover:border-indigo-300'
                     }`}
                   >
                     <span>📋</span>
                     <span>Tabla</span>
               </button>
-              
+
 
               <button
-                    onClick={() => setViewMode('minutas')}
+                    onClick={() => !isReadOnlyMode && setViewMode('minutas')}
+                    disabled={isReadOnlyMode}
                     className={`px-4 py-2 rounded-lg font-medium text-sm transition-all duration-300 flex items-center space-x-2 ${
-                      viewMode === 'minutas'
-                        ? 'bg-indigo-600 text-white shadow-md hover:shadow-lg'
-                        : 'bg-white text-gray-600 hover:bg-indigo-50 hover:text-indigo-700 border border-gray-300 hover:border-indigo-300'
+                      isReadOnlyMode
+                        ? 'bg-gray-200 text-gray-400 cursor-not-allowed border border-gray-300'
+                        : viewMode === 'minutas'
+                          ? 'bg-indigo-600 text-white shadow-md hover:shadow-lg'
+                          : 'bg-white text-gray-600 hover:bg-indigo-50 hover:text-indigo-700 border border-gray-300 hover:border-indigo-300'
                     }`}
+                    title={isReadOnlyMode ? "Tareas de minutas no disponibles (modo solo lectura)" : "Tareas de minutas"}
                   >
                     <span>📋</span>
                     <span>Tareas de minutas</span>
@@ -5838,24 +5894,39 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
             <div className="flex flex-wrap gap-2">
               <button
                   onClick={generateExampleExcel}
-                  className="bg-purple-600 text-white px-2 py-1.5 rounded text-xs hover:bg-purple-700 flex items-center space-x-1"
-                  title="Descargar archivo Excel de ejemplo con hitos"
+                  disabled={isReadOnlyMode}
+                  className={`px-2 py-1.5 rounded text-xs flex items-center space-x-1 ${
+                    isReadOnlyMode
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-purple-600 text-white hover:bg-purple-700'
+                  }`}
+                  title={isReadOnlyMode ? "No disponible (modo solo lectura)" : "Descargar archivo Excel de ejemplo con hitos"}
               >
                   <span>📋</span>
                   <span>Ejemplo</span>
               </button>
               <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="bg-blue-600 text-white px-2 py-1.5 rounded text-xs hover:bg-blue-700 flex items-center space-x-1"
-                  title="Importar cronograma desde Excel (reemplaza datos existentes)"
+                  disabled={isReadOnlyMode}
+                  className={`px-2 py-1.5 rounded text-xs flex items-center space-x-1 ${
+                    isReadOnlyMode
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                  }`}
+                  title={isReadOnlyMode ? "No disponible (modo solo lectura)" : "Importar cronograma desde Excel (reemplaza datos existentes)"}
               >
                   <span>📊</span>
                   <span>Importar</span>
               </button>
               <button
                   onClick={() => setShowAIWizard(true)}
-                  className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-2 py-1.5 rounded text-xs hover:from-purple-700 hover:to-pink-700 flex items-center space-x-1"
-                  title="Generar cronograma automáticamente con Asistente de IA"
+                  disabled={isReadOnlyMode}
+                  className={`px-2 py-1.5 rounded text-xs flex items-center space-x-1 ${
+                    isReadOnlyMode
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700'
+                  }`}
+                  title={isReadOnlyMode ? "No disponible (modo solo lectura)" : "Generar cronograma automáticamente con Asistente de IA"}
               >
                   <span>🤖</span>
                   <span>IA</span>
@@ -5892,9 +5963,13 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                       setTasks(recalculated);
                     }
                   }}
-                  className="bg-indigo-600 text-white px-2 py-1.5 rounded text-xs hover:bg-indigo-700 flex items-center space-x-1"
-                  title="Recalcular valores de negocio de todas las tareas basado en TIR y costos"
-                  disabled={isBusinessValueSyncing}
+                  className={`px-2 py-1.5 rounded text-xs flex items-center space-x-1 ${
+                    isReadOnlyMode || isBusinessValueSyncing
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                  }`}
+                  title={isReadOnlyMode ? "No disponible (modo solo lectura)" : "Recalcular valores de negocio de todas las tareas basado en TIR y costos"}
+                  disabled={isReadOnlyMode || isBusinessValueSyncing}
                 >
                   <span>{isBusinessValueSyncing ? '⏳' : '💰'}</span>
                   <span className="whitespace-nowrap">{isBusinessValueSyncing ? 'Sync...' : 'Valores'}</span>
@@ -5957,8 +6032,13 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                                     e.stopPropagation();
                                     addTaskAtEnd();
                                   }}
-                                  className="bg-blue-500 hover:bg-blue-600 text-white text-sm px-4 py-2 rounded-md shadow-sm transition-colors duration-200 flex items-center space-x-2"
-                                  title="Agregar nueva tarea al final"
+                                  disabled={isReadOnlyMode}
+                                  className={`text-sm px-4 py-2 rounded-md shadow-sm transition-colors duration-200 flex items-center space-x-2 ${
+                                    isReadOnlyMode
+                                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                      : 'bg-blue-500 hover:bg-blue-600 text-white'
+                                  }`}
+                                  title={isReadOnlyMode ? "No puedes agregar tareas (modo solo lectura)" : "Agregar nueva tarea al final"}
                                 >
                                   <span>➕</span>
                                   <span>Nueva Tarea</span>
@@ -5992,8 +6072,13 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                               e.stopPropagation();
                               insertTaskAtPosition(task.id, index);
                             }}
-                            className="bg-green-500 hover:bg-green-600 text-white text-sm px-2 py-1 rounded-md shadow-sm transition-colors duration-200 flex items-center justify-center min-w-[32px]"
-                            title="Insertar fila después"
+                            disabled={isReadOnlyMode}
+                            className={`text-sm px-2 py-1 rounded-md shadow-sm transition-colors duration-200 flex items-center justify-center min-w-[32px] ${
+                              isReadOnlyMode
+                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                : 'bg-green-500 hover:bg-green-600 text-white'
+                            }`}
+                            title={isReadOnlyMode ? "No puedes insertar tareas (modo solo lectura)" : "Insertar fila después"}
                           >
                             ➕
                           </button>
@@ -9756,15 +9841,17 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                         </button>
                         <button
                           onClick={() => updateTask(task.id, 'progress', task.progress + 10)}
-                          className="text-green-600 hover:text-green-900 mr-3"
-                          title="Incrementar progreso"
+                          disabled={isReadOnlyMode}
+                          className={isReadOnlyMode ? "text-gray-400 cursor-not-allowed mr-3" : "text-green-600 hover:text-green-900 mr-3"}
+                          title={isReadOnlyMode ? "No disponible (modo solo lectura)" : "Incrementar progreso"}
                         >
                           ⬆️
                         </button>
                         <button
                           onClick={() => updateTask(task.id, 'progress', task.progress - 10)}
-                          className="text-red-600 hover:text-red-900"
-                          title="Disminuir progreso"
+                          disabled={isReadOnlyMode}
+                          className={isReadOnlyMode ? "text-gray-400 cursor-not-allowed" : "text-red-600 hover:text-red-900"}
+                          title={isReadOnlyMode ? "No disponible (modo solo lectura)" : "Disminuir progreso"}
                         >
                           ⬇️
                         </button>
