@@ -27,6 +27,11 @@
     "vercel-build": "CI=false ESLINT_NO_DEV_ERRORS=true GENERATE_SOURCEMAP=false react-scripts build",
     "build:analyze": "CI=false ESLINT_NO_DEV_ERRORS=true GENERATE_SOURCEMAP=false ANALYZE=true react-scripts build",
     "test": "react-scripts test",
+    "test:e2e": "cypress open",
+    "test:e2e:ci": "cypress run",
+    "test:e2e:smoke": "cypress run --spec \"cypress/e2e/01-smoke.cy.js\"",
+    "test:e2e:auth": "cypress run --spec \"cypress/e2e/02-authentication.cy.js\"",
+    "test:e2e:projects": "cypress run --spec \"cypress/e2e/03-projects.cy.js\"",
     "eject": "react-scripts eject",
     "postinstall": "husky install || true"
   },

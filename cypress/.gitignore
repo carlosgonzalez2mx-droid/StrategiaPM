@@ -1,0 +1,7 @@
+# Cypress artifacts
+videos/
+screenshots/
+downloads/
+
+# Cypress binary (instalado en node_modules)
+# Ya está ignorado por node_modules/
