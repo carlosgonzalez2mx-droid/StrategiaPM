@@ -61,13 +61,17 @@ const UpgradeModal = ({
       const { data: { user } } = await supabase.auth.getUser();
       const userEmail = user?.email || 'noemail@example.com';
 
-      // Obtener información de la organización desde localStorage
-      const portfolioData = localStorage.getItem('strategiapm_portfolio_data');
+      // Obtener información de la organización desde localStorage (con error handling)
       let organizationName = 'Organization';
-
-      if (portfolioData) {
-        const portfolio = JSON.parse(portfolioData);
-        organizationName = portfolio?.organization?.name || organizationName;
+      try {
+        const portfolioData = localStorage.getItem('strategiapm_portfolio_data');
+        if (portfolioData) {
+          const portfolio = JSON.parse(portfolioData);
+          organizationName = portfolio?.organization?.name || organizationName;
+        }
+      } catch (parseError) {
+        console.warn('[UpgradeModal] Error parseando portfolio data:', parseError);
+        // Continuar con nombre por defecto
       }
 
       console.log('[UpgradeModal] Creando sesión de checkout para:', {
@@ -76,16 +80,24 @@ const UpgradeModal = ({
         userEmail
       });
 
-      // Llamar a la Edge Function para crear sesión de checkout
-      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
-        body: {
-          organizationId,
-          organizationName,
-          userEmail,
-          priceId: STRIPE_PRICE_ID,
-          plan: 'professional'
-        }
-      });
+      // Crear timeout de 30 segundos para evitar modal congelado
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Timeout: La solicitud a Stripe tardó demasiado (30s)')), 30000)
+      );
+
+      // Llamar a la Edge Function para crear sesión de checkout con timeout
+      const { data, error } = await Promise.race([
+        supabase.functions.invoke('create-checkout-session', {
+          body: {
+            organizationId,
+            organizationName,
+            userEmail,
+            priceId: STRIPE_PRICE_ID,
+            plan: 'professional'
+          }
+        }),
+        timeoutPromise
+      ]);
 
       if (error) {
         throw new Error(error.message || 'Error al crear sesión de checkout');
@@ -124,13 +136,17 @@ const UpgradeModal = ({
     setIsUpgrading(true);
 
     try {
-      // Obtener el usuario actual desde localStorage
-      const portfolioData = localStorage.getItem('strategiapm_portfolio_data');
+      // Obtener el usuario actual desde localStorage (con error handling)
       let userId = null;
-
-      if (portfolioData) {
-        const portfolio = JSON.parse(portfolioData);
-        userId = portfolio?.user?.id;
+      try {
+        const portfolioData = localStorage.getItem('strategiapm_portfolio_data');
+        if (portfolioData) {
+          const portfolio = JSON.parse(portfolioData);
+          userId = portfolio?.user?.id;
+        }
+      } catch (parseError) {
+        console.warn('[UpgradeModal] Error parseando portfolio data en simulación:', parseError);
+        // Continuar sin userId
       }
 
       // Cambiar plan usando el servicio

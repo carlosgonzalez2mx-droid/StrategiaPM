@@ -60,9 +60,16 @@ class FilePersistenceService {
         // Fallback a localStorage si no hay datos en IndexedDB
         const savedData = localStorage.getItem('mi-dashboard-portfolio');
         if (savedData) {
-          const parsedData = JSON.parse(savedData);
-          console.log('📂 Datos cargados desde localStorage (fallback)');
-          return parsedData;
+          try {
+            const parsedData = JSON.parse(savedData);
+            console.log('📂 Datos cargados desde localStorage (fallback)');
+            return parsedData;
+          } catch (parseError) {
+            console.error('❌ Error parseando datos de localStorage (corrupto):', parseError);
+            console.warn('🧹 Limpiando datos corruptos de localStorage...');
+            localStorage.removeItem('mi-dashboard-portfolio');
+            return null;
+          }
         }
         return null;
       }
@@ -92,12 +99,19 @@ class FilePersistenceService {
       console.log('📂 Cargando datos desde localStorage...');
       const savedData = localStorage.getItem('mi-dashboard-portfolio');
       if (savedData) {
-        const parsedData = JSON.parse(savedData);
-        console.log('📂 Datos cargados - globalResources:', parsedData.globalResources);
-        console.log('📂 Cantidad de recursos cargados:', parsedData.globalResources?.length || 0);
-        return parsedData;
+        try {
+          const parsedData = JSON.parse(savedData);
+          console.log('📂 Datos cargados - globalResources:', parsedData.globalResources);
+          console.log('📂 Cantidad de recursos cargados:', parsedData.globalResources?.length || 0);
+          return parsedData;
+        } catch (parseError) {
+          console.error('❌ Error parseando datos de localStorage (corrupto):', parseError);
+          console.warn('🧹 Limpiando datos corruptos de localStorage...');
+          localStorage.removeItem('mi-dashboard-portfolio');
+          return null;
+        }
       }
-      
+
       console.log('📂 No hay datos guardados');
       return null;
       

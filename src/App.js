@@ -36,34 +36,59 @@ import ErrorBoundary from './components/ErrorBoundary';
 import TrialStatusBanner from './components/subscription/TrialStatusBanner';
 import OverLimitBanner from './components/subscription/OverLimitBanner';
 
-// Componentes grandes con lazy loading (code splitting)
-const ConsolidatedDashboard = lazy(() => import('./components/ConsolidatedDashboard'));
-const IntegratedPMODashboard = lazy(() => import('./components/IntegratedPMODashboard'));
-const PortfolioStrategic = lazy(() => import('./components/PortfolioStrategic'));
-const ProjectManagementTabs = lazy(() => import('./components/ProjectManagementTabs'));
-const ScheduleManagement = lazy(() => import('./components/ScheduleManagement'));
-const FinancialManagement = lazy(() => import('./components/FinancialManagement'));
-const ResourceManagement = lazy(() => import('./components/ResourceManagement'));
-const RiskManagement = lazy(() => import('./components/RiskManagement'));
-const ChangeManagement = lazy(() => import('./components/ChangeManagement'));
-const CashFlowProjection = lazy(() => import('./components/CashFlowProjection'));
-const FileManager = lazy(() => import('./components/FileManager'));
-const ReportsManagement = lazy(() => import('./components/ReportsManagement'));
-const ProjectAudit = lazy(() => import('./components/ProjectAudit'));
-const ProjectArchive = lazy(() => import('./components/ProjectArchive'));
-const BackupManager = lazy(() => import('./components/BackupManager'));
-const OrganizationMembers = lazy(() => import('./components/OrganizationMembers'));
-const UserManagement = lazy(() => import('./components/UserManagement'));
-const UpgradeModal = lazy(() => import('./components/subscription/UpgradeModal'));
+// Componente de error para lazy loading fallido
+const LazyErrorFallback = ({ componentName }) => (
+  <div className="flex items-center justify-center min-h-screen bg-gray-50">
+    <div className="max-w-md p-8 bg-white rounded-lg shadow-xl">
+      <div className="text-center">
+        <div className="inline-flex items-center justify-center w-16 h-16 mb-4 bg-red-100 rounded-full">
+          <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        </div>
+        <h2 className="mb-2 text-2xl font-bold text-gray-800">Error al cargar</h2>
+        <p className="mb-6 text-gray-600">
+          No se pudo cargar el componente {componentName}. Verifica tu conexión a internet.
+        </p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors duration-200"
+        >
+          Recargar página
+        </button>
+      </div>
+    </div>
+  </div>
+);
 
-// Subscription Components (lazy loading)
-const SubscriptionSuccess = lazy(() => import('./components/subscription/SubscriptionSuccess'));
-const SubscriptionCancelled = lazy(() => import('./components/subscription/SubscriptionCancelled'));
+// Componentes grandes con lazy loading (code splitting) + error handling
+const ConsolidatedDashboard = lazy(() => import('./components/ConsolidatedDashboard').catch(() => ({ default: () => <LazyErrorFallback componentName="Dashboard Consolidado" /> })));
+const IntegratedPMODashboard = lazy(() => import('./components/IntegratedPMODashboard').catch(() => ({ default: () => <LazyErrorFallback componentName="Dashboard PMO" /> })));
+const PortfolioStrategic = lazy(() => import('./components/PortfolioStrategic').catch(() => ({ default: () => <LazyErrorFallback componentName="Portafolio Estratégico" /> })));
+const ProjectManagementTabs = lazy(() => import('./components/ProjectManagementTabs').catch(() => ({ default: () => <LazyErrorFallback componentName="Gestión de Proyectos" /> })));
+const ScheduleManagement = lazy(() => import('./components/ScheduleManagement').catch(() => ({ default: () => <LazyErrorFallback componentName="Gestión de Cronograma" /> })));
+const FinancialManagement = lazy(() => import('./components/FinancialManagement').catch(() => ({ default: () => <LazyErrorFallback componentName="Gestión Financiera" /> })));
+const ResourceManagement = lazy(() => import('./components/ResourceManagement').catch(() => ({ default: () => <LazyErrorFallback componentName="Gestión de Recursos" /> })));
+const RiskManagement = lazy(() => import('./components/RiskManagement').catch(() => ({ default: () => <LazyErrorFallback componentName="Gestión de Riesgos" /> })));
+const ChangeManagement = lazy(() => import('./components/ChangeManagement').catch(() => ({ default: () => <LazyErrorFallback componentName="Gestión de Cambios" /> })));
+const CashFlowProjection = lazy(() => import('./components/CashFlowProjection').catch(() => ({ default: () => <LazyErrorFallback componentName="Proyección de Flujo de Caja" /> })));
+const FileManager = lazy(() => import('./components/FileManager').catch(() => ({ default: () => <LazyErrorFallback componentName="Gestor de Archivos" /> })));
+const ReportsManagement = lazy(() => import('./components/ReportsManagement').catch(() => ({ default: () => <LazyErrorFallback componentName="Gestión de Reportes" /> })));
+const ProjectAudit = lazy(() => import('./components/ProjectAudit').catch(() => ({ default: () => <LazyErrorFallback componentName="Auditoría de Proyecto" /> })));
+const ProjectArchive = lazy(() => import('./components/ProjectArchive').catch(() => ({ default: () => <LazyErrorFallback componentName="Archivo de Proyectos" /> })));
+const BackupManager = lazy(() => import('./components/BackupManager').catch(() => ({ default: () => <LazyErrorFallback componentName="Gestor de Respaldos" /> })));
+const OrganizationMembers = lazy(() => import('./components/OrganizationMembers').catch(() => ({ default: () => <LazyErrorFallback componentName="Miembros de Organización" /> })));
+const UserManagement = lazy(() => import('./components/UserManagement').catch(() => ({ default: () => <LazyErrorFallback componentName="Gestión de Usuarios" /> })));
+const UpgradeModal = lazy(() => import('./components/subscription/UpgradeModal').catch(() => ({ default: () => <LazyErrorFallback componentName="Modal de Actualización" /> })));
 
-// Super Admin Components (lazy loading)
-const SuperAdminRoute = lazy(() => import('./components/admin/SuperAdminRoute'));
-const SuperAdminDashboard = lazy(() => import('./components/admin/SuperAdminDashboard'));
-const OrganizationDetails = lazy(() => import('./components/admin/OrganizationDetails'));
+// Subscription Components (lazy loading) + error handling
+const SubscriptionSuccess = lazy(() => import('./components/subscription/SubscriptionSuccess').catch(() => ({ default: () => <LazyErrorFallback componentName="Suscripción Exitosa" /> })));
+const SubscriptionCancelled = lazy(() => import('./components/subscription/SubscriptionCancelled').catch(() => ({ default: () => <LazyErrorFallback componentName="Suscripción Cancelada" /> })));
+
+// Super Admin Components (lazy loading) + error handling
+const SuperAdminRoute = lazy(() => import('./components/admin/SuperAdminRoute').catch(() => ({ default: () => <LazyErrorFallback componentName="Ruta Super Admin" /> })));
+const SuperAdminDashboard = lazy(() => import('./components/admin/SuperAdminDashboard').catch(() => ({ default: () => <LazyErrorFallback componentName="Dashboard Super Admin" /> })));
+const OrganizationDetails = lazy(() => import('./components/admin/OrganizationDetails').catch(() => ({ default: () => <LazyErrorFallback componentName="Detalles de Organización" /> })));
 
 // Función de ordenamiento de tareas por wbsCode (importada desde ScheduleManagement)
 const sortTasksByWbsCode = (tasks) => {
