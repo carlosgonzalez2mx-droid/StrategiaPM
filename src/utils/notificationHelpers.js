@@ -73,18 +73,26 @@ export const createNotification = async ({
  */
 export const getUnreadNotifications = async (userEmail) => {
   try {
+    // Verificar que el usuario esté autenticado antes de hacer consultas
+    const { data: { session } } = await supabaseService.supabase.auth.getSession();
+
+    if (!session?.user) {
+      console.warn('⚠️ getUnreadNotifications: Usuario no autenticado');
+      return [];
+    }
+
     const { data, error } = await supabaseService.supabase
       .from('change_notifications')
       .select('*')
       .eq('user_email', userEmail)
       .eq('status', 'unread')
       .order('created_at', { ascending: false });
-    
+
     if (error) {
       console.error('Error obteniendo notificaciones:', error);
       return [];
     }
-    
+
     return data || [];
   } catch (error) {
     console.error('Error inesperado obteniendo notificaciones:', error);
@@ -156,17 +164,25 @@ export const markAllAsRead = async (userEmail) => {
  */
 export const getUnreadCount = async (userEmail) => {
   try {
+    // Verificar que el usuario esté autenticado antes de hacer consultas
+    const { data: { session } } = await supabaseService.supabase.auth.getSession();
+
+    if (!session?.user) {
+      console.warn('⚠️ getUnreadCount: Usuario no autenticado');
+      return 0;
+    }
+
     const { count, error } = await supabaseService.supabase
       .from('change_notifications')
       .select('*', { count: 'exact', head: true })
       .eq('user_email', userEmail)
       .eq('status', 'unread');
-    
+
     if (error) {
       console.error('Error obteniendo conteo:', error);
       return 0;
     }
-    
+
     return count || 0;
   } catch (error) {
     console.error('Error inesperado obteniendo conteo:', error);
