@@ -754,11 +754,10 @@ class SupabaseService {
   async loadPortfolioData() {
     try {
       console.log('📊 Cargando datos del portafolio desde Supabase (versión optimizada)...');
-      console.time('⚡ Carga Total del Portafolio');
-      
+
       // Obtener usuario autenticado
       const { data: { user }, error: userError } = await this.supabase.auth.getUser();
-      
+
       if (userError || !user?.email) {
         console.error('❌ Error obteniendo usuario:', userError);
         return null;
@@ -766,7 +765,7 @@ class SupabaseService {
 
       console.log('🏢 EJECUTANDO DETECCIÓN AUTOMÁTICA DE ORGANIZACIÓN...');
       const organization = await this.detectUserOrganization(user.email);
-      
+
       if (!organization) {
         console.error('❌ No se pudo detectar organización para el usuario:', user.email);
         console.error('💡 El usuario debe tener una membresía activa en una organización');
@@ -779,7 +778,6 @@ class SupabaseService {
       // ============================================
       // PASO 1: QUERIES PARALELAS PRINCIPALES
       // ============================================
-      console.time('📊 Queries Principales');
       
       const [
         projectsResult,
@@ -805,8 +803,6 @@ class SupabaseService {
           .select('*')
           .eq('organization_id', orgId)
       ]);
-
-      console.timeEnd('📊 Queries Principales');
 
       if (projectsResult.error) {
         console.error('❌ Error cargando proyectos:', projectsResult.error);
@@ -850,8 +846,7 @@ class SupabaseService {
       // Si no hay proyectos, retornar estructura básica
       if (convertedProjects.length === 0) {
         console.log('⚠️ No hay proyectos en la organización');
-        console.timeEnd('⚡ Carga Total del Portafolio');
-        
+
         return {
           organization,
           projects: [],
@@ -877,8 +872,7 @@ class SupabaseService {
       // ============================================
       // PASO 2: BATCH LOADING - 1 QUERY POR TABLA
       // ============================================
-      console.time('📦 Batch Loading');
-      
+
       const projectIds = convertedProjects.map(p => p.id);
       
       const [
@@ -948,8 +942,6 @@ class SupabaseService {
           .in('project_id', projectIds)
       ]);
 
-      console.timeEnd('📦 Batch Loading');
-
       // 🔍 DEBUG: Verificar orden de tareas desde Supabase
       if (tasksResult.data && tasksResult.data.length > 0) {
         console.log('🔍 DEBUG - Primeras 10 tareas desde Supabase (después de .order()):');
@@ -961,7 +953,6 @@ class SupabaseService {
       // ============================================
       // PASO 3: AGRUPAR DATOS POR PROYECTO
       // ============================================
-      console.time('🔨 Procesamiento de Datos');
 
       // Inicializar objetos para cada proyecto
       const tasksByProject = {};
@@ -1091,7 +1082,6 @@ class SupabaseService {
         includeWeekendsByProject[config.project_id] = config.include_weekends || false;
       });
 
-      console.timeEnd('🔨 Procesamiento de Datos');
 
       // ✅ FIX ADICIONAL: Ordenar manualmente cada proyecto por wbsCode numérico
       // Esto asegura el orden correcto incluso si wbs_code es VARCHAR en Supabase
@@ -1107,7 +1097,6 @@ class SupabaseService {
         );
       });
 
-      console.timeEnd('⚡ Carga Total del Portafolio');
 
       // ============================================
       // LOGS DE RENDIMIENTO

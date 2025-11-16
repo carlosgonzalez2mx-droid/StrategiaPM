@@ -330,6 +330,15 @@ class SubscriptionService {
           .eq('status', 'active')
       ]);
 
+      // Verificar errores en las consultas
+      if (projectsCount.error) {
+        console.warn('⚠️ Error contando proyectos:', projectsCount.error);
+      }
+
+      if (usersCount.error) {
+        console.warn('⚠️ Error contando usuarios:', usersCount.error);
+      }
+
       const currentProjects = projectsCount.count || 0;
       const currentUsers = usersCount.count || 0;
       const maxProjects = subscription?.max_projects;
