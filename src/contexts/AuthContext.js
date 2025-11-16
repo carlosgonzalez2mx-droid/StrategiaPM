@@ -208,27 +208,28 @@ export const AuthProvider = ({ children }) => {
       console.log('🔄 Sincronizando usuario desde Supabase...');
 
       // Detectar organización
-      const orgId = await supabaseService.detectUserOrganization();
-      
+      const orgData = await supabaseService.detectUserOrganization();
+      const orgId = orgData?.id || null;
+
       // 🆕 VERIFICAR SI CAMBIÓ LA ORGANIZACIÓN
       const previousOrgId = organizationId;
       const hasOrganizationChanged = previousOrgId && previousOrgId !== orgId;
       const isNewUserWithoutOrg = !orgId && previousOrgId;
-      
+
       // 🆕 SI CAMBIÓ LA ORGANIZACIÓN O EL NUEVO USUARIO NO TIENE ORG, LIMPIAR DATOS
       if (hasOrganizationChanged || isNewUserWithoutOrg) {
         console.log('🔄 Organización cambió o usuario sin org - Limpiando datos...');
         console.log('   📍 Org anterior:', previousOrgId);
         console.log('   📍 Org nueva:', orgId || 'ninguna');
-        
+
         clearLocalData();
-        
+
         console.log('✅ Datos limpiados - Usuario verá datos limpios');
       }
-      
+
       // Obtener rol del usuario desde organization_members
       let userRole = 'pmo_assistant'; // Rol por defecto
-      
+
       if (orgId) {
         try {
           const { data: membership } = await supabaseService.supabase
