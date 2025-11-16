@@ -317,6 +317,14 @@ class SubscriptionService {
    */
   async getUsageStats(organizationId) {
     try {
+      // Verificar que el usuario esté autenticado antes de hacer consultas
+      const { data: { session } } = await supabaseService.supabase.auth.getSession();
+
+      if (!session?.user) {
+        console.warn('⚠️ getUsageStats: Usuario no autenticado, retornando valores por defecto');
+        return null;
+      }
+
       const [subscription, projectsCount, usersCount] = await Promise.all([
         this.getOrganizationSubscription(organizationId),
         supabaseService.supabase
