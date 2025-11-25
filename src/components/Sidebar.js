@@ -1,3 +1,5 @@
+import { logger } from '../utils/logger';
+
 import React from 'react';
 import supabaseService from '../services/SupabaseService';
 import usePermissions from '../hooks/usePermissions';
@@ -32,22 +34,22 @@ const Sidebar = ({
   const handleDatabaseBackup = async () => {
     try {
       setIsBackingUp(true);
-      console.log('🔄 Iniciando backup de base de datos...');
+      logger.debug('🔄 Iniciando backup de base de datos...');
       
       const result = await supabaseService.createDatabaseBackup();
       
       if (result.success) {
-        console.log(`✅ Backup exitoso: ${result.fileName}`);
-        console.log(`📊 Registros respaldados: ${result.recordCount} de ${result.tables} tablas`);
+        logger.debug(`✅ Backup exitoso: ${result.fileName}`);
+        logger.debug(`📊 Registros respaldados: ${result.recordCount} de ${result.tables} tablas`);
         
         // Mostrar notificación de éxito
         alert(`✅ Backup completado exitosamente!\n\nArchivo: ${result.fileName}\nRegistros: ${result.recordCount}\nTablas: ${result.tables}`);
       } else {
-        console.error('❌ Error en backup:', result.error);
+        logger.error('❌ Error en backup:', result.error);
         alert(`❌ Error al crear backup:\n${result.error}`);
       }
     } catch (error) {
-      console.error('❌ Error inesperado en backup:', error);
+      logger.error('❌ Error inesperado en backup:', error);
       alert(`❌ Error inesperado:\n${error.message}`);
     } finally {
       setIsBackingUp(false);
@@ -76,7 +78,7 @@ const Sidebar = ({
         
         if (preview.success) {
           setRestorePreview(preview);
-          console.log('✅ Archivo de backup válido:', preview);
+          logger.debug('✅ Archivo de backup válido:', preview);
         } else {
           alert(`❌ Error validando archivo: ${preview.error}`);
           setRestoreFile(null);
@@ -115,7 +117,7 @@ const Sidebar = ({
 
     try {
       setIsRestoring(true);
-      console.log('🔄 Iniciando restauración de backup...');
+      logger.debug('🔄 Iniciando restauración de backup...');
 
       // Leer archivo nuevamente
       const reader = new FileReader();
@@ -149,7 +151,7 @@ const Sidebar = ({
             alert(`❌ Error en restauración: ${result.error}`);
           }
         } catch (error) {
-          console.error('❌ Error procesando restauración:', error);
+          logger.error('❌ Error procesando restauración:', error);
           alert(`❌ Error inesperado: ${error.message}`);
         } finally {
           setIsRestoring(false);
@@ -159,7 +161,7 @@ const Sidebar = ({
       reader.readAsText(restoreFile);
 
     } catch (error) {
-      console.error('❌ Error iniciando restauración:', error);
+      logger.error('❌ Error iniciando restauración:', error);
       alert(`❌ Error inesperado: ${error.message}`);
       setIsRestoring(false);
     }
@@ -174,7 +176,7 @@ const Sidebar = ({
           setBackupStats(stats);
         }
       } catch (error) {
-        console.warn('⚠️ No se pudieron cargar estadísticas de backup:', error);
+        logger.warn('⚠️ No se pudieron cargar estadísticas de backup:', error);
       }
     };
     
@@ -285,32 +287,32 @@ const Sidebar = ({
                   <button
                     onClick={async () => {
                       if (window.confirm('¿Estás seguro de que quieres desconectarte?\n\nEsto cerrará completamente tu sesión por seguridad.')) {
-                        console.log('🚪 Cerrando sesión de Supabase...');
+                        logger.debug('🚪 Cerrando sesión de Supabase...');
                         
                         try {
                           // LOGOUT REAL DE SUPABASE para seguridad
                           const result = await supabaseService.signOut();
                           
                           if (result.success) {
-                            console.log('✅ Logout completo exitoso');
+                            logger.debug('✅ Logout completo exitoso');
                             
                             // Verificar que realmente no hay usuario
                             const stillLoggedIn = supabaseService.getCurrentUser();
                             if (stillLoggedIn) {
-                              console.warn('⚠️ Usuario aún detectado después del logout, forzando recarga...');
+                              logger.warn('⚠️ Usuario aún detectado después del logout, forzando recarga...');
                             }
                             
                             // Pequeña pausa para asegurar que el logout se procesó
                             setTimeout(() => {
-                              console.log('🔄 Recargando página para limpiar estado...');
+                              logger.debug('🔄 Recargando página para limpiar estado...');
                               window.location.reload();
                             }, 500);
                           } else {
-                            console.error('❌ Error cerrando sesión:', result.error);
+                            logger.error('❌ Error cerrando sesión:', result.error);
                             alert('❌ Error al cerrar sesión. Inténtalo de nuevo.');
                           }
                         } catch (error) {
-                          console.error('❌ Error inesperado:', error);
+                          logger.error('❌ Error inesperado:', error);
                           alert('❌ Error inesperado al cerrar sesión.');
                         }
                       }
@@ -328,7 +330,7 @@ const Sidebar = ({
                 {!supabaseService.getCurrentUser() && (
                   <button
                     onClick={() => {
-                      console.log('🔑 Abriendo modal de autenticación...');
+                      logger.debug('🔑 Abriendo modal de autenticación...');
                       // Disparar evento para abrir modal de autenticación
                       window.dispatchEvent(new CustomEvent('requestSupabaseAuth', { 
                         detail: { action: 'login' } 

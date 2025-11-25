@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { supabaseLogger } from '../utils/logger';
 
 // Configuración de Supabase desde variables de entorno
 const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL;
@@ -28,20 +29,20 @@ class SupabaseService {
     if (uuidRegex.test(uniqueIdentifier)) {
       return uniqueIdentifier;
     }
-    
+
     // Crear un ID determinístico basado en proyecto + identificador
     const baseString = `${projectId}-${uniqueIdentifier}`;
     let hash = 0;
-    
+
     for (let i = 0; i < baseString.length; i++) {
       const char = baseString.charCodeAt(i);
       hash = ((hash << 5) - hash) + char;
       hash = hash & hash; // Convert to 32bit integer
     }
-    
+
     // Convertir a formato UUID-like
     const hashHex = Math.abs(hash).toString(16).padStart(32, '0');
-    
+
     return [
       hashHex.substring(0, 8),
       hashHex.substring(8, 12),
@@ -54,38 +55,38 @@ class SupabaseService {
   // Inicializar el servicio
   async initialize() {
     try {
-      console.log('🚀 Inicializando SupabaseService...');
-      
+      supabaseLogger.init(' Inicializando SupabaseService...');
+
       // Verificar si hay un usuario autenticado
       const { data: { user } } = await this.supabase.auth.getUser();
       this.currentUser = user;
-      
+
       if (user) {
-        console.log('✅ Usuario autenticado:', user.email);
-        
+        supabaseLogger.success(' Usuario autenticado:', user.email);
+
         try {
           // USAR DETECCIÓN AUTOMÁTICA
-          console.log('🚀 Iniciando detección de organización...');
+          supabaseLogger.init(' Iniciando detección de organización...');
           const orgData = await this.detectUserOrganization();
           if (orgData && orgData.id) {
             this.organizationId = orgData.id;
-            console.log('✅ Detección de organización completada. OrganizationId:', this.organizationId);
+            supabaseLogger.success(' Detección de organización completada. OrganizationId:', this.organizationId);
           } else {
-            console.log('⚠️ No se pudo detectar organización automáticamente');
+            supabaseLogger.warning(' No se pudo detectar organización automáticamente');
             this.organizationId = null;
           }
         } catch (error) {
-          console.error('❌ Error en detección de organización:', error);
+          supabaseLogger.error(' Error en detección de organización:', error);
           this.organizationId = null;
         }
       } else {
-        console.log('⚠️ No hay usuario autenticado');
+        supabaseLogger.warning(' No hay usuario autenticado');
         this.organizationId = null;
       }
-      
+
       return true;
     } catch (error) {
-      console.error('❌ Error inicializando SupabaseService:', error);
+      supabaseLogger.error(' Error inicializando SupabaseService:', error);
       return false;
     }
   }
@@ -93,15 +94,15 @@ class SupabaseService {
   // Detectar organización del usuario automáticamente
   async detectUserOrganization(userEmail) {
     const emailToUse = userEmail || this.currentUser?.email;
-    
+
     if (!emailToUse) {
-      console.log('❌ No hay usuario para detectar organización');
+      supabaseLogger.data('❌ No hay usuario para detectar organización');
       return null;
     }
 
     try {
-      console.log('🔍 Detectando organización para:', emailToUse);
-      
+      supabaseLogger.loading(' Detectando organización para:', emailToUse);
+
       // Query que aprovecha las políticas RLS corregidas
       const { data: membership, error } = await this.supabase
         .from('organization_members')
@@ -127,19 +128,19 @@ class SupabaseService {
         .eq('user_email', emailToUse)
         .eq('status', 'active')
         .single();
-      
+
       if (error) {
-        console.error('❌ Error buscando membresía:', error);
-        console.error('Código de error:', error.code);
-        console.error('Mensaje:', error.message);
+        supabaseLogger.error(' Error buscando membresía:', error);
+        supabaseLogger.error('Código de error:', error.code);
+        supabaseLogger.error('Mensaje:', error.message);
         return null;
       }
-      
+
       if (!membership || !membership.organizations) {
-        console.warn('⚠️ No se encontró organización activa para el usuario');
+        supabaseLogger.warning('⚠️ No se encontró organización activa para el usuario');
         return null;
       }
-      
+
       const orgData = {
         id: membership.organizations.id,
         name: membership.organizations.name,
@@ -164,30 +165,30 @@ class SupabaseService {
         max_projects: membership.organizations.max_projects,
         max_users: membership.organizations.max_users
       };
-      
-      console.log('✅ Organización detectada:', orgData.name);
-      console.log('👤 Rol del usuario:', orgData.role);
-      console.log('🆔 Organization ID:', orgData.id);
-      
+
+      supabaseLogger.success(' Organización detectada:', orgData.name);
+      supabaseLogger.data(' Rol del usuario:', orgData.role);
+      supabaseLogger.data(' Organization ID:', orgData.id);
+
       // Guardar en la instancia
       this.organizationId = orgData.id;
-      
+
       return orgData;
-      
+
     } catch (error) {
-      console.error('❌ Error inesperado detectando organización:', error);
+      supabaseLogger.error(' Error inesperado detectando organización:', error);
       return null;
     }
   }
 
   // NUEVA: Forzar recarga de organización y limpiar caché
   async forceReloadOrganization() {
-    console.log('🔄 Forzando recarga de organización...');
-    
+    supabaseLogger.update(' Forzando recarga de organización...');
+
     try {
       // Limpiar caché de organización
       this.organizationId = null;
-      
+
       // Limpiar localStorage relacionado con organización
       const keysToClean = [
         'mi-dashboard-portfolio',
@@ -196,36 +197,36 @@ class SupabaseService {
         'organizationData',
         'userSession'
       ];
-      
+
       keysToClean.forEach(key => {
         if (localStorage.getItem(key)) {
-          console.log(`🗑️ Limpiando localStorage: ${key}`);
+          supabaseLogger.data(`🗑️ Limpiando localStorage: ${key}`);
           localStorage.removeItem(key);
         }
       });
-      
+
       // Limpiar sessionStorage
       const sessionKeysToClean = [
         'currentUser',
         'userSession',
         'organizationData'
       ];
-      
+
       sessionKeysToClean.forEach(key => {
         if (sessionStorage.getItem(key)) {
-          console.log(`🗑️ Limpiando sessionStorage: ${key}`);
+          supabaseLogger.data(`🗑️ Limpiando sessionStorage: ${key}`);
           sessionStorage.removeItem(key);
         }
       });
-      
+
       // Forzar nueva detección de organización
       const newOrgId = await this.detectUserOrganization();
-      
-      console.log('✅ Recarga de organización completada:', newOrgId);
+
+      supabaseLogger.success(' Recarga de organización completada:', newOrgId);
       return newOrgId;
-      
+
     } catch (error) {
-      console.error('❌ Error en forceReloadOrganization:', error);
+      supabaseLogger.error(' Error en forceReloadOrganization:', error);
       return null;
     }
   }
@@ -233,25 +234,25 @@ class SupabaseService {
   // Cargar organización del usuario
   async loadOrganization() {
     if (!this.currentUser) return null;
-    
+
     try {
       const { data: organization, error } = await this.supabase
         .from('organizations')
         .select('id')
         .eq('owner_id', this.currentUser.id)
         .single();
-      
+
       if (error) {
-        console.error('❌ Error cargando organización:', error);
+        supabaseLogger.error(' Error cargando organización:', error);
         return null;
       }
-      
+
       // DETECCIÓN AUTOMÁTICA: Usar organización del usuario
       this.organizationId = organization.id;
-      console.log('✅ Organización detectada automáticamente:', this.organizationId);
+      supabaseLogger.success(' Organización detectada automáticamente:', this.organizationId);
       return organization.id;
     } catch (error) {
-      console.error('❌ Error cargando organización:', error);
+      supabaseLogger.error(' Error cargando organización:', error);
       return null;
     }
   }
@@ -259,8 +260,8 @@ class SupabaseService {
   // NUEVA: Activar invitaciones pendientes automáticamente
   async activatePendingInvitations(userEmail, userId) {
     try {
-      console.log('🔍 Buscando invitaciones pendientes para:', userEmail);
-      
+      supabaseLogger.loading(' Buscando invitaciones pendientes para:', userEmail);
+
       // Buscar invitaciones pendientes para este email
       const { data: pendingInvites, error: searchError } = await this.supabase
         .from('organization_members')
@@ -269,19 +270,19 @@ class SupabaseService {
         .eq('status', 'pending');
 
       if (searchError) {
-        console.error('❌ Error buscando invitaciones:', searchError);
+        supabaseLogger.error(' Error buscando invitaciones:', searchError);
         return;
       }
 
       if (pendingInvites && pendingInvites.length > 0) {
-        console.log(`✅ Encontradas ${pendingInvites.length} invitaciones pendientes`);
-        
+        supabaseLogger.data(`✅ Encontradas ${pendingInvites.length} invitaciones pendientes`);
+
         let primaryOrganization = null;
-        
+
         // Activar todas las invitaciones pendientes
         for (const invite of pendingInvites) {
-          console.log('🔄 Activando invitación para organización:', invite.organizations?.name);
-          
+          supabaseLogger.update(' Activando invitación para organización:', invite.organizations?.name);
+
           const { error: updateError } = await this.supabase
             .from('organization_members')
             .update({
@@ -292,29 +293,29 @@ class SupabaseService {
             .eq('id', invite.id);
 
           if (updateError) {
-            console.error('❌ Error activando invitación:', updateError);
+            supabaseLogger.error(' Error activando invitación:', updateError);
           } else {
-            console.log('✅ Invitación activada exitosamente');
+            supabaseLogger.success(' Invitación activada exitosamente');
             // Usar la primera organización como primaria
             if (!primaryOrganization) {
               primaryOrganization = invite.organization_id;
             }
           }
         }
-        
+
         // Configurar la organización primaria (USAR LA DE LA INVITACIÓN)
         if (primaryOrganization) {
           this.organizationId = primaryOrganization;
-          console.log('🏢 Organización primaria configurada:', primaryOrganization);
-          
+          supabaseLogger.data(' Organización primaria configurada:', primaryOrganization);
+
           // Mostrar mensaje de bienvenida
           const orgName = pendingInvites[0].organizations?.name || 'la organización';
-          console.log(`🎉 ¡Bienvenido a ${orgName}! Has sido agregado automáticamente.`);
-          
+          supabaseLogger.data(`🎉 ¡Bienvenido a ${orgName}! Has sido agregado automáticamente.`);
+
           // FORZAR DETECCIÓN AUTOMÁTICA DESPUÉS DE ACTIVAR
           await this.detectUserOrganization();
         }
-        
+
         return {
           activated: pendingInvites.length,
           primaryOrganization: primaryOrganization,
@@ -325,12 +326,12 @@ class SupabaseService {
           }))
         };
       } else {
-        console.log('ℹ️ No se encontraron invitaciones pendientes para este usuario');
+        supabaseLogger.data(' No se encontraron invitaciones pendientes para este usuario');
         return { activated: 0 };
       }
-      
+
     } catch (error) {
-      console.error('❌ Error activando invitaciones pendientes:', error);
+      supabaseLogger.error(' Error activando invitaciones pendientes:', error);
       return { activated: 0, error: error.message };
     }
   }
@@ -340,10 +341,10 @@ class SupabaseService {
     let authUser = null;
     let userCreated = false;
     let organizationCreated = false;
-    
+
     try {
-      console.log('🚀 Iniciando registro de usuario:', email);
-      
+      supabaseLogger.init(' Iniciando registro de usuario:', email);
+
       // PASO 1: Crear usuario en auth.users
       const { data, error } = await this.supabase.auth.signUp({
         email,
@@ -359,7 +360,7 @@ class SupabaseService {
       });
 
       if (error) {
-        console.error('❌ Error en auth.signUp:', error);
+        supabaseLogger.error(' Error en auth.signUp:', error);
         throw error;
       }
 
@@ -368,10 +369,10 @@ class SupabaseService {
       }
 
       authUser = data.user;
-      console.log('✅ Usuario creado en auth.users:', authUser.id);
+      supabaseLogger.success(' Usuario creado en auth.users:', authUser.id);
 
       // PASO 2: Crear usuario en tabla users DIRECTAMENTE (sin esperar trigger)
-      console.log('📝 Creando usuario en tabla users...');
+      supabaseLogger.data(' Creando usuario en tabla users...');
 
       try {
         // Crear usuario directamente sin esperar al trigger
@@ -389,35 +390,35 @@ class SupabaseService {
         if (insertError) {
           // Si es error de duplicado (23505), está bien, significa que ya existe
           if (insertError.code === '23505') {
-            console.log('ℹ️ Usuario ya existe en tabla users (posiblemente creado por trigger)');
+            supabaseLogger.data(' Usuario ya existe en tabla users (posiblemente creado por trigger)');
             userCreated = true;
           } else {
             // Cualquier otro error es crítico
-            console.error('❌ Error crítico creando usuario:', insertError);
+            supabaseLogger.error(' Error crítico creando usuario:', insertError);
             throw insertError;
           }
         } else {
-          console.log('✅ Usuario creado en tabla users:', insertedUser.email);
+          supabaseLogger.success(' Usuario creado en tabla users:', insertedUser.email);
           userCreated = true;
         }
 
       } catch (userError) {
-        console.error('❌ Error verificando/creando usuario en tabla users:', userError);
+        supabaseLogger.error(' Error verificando/creando usuario en tabla users:', userError);
 
         // ROLLBACK: Eliminar usuario de auth.users si falla completamente
         try {
-          console.log('🔄 Iniciando rollback - eliminando usuario de auth.users...');
+          supabaseLogger.update(' Iniciando rollback - eliminando usuario de auth.users...');
           await this.supabase.auth.admin.deleteUser(authUser.id);
-          console.log('✅ Rollback completado');
+          supabaseLogger.success(' Rollback completado');
         } catch (rollbackError) {
-          console.error('❌ Error en rollback:', rollbackError);
+          supabaseLogger.error(' Error en rollback:', rollbackError);
         }
 
         throw new Error(`Error creando usuario en tabla users: ${userError.message}`);
       }
 
       // PASO 3: Verificar invitaciones pendientes ANTES de crear organización
-      console.log('🔍 Verificando invitaciones pendientes antes de crear organización...');
+      supabaseLogger.loading(' Verificando invitaciones pendientes antes de crear organización...');
       const { data: pendingInvites } = await this.supabase
         .from('organization_members')
         .select('id')
@@ -427,13 +428,13 @@ class SupabaseService {
       const hasPendingInvitations = pendingInvites && pendingInvites.length > 0;
 
       if (hasPendingInvitations) {
-        console.log(`✅ Usuario tiene ${pendingInvites.length} invitación(es) pendiente(s) - NO se creará organización propia`);
+        supabaseLogger.data(`✅ Usuario tiene ${pendingInvites.length} invitación(es) pendiente(s) - NO se creará organización propia`);
       }
 
       // PASO 4: Crear organización SOLO si NO hay invitaciones pendientes
       if (!hasPendingInvitations) {
         try {
-          console.log('🏢 Creando organización con plan FREE para nuevo usuario...');
+          supabaseLogger.data(' Creando organización con plan FREE para nuevo usuario...');
 
           // Calcular fecha de fin de trial (14 días desde ahora)
           const trialEndsAt = new Date();
@@ -455,16 +456,16 @@ class SupabaseService {
             .single();
 
           if (orgError) {
-            console.warn('⚠️ Error creando organización:', orgError);
+            supabaseLogger.warning('⚠️ Error creando organización:', orgError);
             // No es crítico, el usuario puede ser invitado a una organización existente
           } else {
-            console.log('✅ Organización creada con plan FREE:', orgData.id);
+            supabaseLogger.success(' Organización creada con plan FREE:', orgData.id);
             this.organizationId = orgData.id;
             organizationCreated = true;
 
             // PASO 4.1: Crear membresía del owner en su nueva organización
             try {
-              console.log('👥 Creando membresía del owner en la organización...');
+              supabaseLogger.data(' Creando membresía del owner en la organización...');
               const { data: memberData, error: memberError } = await this.supabase
                 .from('organization_members')
                 .insert({
@@ -478,19 +479,19 @@ class SupabaseService {
                 .single();
 
               if (memberError) {
-                console.error('❌ Error creando membresía:', memberError);
+                supabaseLogger.error(' Error creando membresía:', memberError);
               } else {
-                console.log('✅ Membresía creada exitosamente:', memberData.id);
+                supabaseLogger.success(' Membresía creada exitosamente:', memberData.id);
               }
             } catch (memberError) {
-              console.error('❌ Error no crítico creando membresía:', memberError);
+              supabaseLogger.error(' Error no crítico creando membresía:', memberError);
             }
           }
         } catch (orgError) {
-          console.warn('⚠️ Error no crítico creando organización:', orgError);
+          supabaseLogger.warning('⚠️ Error no crítico creando organización:', orgError);
         }
       } else {
-        console.log('ℹ️ Omitiendo creación de organización - usuario será agregado a organización(es) existente(s)');
+        supabaseLogger.data(' Omitiendo creación de organización - usuario será agregado a organización(es) existente(s)');
       }
 
       // PASO 5: Configurar usuario actual
@@ -498,17 +499,17 @@ class SupabaseService {
 
       // PASO 6: Activar invitaciones pendientes (si existen)
       const invitationResult = await this.activatePendingInvitations(email, authUser.id);
-      
-      console.log('🎉 Registro completado exitosamente');
-      console.log('📊 Resumen:', {
+
+      supabaseLogger.success(' Registro completado exitosamente');
+      supabaseLogger.data(' Resumen:', {
         authUser: !!authUser,
         userCreated,
         organizationCreated,
         invitationsActivated: invitationResult.activated
       });
-      
-      return { 
-        success: true, 
+
+      return {
+        success: true,
         user: authUser,
         invitationActivation: invitationResult,
         details: {
@@ -517,22 +518,22 @@ class SupabaseService {
           organizationId: this.organizationId
         }
       };
-      
+
     } catch (error) {
-      console.error('❌ Error en signUp:', error);
-      
+      supabaseLogger.error(' Error en signUp:', error);
+
       // Si el usuario fue creado en auth.users pero falló en users, intentar limpiar
       if (authUser && !userCreated) {
-        console.log('🧹 Limpiando usuario huérfano de auth.users...');
+        supabaseLogger.data(' Limpiando usuario huérfano de auth.users...');
         try {
           await this.supabase.auth.admin.deleteUser(authUser.id);
         } catch (cleanupError) {
-          console.error('❌ Error limpiando usuario huérfano:', cleanupError);
+          supabaseLogger.error(' Error limpiando usuario huérfano:', cleanupError);
         }
       }
-      
-      return { 
-        success: false, 
+
+      return {
+        success: false,
         error: error.message,
         details: {
           authUser: !!authUser,
@@ -545,8 +546,8 @@ class SupabaseService {
 
   async signIn(email, password) {
     try {
-      console.log('🚀 Iniciando login de usuario:', email);
-      
+      supabaseLogger.init(' Iniciando login de usuario:', email);
+
       // PASO 1: Autenticar en auth.users
       const { data, error } = await this.supabase.auth.signInWithPassword({
         email,
@@ -554,7 +555,7 @@ class SupabaseService {
       });
 
       if (error) {
-        console.error('❌ Error en auth.signIn:', error);
+        supabaseLogger.error(' Error en auth.signIn:', error);
         throw error;
       }
 
@@ -562,7 +563,7 @@ class SupabaseService {
         throw new Error('No se pudo autenticar el usuario');
       }
 
-      console.log('✅ Usuario autenticado en auth.users:', data.user.id);
+      supabaseLogger.success(' Usuario autenticado en auth.users:', data.user.id);
       this.currentUser = data.user;
 
       // PASO 2: Verificar/crear usuario en tabla users (SINCRONIZACIÓN AUTOMÁTICA)
@@ -576,8 +577,8 @@ class SupabaseService {
         if (userError) {
           if (userError.code === 'PGRST116') {
             // Usuario no existe en tabla users, crearlo
-            console.log('⚠️ Usuario no existe en tabla users, creando...');
-            
+            supabaseLogger.warning(' Usuario no existe en tabla users, creando...');
+
             const { error: createError } = await this.supabase
               .from('users')
               .insert({
@@ -588,24 +589,24 @@ class SupabaseService {
               });
 
             if (createError) {
-              console.error('❌ Error creando usuario en tabla users:', createError);
+              supabaseLogger.error(' Error creando usuario en tabla users:', createError);
               throw new Error(`Error sincronizando usuario: ${createError.message}`);
             }
-            
-            console.log('✅ Usuario sincronizado en tabla users');
+
+            supabaseLogger.success(' Usuario sincronizado en tabla users');
           } else {
             throw userError;
           }
         } else {
-          console.log('✅ Usuario existe en tabla users');
-          
+          supabaseLogger.success(' Usuario existe en tabla users');
+
           // Verificar si necesita actualización
-          const needsUpdate = 
+          const needsUpdate =
             existingUser.email !== data.user.email ||
             existingUser.name !== (data.user.user_metadata?.name || data.user.email.split('@')[0]);
-          
+
           if (needsUpdate) {
-            console.log('🔄 Actualizando datos del usuario en tabla users...');
+            supabaseLogger.update(' Actualizando datos del usuario en tabla users...');
             const { error: updateError } = await this.supabase
               .from('users')
               .update({
@@ -614,35 +615,35 @@ class SupabaseService {
                 updated_at: new Date().toISOString()
               })
               .eq('id', data.user.id);
-            
+
             if (updateError) {
-              console.warn('⚠️ Error actualizando usuario:', updateError);
+              supabaseLogger.warning('⚠️ Error actualizando usuario:', updateError);
             } else {
-              console.log('✅ Usuario actualizado en tabla users');
+              supabaseLogger.success(' Usuario actualizado en tabla users');
             }
           }
         }
       } catch (syncError) {
-        console.error('❌ Error crítico en sincronización de usuario:', syncError);
+        supabaseLogger.error(' Error crítico en sincronización de usuario:', syncError);
         // No fallar el login por problemas de sincronización, pero logear el error
-        console.warn('⚠️ Continuando con login a pesar del error de sincronización');
+        supabaseLogger.warning('⚠️ Continuando con login a pesar del error de sincronización');
       }
 
       // PASO 3: Activar invitaciones pendientes
       const invitationResult = await this.activatePendingInvitations(email, data.user.id);
-      
+
       // PASO 4: Cargar organización
       await this.loadOrganization();
-      
-      console.log('🎉 Login completado exitosamente');
-      console.log('📊 Resumen:', {
+
+      supabaseLogger.success(' Login completado exitosamente');
+      supabaseLogger.data(' Resumen:', {
         userAuthenticated: !!data.user,
         invitationsActivated: invitationResult.activated,
         organizationId: this.organizationId
       });
-      
-      return { 
-        success: true, 
+
+      return {
+        success: true,
         user: data.user,
         invitationActivation: invitationResult,
         details: {
@@ -651,9 +652,9 @@ class SupabaseService {
         }
       };
     } catch (error) {
-      console.error('❌ Error en signIn:', error);
-      return { 
-        success: false, 
+      supabaseLogger.error(' Error en signIn:', error);
+      return {
+        success: false,
         error: error.message,
         details: {
           userAuthenticated: false,
@@ -665,22 +666,22 @@ class SupabaseService {
 
   async signOut() {
     try {
-      console.log('🚪 Iniciando logout completo...');
-      
+      supabaseLogger.data(' Iniciando logout completo...');
+
       // 1. LOGOUT DE SUPABASE AUTH
       const { error } = await this.supabase.auth.signOut();
       if (error) {
-        console.error('❌ Error en Supabase signOut:', error);
+        supabaseLogger.error(' Error en Supabase signOut:', error);
         throw error;
       }
-      console.log('✅ Supabase auth signOut exitoso');
+      supabaseLogger.success(' Supabase auth signOut exitoso');
 
       // 2. LIMPIAR TODAS LAS PROPIEDADES DEL SERVICIO
       this.currentUser = null;
       this.organizationId = null;
       this.isInitialized = false;
-      
-      console.log('✅ Propiedades del servicio limpiadas');
+
+      supabaseLogger.success(' Propiedades del servicio limpiadas');
 
       // 3. LIMPIAR COMPLETAMENTE EL LOCALSTORAGE
       const keysToRemove = [
@@ -692,60 +693,60 @@ class SupabaseService {
         'sb-localhost-auth-token',
         'sb-auth-token'
       ];
-      
+
       keysToRemove.forEach(key => {
         localStorage.removeItem(key);
-        console.log(`🗑️ Eliminado localStorage: ${key}`);
+        supabaseLogger.data(`🗑️ Eliminado localStorage: ${key}`);
       });
 
       // 4. LIMPIAR SESSIONSTORAGE TAMBIÉN
       const sessionKeysToRemove = [
         'supabase.auth.token',
-        'sb-localhost-auth-token', 
+        'sb-localhost-auth-token',
         'sb-auth-token'
       ];
-      
+
       sessionKeysToRemove.forEach(key => {
         sessionStorage.removeItem(key);
-        console.log(`🗑️ Eliminado sessionStorage: ${key}`);
+        supabaseLogger.data(`🗑️ Eliminado sessionStorage: ${key}`);
       });
 
       // 4.1. LIMPIAR INDEXEDDB (datos persistentes de proyectos)
       try {
-        console.log('🗑️ Limpiando IndexedDB...');
+        supabaseLogger.delete(' Limpiando IndexedDB...');
 
         // Eliminar base de datos principal de FilePersistenceService
         const deleteMainDB = indexedDB.deleteDatabase('MiDashboardDB');
         deleteMainDB.onsuccess = () => {
-          console.log('✅ IndexedDB "MiDashboardDB" eliminada');
+          supabaseLogger.success(' IndexedDB "MiDashboardDB" eliminada');
         };
         deleteMainDB.onerror = () => {
-          console.warn('⚠️ No se pudo eliminar IndexedDB "MiDashboardDB"');
+          supabaseLogger.warning('⚠️ No se pudo eliminar IndexedDB "MiDashboardDB"');
         };
 
         // También limpiar otras posibles DBs relacionadas
         const deleteLocalforage = indexedDB.deleteDatabase('localforage');
         deleteLocalforage.onsuccess = () => {
-          console.log('✅ IndexedDB "localforage" eliminada');
+          supabaseLogger.success(' IndexedDB "localforage" eliminada');
         };
 
       } catch (idbError) {
-        console.warn('⚠️ Error limpiando IndexedDB:', idbError);
+        supabaseLogger.warning('⚠️ Error limpiando IndexedDB:', idbError);
         // No es crítico, continuar con el logout
       }
 
       // 5. VERIFICAR QUE NO HAY USUARIO ACTUAL
       const currentUser = await this.supabase.auth.getUser();
       if (currentUser.data.user) {
-        console.warn('⚠️ Aún hay usuario después del logout, forzando limpieza...');
+        supabaseLogger.warning('⚠️ Aún hay usuario después del logout, forzando limpieza...');
         // Forzar logout adicional si es necesario
         await this.supabase.auth.signOut({ scope: 'global' });
       }
 
-      console.log('✅ Logout completo terminado exitosamente');
+      supabaseLogger.success(' Logout completo terminado exitosamente');
       return { success: true };
     } catch (error) {
-      console.error('❌ Error en signOut completo:', error);
+      supabaseLogger.error(' Error en signOut completo:', error);
       return { success: false, error: error.message };
     }
   }
@@ -753,32 +754,32 @@ class SupabaseService {
   // Cargar datos del portafolio - VERSIÓN OPTIMIZADA
   async loadPortfolioData() {
     try {
-      console.log('📊 Cargando datos del portafolio desde Supabase (versión optimizada)...');
+      supabaseLogger.data(' Cargando datos del portafolio desde Supabase (versión optimizada)...');
 
       // Obtener usuario autenticado
       const { data: { user }, error: userError } = await this.supabase.auth.getUser();
 
       if (userError || !user?.email) {
-        console.error('❌ Error obteniendo usuario:', userError);
+        supabaseLogger.error(' Error obteniendo usuario:', userError);
         return null;
       }
 
-      console.log('🏢 EJECUTANDO DETECCIÓN AUTOMÁTICA DE ORGANIZACIÓN...');
+      supabaseLogger.data(' EJECUTANDO DETECCIÓN AUTOMÁTICA DE ORGANIZACIÓN...');
       const organization = await this.detectUserOrganization(user.email);
 
       if (!organization) {
-        console.error('❌ No se pudo detectar organización para el usuario:', user.email);
-        console.error('💡 El usuario debe tener una membresía activa en una organización');
+        supabaseLogger.error(' No se pudo detectar organización para el usuario:', user.email);
+        supabaseLogger.error('💡 El usuario debe tener una membresía activa en una organización');
         return null;
       }
 
       const orgId = organization.id;
-      console.log('✅ Organización detectada:', organization.name);
+      supabaseLogger.success(' Organización detectada:', organization.name);
 
       // ============================================
       // PASO 1: QUERIES PARALELAS PRINCIPALES
       // ============================================
-      
+
       const [
         projectsResult,
         resourcesResult,
@@ -790,13 +791,13 @@ class SupabaseService {
           .select('*')
           .eq('organization_id', orgId)
           .order('created_at', { ascending: false }),
-        
+
         // Recursos globales
         this.supabase
           .from('resources')
           .select('*')
           .eq('organization_id', orgId),
-        
+
         // Alertas corporativas
         this.supabase
           .from('corporate_alerts')
@@ -805,14 +806,14 @@ class SupabaseService {
       ]);
 
       if (projectsResult.error) {
-        console.error('❌ Error cargando proyectos:', projectsResult.error);
+        supabaseLogger.error(' Error cargando proyectos:', projectsResult.error);
       }
 
       const projects = projectsResult.data || [];
       const globalResources = resourcesResult.data || [];
       const corporateAlerts = alertsResult.data || [];
 
-      console.log(`✅ Proyectos cargados: ${projects.length}`);
+      supabaseLogger.data(`✅ Proyectos cargados: ${projects.length}`);
 
       // Convertir nombres de columnas de snake_case a camelCase
       const convertedProjects = projects.map(project => ({
@@ -845,7 +846,7 @@ class SupabaseService {
 
       // Si no hay proyectos, retornar estructura básica
       if (convertedProjects.length === 0) {
-        console.log('⚠️ No hay proyectos en la organización');
+        supabaseLogger.warning(' No hay proyectos en la organización');
 
         return {
           organization,
@@ -874,7 +875,7 @@ class SupabaseService {
       // ============================================
 
       const projectIds = convertedProjects.map(p => p.id);
-      
+
       const [
         tasksResult,
         risksResult,
@@ -898,43 +899,43 @@ class SupabaseService {
           .from('risks')
           .select('*')
           .in('project_id', projectIds),
-        
+
         // TODAS las purchase_orders en 1 query
         this.supabase
           .from('purchase_orders')
           .select('*')
           .in('project_id', projectIds),
-        
+
         // TODOS los advances en 1 query
         this.supabase
           .from('advances')
           .select('*')
           .in('project_id', projectIds),
-        
+
         // TODAS las invoices en 1 query
         this.supabase
           .from('invoices')
           .select('*')
           .in('project_id', projectIds),
-        
+
         // TODOS los contracts en 1 query
         this.supabase
           .from('contracts')
           .select('*')
           .in('project_id', projectIds),
-        
+
         // TODOS los resource_assignments en 1 query
         this.supabase
           .from('resource_assignments')
           .select('*')
           .in('project_id', projectIds),
-        
+
         // TODAS las minute_tasks en 1 query
         this.supabase
           .from('minute_tasks')
           .select('*')
           .in('project_id', projectIds),
-        
+
         // TODAS las configuraciones en 1 query
         this.supabase
           .from('project_configurations')
@@ -944,9 +945,9 @@ class SupabaseService {
 
       // 🔍 DEBUG: Verificar orden de tareas desde Supabase
       if (tasksResult.data && tasksResult.data.length > 0) {
-        console.log('🔍 DEBUG - Primeras 10 tareas desde Supabase (después de .order()):');
+        supabaseLogger.loading(' DEBUG - Primeras 10 tareas desde Supabase (después de .order()):');
         tasksResult.data.slice(0, 10).forEach((t, i) => {
-          console.log(`  ${i + 1}. wbs_code="${t.wbs_code}" (tipo: ${typeof t.wbs_code}) - ${t.name}`);
+          supabaseLogger.data(`  ${i + 1}. wbs_code="${t.wbs_code}" (tipo: ${typeof t.wbs_code}) - ${t.name}`);
         });
       }
 
@@ -1005,14 +1006,14 @@ class SupabaseService {
           isMilestone: task.is_milestone,
           originalDuration: task.original_duration
         };
-        
+
         // Remover undefined/null
         Object.keys(cleanTask).forEach(key => {
           if (cleanTask[key] === undefined || cleanTask[key] === null) {
             delete cleanTask[key];
           }
         });
-        
+
         if (tasksByProject[task.project_id]) {
           tasksByProject[task.project_id].push(cleanTask);
         }
@@ -1071,7 +1072,7 @@ class SupabaseService {
           estatus: mt.status,
           fechaCreacion: mt.created_at
         };
-        
+
         if (minutasByProject[mt.project_id]) {
           minutasByProject[mt.project_id].push(convertedMinuta);
         }
@@ -1092,7 +1093,7 @@ class SupabaseService {
           return aNum - bNum;
         });
 
-        console.log(`✅ Tareas ordenadas para proyecto ${projectId}:`,
+        supabaseLogger.data(`✅ Tareas ordenadas para proyecto ${projectId}:`,
           tasksByProject[projectId].slice(0, 5).map(t => `${t.wbsCode}: ${t.name}`)
         );
       });
@@ -1101,14 +1102,14 @@ class SupabaseService {
       // ============================================
       // LOGS DE RENDIMIENTO
       // ============================================
-      console.log('📊 Estadísticas de carga optimizada:');
-      console.log(`  - Proyectos: ${convertedProjects.length}`);
-      console.log(`  - Tasks totales: ${tasksResult.data?.length || 0}`);
-      console.log(`  - Risks totales: ${risksResult.data?.length || 0}`);
-      console.log(`  - Purchase Orders: ${purchaseOrdersResult.data?.length || 0}`);
-      console.log(`  - Minutas: ${minuteTasksResult.data?.length || 0}`);
-      console.log(`  - Queries ejecutadas: 13 (vs ${4 + (convertedProjects.length * 9)} antes)`);
-      console.log(`  - Mejora: ~${Math.round(((4 + (convertedProjects.length * 9) - 13) / (4 + (convertedProjects.length * 9))) * 100)}% menos queries`);
+      supabaseLogger.data(' Estadísticas de carga optimizada:');
+      supabaseLogger.data(`  - Proyectos: ${convertedProjects.length}`);
+      supabaseLogger.data(`  - Tasks totales: ${tasksResult.data?.length || 0}`);
+      supabaseLogger.data(`  - Risks totales: ${risksResult.data?.length || 0}`);
+      supabaseLogger.data(`  - Purchase Orders: ${purchaseOrdersResult.data?.length || 0}`);
+      supabaseLogger.data(`  - Minutas: ${minuteTasksResult.data?.length || 0}`);
+      supabaseLogger.data(`  - Queries ejecutadas: 13 (vs ${4 + (convertedProjects.length * 9)} antes)`);
+      supabaseLogger.data(`  - Mejora: ~${Math.round(((4 + (convertedProjects.length * 9) - 13) / (4 + (convertedProjects.length * 9))) * 100)}% menos queries`);
 
       // ============================================
       // RETORNO: Estructura compatible con código existente
@@ -1137,11 +1138,11 @@ class SupabaseService {
         lastUpdated: new Date().toISOString()
       };
 
-      console.log('✅ Datos del portafolio cargados y optimizados');
+      supabaseLogger.success(' Datos del portafolio cargados y optimizados');
       return portfolioData;
 
     } catch (error) {
-      console.error('❌ Error cargando datos del portafolio:', error);
+      supabaseLogger.error(' Error cargando datos del portafolio:', error);
       return null;
     }
   }
@@ -1149,12 +1150,12 @@ class SupabaseService {
   // Eliminar proyecto de Supabase
   async deleteProject(projectId) {
     if (!this.currentUser || !this.organizationId) {
-      console.warn('⚠️ No hay usuario autenticado o organización');
+      supabaseLogger.warning('⚠️ No hay usuario autenticado o organización');
       return false;
     }
 
     try {
-      console.log(`🗑️ Eliminando proyecto ${projectId} de Supabase...`);
+      supabaseLogger.data(`🗑️ Eliminando proyecto ${projectId} de Supabase...`);
 
       // Eliminar tareas del proyecto
       const { error: tasksError } = await this.supabase
@@ -1163,7 +1164,7 @@ class SupabaseService {
         .eq('project_id', projectId);
 
       if (tasksError) {
-        console.warn('⚠️ Error eliminando tareas del proyecto:', tasksError);
+        supabaseLogger.warning('⚠️ Error eliminando tareas del proyecto:', tasksError);
       }
 
       // Eliminar configuraciones del proyecto
@@ -1173,12 +1174,12 @@ class SupabaseService {
         .eq('project_id', projectId);
 
       if (configError) {
-        console.warn('⚠️ Error eliminando configuración del proyecto:', configError);
+        supabaseLogger.warning('⚠️ Error eliminando configuración del proyecto:', configError);
       }
 
       // NOTA: Los logs de auditoría se manejan en localStorage
       // No se eliminan de tabla 'audit_logs' porque no existe con estructura correcta
-      console.log('📋 Los logs de auditoría se mantienen en localStorage');
+      supabaseLogger.data('📋 Los logs de auditoría se mantienen en localStorage');
 
       // Eliminar el proyecto
       const { error: projectError } = await this.supabase
@@ -1187,15 +1188,15 @@ class SupabaseService {
         .eq('id', projectId);
 
       if (projectError) {
-        console.error('❌ Error eliminando proyecto:', projectError);
+        supabaseLogger.error(' Error eliminando proyecto:', projectError);
         return false;
       }
 
-      console.log(`✅ Proyecto ${projectId} eliminado de Supabase`);
+      supabaseLogger.data(`✅ Proyecto ${projectId} eliminado de Supabase`);
       return true;
 
     } catch (error) {
-      console.error('❌ Error eliminando proyecto:', error);
+      supabaseLogger.error(' Error eliminando proyecto:', error);
       return false;
     }
   }
@@ -1203,22 +1204,22 @@ class SupabaseService {
   // Guardar datos del portafolio
   async savePortfolioData(data) {
     if (!this.currentUser || !this.organizationId) {
-      console.warn('⚠️ No hay usuario autenticado o organización');
+      supabaseLogger.warning('⚠️ No hay usuario autenticado o organización');
       return false;
     }
 
     // PREVENIR GUARDADOS SIMULTÁNEOS
     if (this.isSaving) {
-      console.warn('⚠️ savePortfolioData - GUARDADO EN PROGRESO, OMITIENDO');
+      supabaseLogger.warning('⚠️ savePortfolioData - GUARDADO EN PROGRESO, OMITIENDO');
       return false;
     }
 
     this.isSaving = true;
-    console.log('💾 Guardando datos del portafolio en Supabase...');
+    supabaseLogger.save(' Guardando datos del portafolio en Supabase...');
 
     // Disparar evento de inicio de sincronización
     const syncStartEvent = new CustomEvent('supabaseSyncing', {
-      detail: { 
+      detail: {
         timestamp: new Date().toISOString(),
         message: 'Iniciando sincronización con Supabase'
       }
@@ -1233,28 +1234,28 @@ class SupabaseService {
           // Función para validar y corregir fechas
           const validateDate = (dateString) => {
             if (!dateString) return null;
-            
+
             try {
               // Intentar parsear la fecha
               const date = new Date(dateString);
-              
+
               // Verificar si la fecha es válida
               if (isNaN(date.getTime())) {
-                console.warn(`⚠️ Fecha inválida detectada: ${dateString}`);
+                supabaseLogger.warning(`⚠️ Fecha inválida detectada: ${dateString}`);
                 return null;
               }
-              
+
               // Verificar si la fecha está en un rango razonable (1900-2100)
               const year = date.getFullYear();
               if (year < 1900 || year > 2100) {
-                console.warn(`⚠️ Año fuera de rango: ${year} en fecha ${dateString}`);
+                supabaseLogger.warning(`⚠️ Año fuera de rango: ${year} en fecha ${dateString}`);
                 return null;
               }
-              
+
               // Retornar en formato ISO
               return date.toISOString().split('T')[0];
             } catch (error) {
-              console.warn(`⚠️ Error procesando fecha ${dateString}:`, error);
+              supabaseLogger.warning(`⚠️ Error procesando fecha ${dateString}:`, error);
               return null;
             }
           };
@@ -1296,7 +1297,7 @@ class SupabaseService {
           .upsert(projectsToUpsert, { onConflict: 'id' });
 
         if (projectsError) throw projectsError;
-        console.log('✅ Proyectos guardados');
+        supabaseLogger.success(' Proyectos guardados');
       }
 
       // Guardar/actualizar tareas
@@ -1307,56 +1308,56 @@ class SupabaseService {
           const taskIds = new Set();
           const uniqueTasks = [];
           let duplicatesFound = 0;
-          
+
           for (const task of tasks) {
             if (taskIds.has(task.id)) {
-              console.warn(`⚠️ Tarea duplicada detectada en Supabase: ${task.id} - ${task.name}`);
+              supabaseLogger.warning(`⚠️ Tarea duplicada detectada en Supabase: ${task.id} - ${task.name}`);
               duplicatesFound++;
             } else {
               taskIds.add(task.id);
               uniqueTasks.push(task);
             }
           }
-          
+
           if (duplicatesFound > 0) {
-            console.warn(`⚠️ Se encontraron ${duplicatesFound} tareas duplicadas en Supabase, eliminando duplicados...`);
+            supabaseLogger.warning(`⚠️ Se encontraron ${duplicatesFound} tareas duplicadas en Supabase, eliminando duplicados...`);
           }
-          
+
           const tasksToProcess = uniqueTasks;
           const tasksToUpsert = tasksToProcess.map(task => {
             // Generar UUID válido si el ID no es un UUID
             const generateUUID = () => {
-              return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+              return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
                 const r = Math.random() * 16 | 0;
                 const v = c === 'x' ? r : (r & 0x3 | 0x8);
                 return v.toString(16);
               });
             };
-            
+
             // Verificar si el ID es un UUID válido
             const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-            const taskId = uuidRegex.test(task.id) 
-              ? task.id 
+            const taskId = uuidRegex.test(task.id)
+              ? task.id
               : this.generateDeterministicId(projectId, task.wbsCode || task.id || generateUUID());
-            
+
             // Log si se generó un nuevo UUID
             if (taskId !== task.id) {
-              console.log(`🔄 Generando nuevo UUID para tarea "${task.name}": ${task.id} → ${taskId}`);
+              supabaseLogger.data(`🔄 Generando nuevo UUID para tarea "${task.name}": ${task.id} → ${taskId}`);
             }
-            
+
             // Función para validar fechas de tareas
             const validateTaskDate = (dateString) => {
               if (!dateString) return null;
-              
+
               try {
                 const date = new Date(dateString);
                 if (isNaN(date.getTime())) {
-                  console.warn(`⚠️ Fecha inválida en tarea: ${dateString}`);
+                  supabaseLogger.warning(`⚠️ Fecha inválida en tarea: ${dateString}`);
                   return null;
                 }
                 return date.toISOString().split('T')[0];
               } catch (error) {
-                console.warn(`⚠️ Error procesando fecha de tarea ${dateString}:`, error);
+                supabaseLogger.warning(`⚠️ Error procesando fecha de tarea ${dateString}:`, error);
                 return null;
               }
             };
@@ -1384,20 +1385,20 @@ class SupabaseService {
               is_milestone: task.isMilestone || task.is_milestone || false,
               original_duration: task.originalDuration || task.original_duration
             };
-            
+
             // Remover campos undefined o null
             Object.keys(cleanTask).forEach(key => {
               if (cleanTask[key] === undefined || cleanTask[key] === null) {
                 delete cleanTask[key];
               }
             });
-            
+
             return cleanTask;
           });
 
-          console.log(`📋 Enviando ${tasksToUpsert.length} tareas a Supabase para proyecto ${projectId}`);
-          console.log(`📋 Primera tarea de ejemplo:`, tasksToUpsert[0]);
-          
+          supabaseLogger.data(`📋 Enviando ${tasksToUpsert.length} tareas a Supabase para proyecto ${projectId}`);
+          supabaseLogger.data(`📋 Primera tarea de ejemplo:`, tasksToUpsert[0]);
+
           // VERIFICAR DUPLICADOS ANTES DE ENVIAR
           const taskIdsToVerify = new Set();
           const duplicateIds = [];
@@ -1408,14 +1409,14 @@ class SupabaseService {
               taskIdsToVerify.add(task.id);
             }
           });
-          
+
           if (duplicateIds.length > 0) {
-            console.error(`🚨 DUPLICADOS DETECTADOS ANTES DE ENVIAR A SUPABASE:`, duplicateIds);
-            console.error(`🚨 Total duplicados: ${duplicateIds.length} de ${tasksToUpsert.length} tareas`);
+            supabaseLogger.error(`🚨 DUPLICADOS DETECTADOS ANTES DE ENVIAR A SUPABASE:`, duplicateIds);
+            supabaseLogger.error(`🚨 Total duplicados: ${duplicateIds.length} de ${tasksToUpsert.length} tareas`);
           }
-          
+
           // UPSERT: Actualiza si existe, inserta si es nuevo
-          console.log(`📝 Guardando ${tasksToUpsert.length} tareas con UPSERT para proyecto ${projectId}...`);
+          supabaseLogger.data(`📝 Guardando ${tasksToUpsert.length} tareas con UPSERT para proyecto ${projectId}...`);
 
           // Primero, obtener las tareas existentes para preservar datos no modificados
           const { data: existingTasks, error: fetchError } = await this.supabase
@@ -1424,7 +1425,7 @@ class SupabaseService {
             .eq('project_id', projectId);
 
           if (fetchError) {
-            console.warn('⚠️ No se pudieron verificar tareas existentes:', fetchError);
+            supabaseLogger.warning('⚠️ No se pudieron verificar tareas existentes:', fetchError);
           }
 
           // Marcar tareas para eliminación (las que ya no están en el array nuevo)
@@ -1434,14 +1435,14 @@ class SupabaseService {
 
           // Eliminar tareas que ya no existen
           if (tasksToDelete.length > 0) {
-            console.log(`🗑️ Eliminando ${tasksToDelete.length} tareas que ya no están en el cronograma`);
+            supabaseLogger.data(`🗑️ Eliminando ${tasksToDelete.length} tareas que ya no están en el cronograma`);
             const { error: deleteError } = await this.supabase
               .from('tasks')
               .delete()
               .in('id', tasksToDelete);
-            
+
             if (deleteError) {
-              console.error('❌ Error eliminando tareas obsoletas:', deleteError);
+              supabaseLogger.error(' Error eliminando tareas obsoletas:', deleteError);
             }
           }
 
@@ -1455,36 +1456,36 @@ class SupabaseService {
             .select('id, name');
 
           if (tasksError) {
-            console.error(`❌ Error en UPSERT de tareas para proyecto ${projectId}:`, tasksError);
-            console.error(`❌ Detalles del error:`, {
+            supabaseLogger.error(`❌ Error en UPSERT de tareas para proyecto ${projectId}:`, tasksError);
+            supabaseLogger.error(`❌ Detalles del error:`, {
               code: tasksError.code,
               message: tasksError.message,
               details: tasksError.details,
               hint: tasksError.hint
             });
           } else {
-            console.log(`✅ UPSERT exitoso: ${upsertedTasks?.length || 0} tareas actualizadas/creadas`);
-            
+            supabaseLogger.data(`✅ UPSERT exitoso: ${upsertedTasks?.length || 0} tareas actualizadas/creadas`);
+
             // VERIFICAR SI SUPABASE DUPLICÓ LAS TAREAS
             try {
               // Esperar un momento para que se complete la transacción
               await new Promise(resolve => setTimeout(resolve, 500));
-              
+
               const { data: savedTasks, error: verifyError } = await this.supabase
                 .from('tasks')
                 .select('id, name, created_at')
                 .eq('project_id', projectId)
                 .order('created_at', { ascending: false });
-              
+
               if (!verifyError && savedTasks) {
                 const savedCount = savedTasks.length;
                 const expectedCount = tasksToUpsert.length;
-                
+
                 if (savedCount !== expectedCount) {
-                  console.error(`🚨 DUPLICACIÓN DETECTADA EN SUPABASE!`);
-                  console.error(`🚨 Esperadas: ${expectedCount}, Guardadas: ${savedCount}`);
-                  console.error(`🚨 Diferencia: ${savedCount - expectedCount} tareas duplicadas`);
-                  
+                  supabaseLogger.error(`🚨 DUPLICACIÓN DETECTADA EN SUPABASE!`);
+                  supabaseLogger.error(`🚨 Esperadas: ${expectedCount}, Guardadas: ${savedCount}`);
+                  supabaseLogger.error(`🚨 Diferencia: ${savedCount - expectedCount} tareas duplicadas`);
+
                   // Detectar duplicados por ID
                   const taskIds = new Set();
                   const duplicates = [];
@@ -1495,33 +1496,33 @@ class SupabaseService {
                       taskIds.add(task.id);
                     }
                   });
-                  
+
                   if (duplicates.length > 0) {
-                    console.error(`🚨 TAREAS DUPLICADAS POR ID:`, duplicates.slice(0, 5));
+                    supabaseLogger.error(`🚨 TAREAS DUPLICADAS POR ID:`, duplicates.slice(0, 5));
                   }
-                  
+
                   // Detectar duplicados por nombre
                   const nameCounts = {};
                   savedTasks.forEach(task => {
                     nameCounts[task.name] = (nameCounts[task.name] || 0) + 1;
                   });
-                  
+
                   const duplicateNames = Object.entries(nameCounts)
                     .filter(([name, count]) => count > 1)
                     .slice(0, 5);
-                  
+
                   if (duplicateNames.length > 0) {
-                    console.error(`🚨 TAREAS DUPLICADAS POR NOMBRE:`, duplicateNames);
+                    supabaseLogger.error(`🚨 TAREAS DUPLICADAS POR NOMBRE:`, duplicateNames);
                   }
-                  
+
                 } else {
-                  console.log(`✅ Verificación exitosa: ${savedCount} tareas en Supabase`);
+                  supabaseLogger.data(`✅ Verificación exitosa: ${savedCount} tareas en Supabase`);
                 }
               } else {
-                console.warn(`⚠️ Error verificando tareas guardadas:`, verifyError);
+                supabaseLogger.warning(`⚠️ Error verificando tareas guardadas:`, verifyError);
               }
             } catch (verifyError) {
-              console.warn(`⚠️ Error verificando tareas guardadas:`, verifyError);
+              supabaseLogger.warning(`⚠️ Error verificando tareas guardadas:`, verifyError);
             }
           }
         }
@@ -1543,7 +1544,7 @@ class SupabaseService {
             .upsert(risksToUpsert, { onConflict: 'id' });
 
           if (risksError) {
-            console.warn(`⚠️ Error guardando riesgos para proyecto ${projectId}:`, risksError);
+            supabaseLogger.warning(`⚠️ Error guardando riesgos para proyecto ${projectId}:`, risksError);
           }
         }
       }
@@ -1562,7 +1563,7 @@ class SupabaseService {
           .upsert(resourcesToUpsert, { onConflict: 'id' });
 
         if (resourcesError) {
-          console.warn('⚠️ Error guardando recursos:', resourcesError);
+          supabaseLogger.warning('⚠️ Error guardando recursos:', resourcesError);
         }
       }
 
@@ -1580,7 +1581,7 @@ class SupabaseService {
           .upsert(alertsToUpsert, { onConflict: 'id' });
 
         if (alertsError) {
-          console.warn('⚠️ Error guardando alertas:', alertsError);
+          supabaseLogger.warning('⚠️ Error guardando alertas:', alertsError);
         }
       }
 
@@ -1591,7 +1592,7 @@ class SupabaseService {
           const poToUpsert = purchaseOrders.map(po => {
             // Limpiar strings vacíos para columnas de fecha
             const cleanedPo = { ...po };
-            
+
             // Convertir strings vacíos a null para columnas de fecha
             const dateFields = ['requestDate', 'approvalDate', 'expectedDate'];
             dateFields.forEach(field => {
@@ -1599,7 +1600,7 @@ class SupabaseService {
                 cleanedPo[field] = null;
               }
             });
-            
+
             return {
               ...cleanedPo,
               project_id: projectId,
@@ -1613,7 +1614,7 @@ class SupabaseService {
             .upsert(poToUpsert, { onConflict: 'id' });
 
           if (poError) {
-            console.warn(`⚠️ Error guardando órdenes de compra para proyecto ${projectId}:`, poError);
+            supabaseLogger.warning(`⚠️ Error guardando órdenes de compra para proyecto ${projectId}:`, poError);
           }
         }
       }
@@ -1634,7 +1635,7 @@ class SupabaseService {
             .upsert(advancesToUpsert, { onConflict: 'id' });
 
           if (advancesError) {
-            console.warn(`⚠️ Error guardando anticipos para proyecto ${projectId}:`, advancesError);
+            supabaseLogger.warning(`⚠️ Error guardando anticipos para proyecto ${projectId}:`, advancesError);
           }
         }
       }
@@ -1655,7 +1656,7 @@ class SupabaseService {
             .upsert(invoicesToUpsert, { onConflict: 'id' });
 
           if (invoicesError) {
-            console.warn(`⚠️ Error guardando facturas para proyecto ${projectId}:`, invoicesError);
+            supabaseLogger.warning(`⚠️ Error guardando facturas para proyecto ${projectId}:`, invoicesError);
           }
         }
       }
@@ -1676,7 +1677,7 @@ class SupabaseService {
             .upsert(contractsToUpsert, { onConflict: 'id' });
 
           if (contractsError) {
-            console.warn(`⚠️ Error guardando contratos para proyecto ${projectId}:`, contractsError);
+            supabaseLogger.warning(`⚠️ Error guardando contratos para proyecto ${projectId}:`, contractsError);
           }
         }
       }
@@ -1697,7 +1698,7 @@ class SupabaseService {
             .upsert(assignmentsToUpsert, { onConflict: 'id' });
 
           if (assignmentsError) {
-            console.warn(`⚠️ Error guardando asignaciones para proyecto ${projectId}:`, assignmentsError);
+            supabaseLogger.warning(`⚠️ Error guardando asignaciones para proyecto ${projectId}:`, assignmentsError);
           }
         }
       }
@@ -1706,7 +1707,7 @@ class SupabaseService {
       // La tabla 'audit_logs' en Supabase no tiene la estructura correcta
       // Los logs se manejan a través de useAuditLog hook y localStorage
       if (data.auditLogsByProject) {
-        console.log(`📋 Audit logs detectados pero no se guardan en Supabase (se usan localStorage)`);
+        supabaseLogger.data(`📋 Audit logs detectados pero no se guardan en Supabase (se usan localStorage)`);
       }
 
       // Guardar/actualizar minutas por proyecto
@@ -1714,21 +1715,21 @@ class SupabaseService {
         for (const projectId in data.minutasByProject) {
           const minutas = data.minutasByProject[projectId];
           if (minutas && minutas.length > 0) {
-            console.log(`📋 Guardando minutas para proyecto ${projectId}: ${minutas.length} minutas`);
+            supabaseLogger.data(`📋 Guardando minutas para proyecto ${projectId}: ${minutas.length} minutas`);
 
             try {
               // Usar upsert para manejar duplicados sin eliminar minutas existentes
               const result = await this.saveMinutas(projectId, minutas);
               if (!result.success) {
-                console.warn(`⚠️ Error guardando minutas para proyecto ${projectId}:`, result.error);
-                console.warn(`⚠️ Continuando con el guardado de otros datos...`);
+                supabaseLogger.warning(`⚠️ Error guardando minutas para proyecto ${projectId}:`, result.error);
+                supabaseLogger.warning(`⚠️ Continuando con el guardado de otros datos...`);
                 // NO lanzar error - continuar con el resto del guardado
               } else {
-                console.log(`✅ Minutas guardadas exitosamente para proyecto ${projectId}`);
+                supabaseLogger.data(`✅ Minutas guardadas exitosamente para proyecto ${projectId}`);
               }
             } catch (minutasError) {
-              console.error(`❌ Error inesperado guardando minutas para proyecto ${projectId}:`, minutasError);
-              console.warn(`⚠️ Continuando con el guardado de otros datos...`);
+              supabaseLogger.error(`❌ Error inesperado guardando minutas para proyecto ${projectId}:`, minutasError);
+              supabaseLogger.warning(`⚠️ Continuando con el guardado de otros datos...`);
               // NO lanzar error - continuar con el resto del guardado
             }
           }
@@ -1742,7 +1743,7 @@ class SupabaseService {
         // Verificar si el projectId es un UUID válido
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
         if (!uuidRegex.test(projectId)) {
-          console.log(`⚠️ Saltando configuración para proyecto con ID inválido: ${projectId}`);
+          supabaseLogger.data(`⚠️ Saltando configuración para proyecto con ID inválido: ${projectId}`);
           continue;
         }
 
@@ -1770,23 +1771,23 @@ class SupabaseService {
         }
 
         if (configError) {
-          console.warn(`⚠️ Error guardando configuración para proyecto ${projectId}:`, configError);
-          console.warn(`⚠️ Detalles del error de configuración:`, {
+          supabaseLogger.warning(`⚠️ Error guardando configuración para proyecto ${projectId}:`, configError);
+          supabaseLogger.warning(`⚠️ Detalles del error de configuración:`, {
             code: configError.code,
             message: configError.message,
             details: configError.details,
             hint: configError.hint
           });
         } else {
-          console.log(`✅ Configuración guardada para proyecto ${projectId}`);
+          supabaseLogger.data(`✅ Configuración guardada para proyecto ${projectId}`);
         }
       }
 
-      console.log('✅ Datos del portafolio guardados en Supabase');
-      
+      supabaseLogger.success(' Datos del portafolio guardados en Supabase');
+
       // Disparar evento de guardado exitoso
       const saveSuccessEvent = new CustomEvent('supabaseDataSaved', {
-        detail: { 
+        detail: {
           timestamp: new Date().toISOString(),
           message: 'Datos guardados exitosamente en Supabase',
           dataSize: JSON.stringify(data).length,
@@ -1794,27 +1795,27 @@ class SupabaseService {
         }
       });
       window.dispatchEvent(saveSuccessEvent);
-      
+
       return true;
 
     } catch (error) {
-      console.error('❌ Error guardando datos del portafolio:', error);
-      
+      supabaseLogger.error(' Error guardando datos del portafolio:', error);
+
       // Disparar evento de error
       const errorEvent = new CustomEvent('supabaseError', {
-        detail: { 
+        detail: {
           timestamp: new Date().toISOString(),
           message: `Error guardando en Supabase: ${error.message}`,
           error: error
         }
       });
       window.dispatchEvent(errorEvent);
-      
+
       return false;
     } finally {
       // Liberar flag de guardado
       this.isSaving = false;
-      console.log('🔓 Flag de guardado liberado');
+      supabaseLogger.data('🔓 Flag de guardado liberado');
 
       // Disparar evento de fin de sincronización
       const syncEndEvent = new CustomEvent('supabaseSynced', {
@@ -1836,19 +1837,19 @@ class SupabaseService {
   async syncUserToPublicTable(userId = null) {
     try {
       const targetUserId = userId || this.currentUser?.id;
-      
+
       if (!targetUserId) {
-        console.warn('⚠️ No hay usuario para sincronizar');
+        supabaseLogger.warning('⚠️ No hay usuario para sincronizar');
         return { success: false, error: 'No hay usuario para sincronizar' };
       }
 
-      console.log('🔄 Sincronizando usuario:', targetUserId);
+      supabaseLogger.update(' Sincronizando usuario:', targetUserId);
 
       // Obtener datos del usuario de auth.users
       const { data: authUser, error: authError } = await this.supabase.auth.admin.getUserById(targetUserId);
-      
+
       if (authError || !authUser.user) {
-        console.error('❌ Error obteniendo usuario de auth.users:', authError);
+        supabaseLogger.error(' Error obteniendo usuario de auth.users:', authError);
         return { success: false, error: 'Usuario no encontrado en auth.users' };
       }
 
@@ -1862,14 +1863,14 @@ class SupabaseService {
         .single();
 
       if (checkError && checkError.code !== 'PGRST116') {
-        console.error('❌ Error verificando usuario existente:', checkError);
+        supabaseLogger.error(' Error verificando usuario existente:', checkError);
         return { success: false, error: checkError.message };
       }
 
       if (existingUser) {
         // Usuario existe, actualizar si es necesario
-        console.log('ℹ️ Usuario existe, verificando actualizaciones...');
-        
+        supabaseLogger.data(' Usuario existe, verificando actualizaciones...');
+
         const { error: updateError } = await this.supabase
           .from('users')
           .update({
@@ -1881,16 +1882,16 @@ class SupabaseService {
           .eq('id', targetUserId);
 
         if (updateError) {
-          console.error('❌ Error actualizando usuario:', updateError);
+          supabaseLogger.error(' Error actualizando usuario:', updateError);
           return { success: false, error: updateError.message };
         }
 
-        console.log('✅ Usuario actualizado en public.users');
+        supabaseLogger.success(' Usuario actualizado en public.users');
         return { success: true, action: 'updated' };
       } else {
         // Usuario no existe, crearlo
-        console.log('ℹ️ Usuario no existe, creando...');
-        
+        supabaseLogger.data(' Usuario no existe, creando...');
+
         const { error: createError } = await this.supabase
           .from('users')
           .insert({
@@ -1901,16 +1902,16 @@ class SupabaseService {
           });
 
         if (createError) {
-          console.error('❌ Error creando usuario:', createError);
+          supabaseLogger.error(' Error creando usuario:', createError);
           return { success: false, error: createError.message };
         }
 
-        console.log('✅ Usuario creado en public.users');
+        supabaseLogger.success(' Usuario creado en public.users');
         return { success: true, action: 'created' };
       }
 
     } catch (error) {
-      console.error('❌ Error en syncUserToPublicTable:', error);
+      supabaseLogger.error(' Error en syncUserToPublicTable:', error);
       return { success: false, error: error.message };
     }
   }
@@ -1919,10 +1920,10 @@ class SupabaseService {
   async checkUserSyncHealth() {
     try {
       if (!this.currentUser?.id) {
-        return { 
-          status: 'no_user', 
+        return {
+          status: 'no_user',
           message: 'No hay usuario autenticado',
-          healthy: false 
+          healthy: false
         };
       }
 
@@ -1935,17 +1936,17 @@ class SupabaseService {
 
       if (error) {
         if (error.code === 'PGRST116') {
-          return { 
-            status: 'missing_in_public', 
+          return {
+            status: 'missing_in_public',
             message: 'Usuario no existe en tabla public.users',
             healthy: false,
             needsSync: true
           };
         } else {
-          return { 
-            status: 'error', 
+          return {
+            status: 'error',
             message: `Error verificando usuario: ${error.message}`,
-            healthy: false 
+            healthy: false
           };
         }
       }
@@ -1955,8 +1956,8 @@ class SupabaseService {
       const isNameSynced = publicUser.name === (this.currentUser.user_metadata?.name || this.currentUser.email.split('@')[0]);
 
       if (!isEmailSynced || !isNameSynced) {
-        return { 
-          status: 'out_of_sync', 
+        return {
+          status: 'out_of_sync',
           message: 'Datos del usuario desactualizados',
           healthy: false,
           needsSync: true,
@@ -1967,19 +1968,19 @@ class SupabaseService {
         };
       }
 
-      return { 
-        status: 'healthy', 
+      return {
+        status: 'healthy',
         message: 'Usuario correctamente sincronizado',
         healthy: true,
         user: publicUser
       };
 
     } catch (error) {
-      console.error('❌ Error en checkUserSyncHealth:', error);
-      return { 
-        status: 'error', 
+      supabaseLogger.error(' Error en checkUserSyncHealth:', error);
+      return {
+        status: 'error',
         message: `Error en health check: ${error.message}`,
-        healthy: false 
+        healthy: false
       };
     }
   }
@@ -1998,12 +1999,12 @@ class SupabaseService {
   // Función para limpiar duplicados en Supabase
   async cleanDuplicatesInSupabase() {
     if (!this.currentUser || !this.organizationId) {
-      console.warn('⚠️ No hay usuario autenticado o organización');
+      supabaseLogger.warning('⚠️ No hay usuario autenticado o organización');
       return false;
     }
 
     try {
-      console.log('🧹 Iniciando limpieza de duplicados en Supabase...');
+      supabaseLogger.data(' Iniciando limpieza de duplicados en Supabase...');
 
       // Obtener proyectos de la organización
       const { data: projects, error: projectsError } = await this.supabase
@@ -2012,7 +2013,7 @@ class SupabaseService {
         .eq('organization_id', this.organizationId);
 
       if (projectsError) {
-        console.error('❌ Error obteniendo proyectos:', projectsError);
+        supabaseLogger.error(' Error obteniendo proyectos:', projectsError);
         return false;
       }
 
@@ -2020,7 +2021,7 @@ class SupabaseService {
       let totalErrors = 0;
 
       for (const project of projects) {
-        console.log(`🧹 Limpiando duplicados para proyecto: ${project.name} (${project.id})`);
+        supabaseLogger.data(`🧹 Limpiando duplicados para proyecto: ${project.name} (${project.id})`);
 
         // Obtener todas las tareas del proyecto
         const { data: tasks, error: tasksError } = await this.supabase
@@ -2030,13 +2031,13 @@ class SupabaseService {
           .order('created_at', { ascending: true });
 
         if (tasksError) {
-          console.warn(`⚠️ Error obteniendo tareas para proyecto ${project.id}:`, tasksError);
+          supabaseLogger.warning(`⚠️ Error obteniendo tareas para proyecto ${project.id}:`, tasksError);
           totalErrors++;
           continue;
         }
 
         if (!tasks || tasks.length === 0) {
-          console.log(`✅ No hay tareas en proyecto ${project.id}`);
+          supabaseLogger.data(`✅ No hay tareas en proyecto ${project.id}`);
           continue;
         }
 
@@ -2053,11 +2054,11 @@ class SupabaseService {
         });
 
         if (duplicatesToDelete.length === 0) {
-          console.log(`✅ No hay duplicados en proyecto ${project.id}`);
+          supabaseLogger.data(`✅ No hay duplicados en proyecto ${project.id}`);
           continue;
         }
 
-        console.log(`🗑️ Eliminando ${duplicatesToDelete.length} duplicados del proyecto ${project.id}`);
+        supabaseLogger.data(`🗑️ Eliminando ${duplicatesToDelete.length} duplicados del proyecto ${project.id}`);
 
         // Eliminar duplicados
         for (const duplicateId of duplicatesToDelete) {
@@ -2067,24 +2068,24 @@ class SupabaseService {
             .eq('id', duplicateId);
 
           if (deleteError) {
-            console.warn(`⚠️ Error eliminando duplicado ${duplicateId}:`, deleteError);
+            supabaseLogger.warning(`⚠️ Error eliminando duplicado ${duplicateId}:`, deleteError);
             totalErrors++;
           } else {
             totalCleaned++;
           }
         }
 
-        console.log(`✅ Limpieza completada para proyecto ${project.id}: ${duplicatesToDelete.length} duplicados eliminados`);
+        supabaseLogger.data(`✅ Limpieza completada para proyecto ${project.id}: ${duplicatesToDelete.length} duplicados eliminados`);
       }
 
-      console.log(`🎉 Limpieza de duplicados completada:`);
-      console.log(`• Duplicados eliminados: ${totalCleaned}`);
-      console.log(`• Errores: ${totalErrors}`);
+      supabaseLogger.data(`🎉 Limpieza de duplicados completada:`);
+      supabaseLogger.data(`• Duplicados eliminados: ${totalCleaned}`);
+      supabaseLogger.data(`• Errores: ${totalErrors}`);
 
       return true;
 
     } catch (error) {
-      console.error('❌ Error en limpieza de duplicados:', error);
+      supabaseLogger.error(' Error en limpieza de duplicados:', error);
       return false;
     }
   }
@@ -2093,7 +2094,7 @@ class SupabaseService {
   async deleteRisk(riskId) {
     try {
       if (!this.supabase || !this.currentUser) {
-        console.warn('⚠️ No se puede eliminar riesgo: Supabase no inicializado o usuario no autenticado');
+        supabaseLogger.warning('⚠️ No se puede eliminar riesgo: Supabase no inicializado o usuario no autenticado');
         return { success: false, error: 'No autenticado' };
       }
 
@@ -2104,14 +2105,14 @@ class SupabaseService {
         .eq('owner_id', this.currentUser.id);
 
       if (error) {
-        console.error('❌ Error eliminando riesgo de Supabase:', error);
+        supabaseLogger.error(' Error eliminando riesgo de Supabase:', error);
         return { success: false, error };
       }
 
-      console.log('✅ Riesgo eliminado de Supabase:', riskId);
+      supabaseLogger.success(' Riesgo eliminado de Supabase:', riskId);
       return { success: true };
     } catch (error) {
-      console.error('❌ Error inesperado eliminando riesgo:', error);
+      supabaseLogger.error(' Error inesperado eliminando riesgo:', error);
       return { success: false, error };
     }
   }
@@ -2120,7 +2121,7 @@ class SupabaseService {
   async deleteAdvance(advanceId) {
     try {
       if (!this.supabase || !this.currentUser) {
-        console.warn('⚠️ No se puede eliminar anticipo: Supabase no inicializado o usuario no autenticado');
+        supabaseLogger.warning('⚠️ No se puede eliminar anticipo: Supabase no inicializado o usuario no autenticado');
         return { success: false, error: 'No autenticado' };
       }
 
@@ -2131,14 +2132,14 @@ class SupabaseService {
         .eq('owner_id', this.currentUser.id);
 
       if (error) {
-        console.error('❌ Error eliminando anticipo de Supabase:', error);
+        supabaseLogger.error(' Error eliminando anticipo de Supabase:', error);
         return { success: false, error };
       }
 
-      console.log('✅ Anticipo eliminado de Supabase:', advanceId);
+      supabaseLogger.success(' Anticipo eliminado de Supabase:', advanceId);
       return { success: true };
     } catch (error) {
-      console.error('❌ Error inesperado eliminando anticipo:', error);
+      supabaseLogger.error(' Error inesperado eliminando anticipo:', error);
       return { success: false, error };
     }
   }
@@ -2147,7 +2148,7 @@ class SupabaseService {
   async deleteInvoice(invoiceId) {
     try {
       if (!this.supabase || !this.currentUser) {
-        console.warn('⚠️ No se puede eliminar factura: Supabase no inicializado o usuario no autenticado');
+        supabaseLogger.warning('⚠️ No se puede eliminar factura: Supabase no inicializado o usuario no autenticado');
         return { success: false, error: 'No autenticado' };
       }
 
@@ -2158,14 +2159,14 @@ class SupabaseService {
         .eq('owner_id', this.currentUser.id);
 
       if (error) {
-        console.error('❌ Error eliminando factura de Supabase:', error);
+        supabaseLogger.error(' Error eliminando factura de Supabase:', error);
         return { success: false, error };
       }
 
-      console.log('✅ Factura eliminada de Supabase:', invoiceId);
+      supabaseLogger.success(' Factura eliminada de Supabase:', invoiceId);
       return { success: true };
     } catch (error) {
-      console.error('❌ Error inesperado eliminando factura:', error);
+      supabaseLogger.error(' Error inesperado eliminando factura:', error);
       return { success: false, error };
     }
   }
@@ -2174,7 +2175,7 @@ class SupabaseService {
   async deletePurchaseOrder(poId) {
     try {
       if (!this.supabase || !this.currentUser) {
-        console.warn('⚠️ No se puede eliminar orden de compra: Supabase no inicializado o usuario no autenticado');
+        supabaseLogger.warning('⚠️ No se puede eliminar orden de compra: Supabase no inicializado o usuario no autenticado');
         return { success: false, error: 'No autenticado' };
       }
 
@@ -2185,14 +2186,14 @@ class SupabaseService {
         .eq('owner_id', this.currentUser.id);
 
       if (error) {
-        console.error('❌ Error eliminando orden de compra de Supabase:', error);
+        supabaseLogger.error(' Error eliminando orden de compra de Supabase:', error);
         return { success: false, error };
       }
 
-      console.log('✅ Orden de compra eliminada de Supabase:', poId);
+      supabaseLogger.success(' Orden de compra eliminada de Supabase:', poId);
       return { success: true };
     } catch (error) {
-      console.error('❌ Error inesperado eliminando orden de compra:', error);
+      supabaseLogger.error(' Error inesperado eliminando orden de compra:', error);
       return { success: false, error };
     }
   }
@@ -2202,32 +2203,32 @@ class SupabaseService {
   // Verificar que el bucket project-files existe (sin intentar crearlo)
   async initializeStorage() {
     try {
-      console.log('🗂️ Verificando Supabase Storage...');
-      
+      supabaseLogger.data('🗂️ Verificando Supabase Storage...');
+
       // Solo verificar si el bucket project-files existe
       const { data: buckets, error: listError } = await this.supabase.storage.listBuckets();
-      
+
       if (listError) {
-        console.error('❌ Error listando buckets:', listError);
+        supabaseLogger.error(' Error listando buckets:', listError);
         return false;
       }
 
       const projectFilesBucket = buckets.find(bucket => bucket.name === 'project-files');
-      
+
       if (!projectFilesBucket) {
-        console.log('❌ Bucket project-files no encontrado');
-        console.log('🔄 SOLUCIÓN: Crea el bucket manualmente en Supabase Dashboard → Storage → New bucket');
-        console.log('🔄 Nombre: project-files, Público: Sí, Límite: 50MB');
+        supabaseLogger.data('❌ Bucket project-files no encontrado');
+        supabaseLogger.update(' SOLUCIÓN: Crea el bucket manualmente en Supabase Dashboard → Storage → New bucket');
+        supabaseLogger.update(' Nombre: project-files, Público: Sí, Límite: 50MB');
         return false;
       } else {
-        console.log('✅ Bucket project-files encontrado y disponible');
-        console.log(`   - Público: ${projectFilesBucket.public ? 'Sí' : 'No'}`);
-        console.log(`   - Límite de archivo: ${projectFilesBucket.file_size_limit ? (projectFilesBucket.file_size_limit / 1024 / 1024).toFixed(0) + 'MB' : 'Sin límite'}`);
+        supabaseLogger.success(' Bucket project-files encontrado y disponible');
+        supabaseLogger.data(`   - Público: ${projectFilesBucket.public ? 'Sí' : 'No'}`);
+        supabaseLogger.data(`   - Límite de archivo: ${projectFilesBucket.file_size_limit ? (projectFilesBucket.file_size_limit / 1024 / 1024).toFixed(0) + 'MB' : 'Sin límite'}`);
       }
 
       return true;
     } catch (error) {
-      console.error('❌ Error verificando Storage:', error);
+      supabaseLogger.error(' Error verificando Storage:', error);
       return false;
     }
   }
@@ -2236,7 +2237,7 @@ class SupabaseService {
   async uploadFileToStorage(file, projectId, category, metadata = {}) {
     try {
       if (!this.currentUser || !this.organizationId) {
-        console.warn('⚠️ No se puede subir archivo: usuario no autenticado');
+        supabaseLogger.warning('⚠️ No se puede subir archivo: usuario no autenticado');
         return { success: false, error: 'No autenticado' };
       }
 
@@ -2266,7 +2267,7 @@ class SupabaseService {
       // Ruta en el bucket: organizationId/projectId/category/filename
       const filePath = `${this.organizationId}/${projectId}/${category}/${fileName}`;
 
-      console.log(`📤 Subiendo archivo a Storage: ${filePath}`);
+      supabaseLogger.data(`📤 Subiendo archivo a Storage: ${filePath}`);
 
       // Subir archivo con metadatos que incluyan el nombre original
       const { data, error } = await this.supabase.storage
@@ -2286,7 +2287,7 @@ class SupabaseService {
         });
 
       if (error) {
-        console.error('❌ Error subiendo archivo:', error);
+        supabaseLogger.error(' Error subiendo archivo:', error);
         return { success: false, error };
       }
 
@@ -2317,11 +2318,11 @@ class SupabaseService {
         }
       };
 
-      console.log('✅ Archivo subido exitosamente a Storage:', fileRecord.fileName);
+      supabaseLogger.success(' Archivo subido exitosamente a Storage:', fileRecord.fileName);
       return { success: true, file: fileRecord };
 
     } catch (error) {
-      console.error('❌ Error inesperado subiendo archivo:', error);
+      supabaseLogger.error(' Error inesperado subiendo archivo:', error);
       return { success: false, error };
     }
   }
@@ -2330,26 +2331,26 @@ class SupabaseService {
   async downloadFileFromStorage(filePath) {
     try {
       if (!this.currentUser) {
-        console.warn('⚠️ No se puede descargar archivo: usuario no autenticado');
+        supabaseLogger.warning('⚠️ No se puede descargar archivo: usuario no autenticado');
         return { success: false, error: 'No autenticado' };
       }
 
-      console.log(`📥 Descargando archivo de Storage: ${filePath}`);
+      supabaseLogger.data(`📥 Descargando archivo de Storage: ${filePath}`);
 
       const { data, error } = await this.supabase.storage
         .from('project-files')
         .download(filePath);
 
       if (error) {
-        console.error('❌ Error descargando archivo:', error);
+        supabaseLogger.error(' Error descargando archivo:', error);
         return { success: false, error };
       }
 
-      console.log('✅ Archivo descargado exitosamente');
+      supabaseLogger.success(' Archivo descargado exitosamente');
       return { success: true, data };
 
     } catch (error) {
-      console.error('❌ Error inesperado descargando archivo:', error);
+      supabaseLogger.error(' Error inesperado descargando archivo:', error);
       return { success: false, error };
     }
   }
@@ -2358,26 +2359,26 @@ class SupabaseService {
   async deleteFileFromStorage(filePath) {
     try {
       if (!this.currentUser) {
-        console.warn('⚠️ No se puede eliminar archivo: usuario no autenticado');
+        supabaseLogger.warning('⚠️ No se puede eliminar archivo: usuario no autenticado');
         return { success: false, error: 'No autenticado' };
       }
 
-      console.log(`🗑️ Eliminando archivo de Storage: ${filePath}`);
+      supabaseLogger.data(`🗑️ Eliminando archivo de Storage: ${filePath}`);
 
       const { error } = await this.supabase.storage
         .from('project-files')
         .remove([filePath]);
 
       if (error) {
-        console.error('❌ Error eliminando archivo:', error);
+        supabaseLogger.error(' Error eliminando archivo:', error);
         return { success: false, error };
       }
 
-      console.log('✅ Archivo eliminado exitosamente de Storage');
+      supabaseLogger.success(' Archivo eliminado exitosamente de Storage');
       return { success: true };
 
     } catch (error) {
-      console.error('❌ Error inesperado eliminando archivo:', error);
+      supabaseLogger.error(' Error inesperado eliminando archivo:', error);
       return { success: false, error };
     }
   }
@@ -2386,7 +2387,7 @@ class SupabaseService {
   async listProjectFiles(projectId, category = null) {
     try {
       if (!this.currentUser || !this.organizationId) {
-        console.warn('⚠️ No se pueden listar archivos: usuario no autenticado');
+        supabaseLogger.warning('⚠️ No se pueden listar archivos: usuario no autenticado');
         return { success: false, error: 'No autenticado', files: [] };
       }
 
@@ -2395,21 +2396,21 @@ class SupabaseService {
       let allFiles = [];
       let error = null;
 
-      console.log(`📋 Buscando archivos siguiendo estructura del bucket`);
-      console.log(`🔍 DEBUG - Parámetros de búsqueda:`, {
+      supabaseLogger.data(`📋 Buscando archivos siguiendo estructura del bucket`);
+      supabaseLogger.data(`🔍 DEBUG - Parámetros de búsqueda:`, {
         organizationId: this.organizationId,
         projectId: projectId,
         category: category
       });
 
       // 1. Buscar SOLO en la ruta específica del proyecto actual
-      const searchPath = category 
+      const searchPath = category
         ? `${this.organizationId}/${projectId}/${category}`
         : `${this.organizationId}/${projectId}`;
 
-      console.log(`📁 Buscando archivos SOLO del proyecto actual en ruta: ${searchPath}`);
-      console.log(`🔍 DEBUG - Proyecto actual: ${projectId}, Categoría: ${category || 'todas'}`);
-      
+      supabaseLogger.data(`📁 Buscando archivos SOLO del proyecto actual en ruta: ${searchPath}`);
+      supabaseLogger.data(`🔍 DEBUG - Proyecto actual: ${projectId}, Categoría: ${category || 'todas'}`);
+
       const { data: projectFiles, error: projectError } = await this.supabase.storage
         .from('project-files')
         .list(searchPath, {
@@ -2418,31 +2419,31 @@ class SupabaseService {
         });
 
       if (projectError) {
-        console.error(`❌ Error listando archivos en ruta ${searchPath}:`, projectError);
+        supabaseLogger.error(`❌ Error listando archivos en ruta ${searchPath}:`, projectError);
         error = projectError;
       } else {
-        console.log(`🔍 DEBUG - Archivos encontrados en ruta ${searchPath}:`, projectFiles);
-        
+        supabaseLogger.data(`🔍 DEBUG - Archivos encontrados en ruta ${searchPath}:`, projectFiles);
+
         // Filtrar solo archivos reales (con id no null)
         const realFiles = (projectFiles || []).filter(file => file.id !== null);
-        console.log(`✅ Archivos reales del proyecto ${projectId} encontrados: ${realFiles.length}`);
-        
+        supabaseLogger.data(`✅ Archivos reales del proyecto ${projectId} encontrados: ${realFiles.length}`);
+
         // Agregar la ruta de búsqueda a cada archivo
         realFiles.forEach(file => {
           file.folderPath = searchPath;
         });
-        
+
         allFiles = realFiles;
       }
 
       // 2. Si no se encontraron archivos en la ruta específica, buscar SOLO en el proyecto actual
       if (allFiles.length === 0) {
-        console.log(`📁 No se encontraron archivos en ruta específica, buscando SOLO en el proyecto actual...`);
-        
+        supabaseLogger.data(`📁 No se encontraron archivos en ruta específica, buscando SOLO en el proyecto actual...`);
+
         // Buscar en la carpeta del proyecto actual (sin categoría específica)
         const projectPath = `${this.organizationId}/${projectId}`;
-        console.log(`📁 Buscando en carpeta del proyecto: ${projectPath}`);
-        
+        supabaseLogger.data(`📁 Buscando en carpeta del proyecto: ${projectPath}`);
+
         const { data: projectFolderContents, error: projectFolderError } = await this.supabase.storage
           .from('project-files')
           .list(projectPath, {
@@ -2451,15 +2452,15 @@ class SupabaseService {
           });
 
         if (projectFolderError) {
-          console.error(`❌ Error listando contenido de proyecto ${projectId}:`, projectFolderError);
+          supabaseLogger.error(`❌ Error listando contenido de proyecto ${projectId}:`, projectFolderError);
         } else {
-          console.log(`🔍 DEBUG - Contenido de proyecto ${projectId}:`, projectFolderContents);
-          
+          supabaseLogger.data(`🔍 DEBUG - Contenido de proyecto ${projectId}:`, projectFolderContents);
+
           // Buscar en cada categoría del proyecto
           for (const item of projectFolderContents || []) {
             if (item.id === null) { // Es una carpeta (categoría)
-              console.log(`📁 Buscando archivos en categoría: ${item.name}`);
-              
+              supabaseLogger.data(`📁 Buscando archivos en categoría: ${item.name}`);
+
               const { data: filesInCategory, error: filesError } = await this.supabase.storage
                 .from('project-files')
                 .list(`${projectPath}/${item.name}`, {
@@ -2468,24 +2469,24 @@ class SupabaseService {
                 });
 
               if (filesError) {
-                console.error(`❌ Error listando archivos en categoría ${item.name}:`, filesError);
+                supabaseLogger.error(`❌ Error listando archivos en categoría ${item.name}:`, filesError);
               } else {
-                console.log(`🔍 DEBUG - Archivos en categoría ${item.name}:`, filesInCategory);
-                
+                supabaseLogger.data(`🔍 DEBUG - Archivos en categoría ${item.name}:`, filesInCategory);
+
                 // Filtrar solo archivos reales (con id no null)
                 const realFilesInCategory = (filesInCategory || []).filter(file => file.id !== null);
-                console.log(`✅ Archivos reales en categoría ${item.name}:`, realFilesInCategory.length);
-                
+                supabaseLogger.data(`✅ Archivos reales en categoría ${item.name}:`, realFilesInCategory.length);
+
                 // Agregar la ruta completa a cada archivo
                 realFilesInCategory.forEach(file => {
                   file.folderPath = `${projectPath}/${item.name}`;
                 });
-                
+
                 allFiles = allFiles.concat(realFilesInCategory);
               }
             } else {
               // Es un archivo directamente en la carpeta del proyecto
-              console.log(`📄 Archivo encontrado directamente en proyecto: ${item.name}`);
+              supabaseLogger.data(`📄 Archivo encontrado directamente en proyecto: ${item.name}`);
               item.folderPath = projectPath;
               allFiles.push(item);
             }
@@ -2493,57 +2494,57 @@ class SupabaseService {
         }
       }
 
-      console.log(`✅ Total archivos reales encontrados: ${allFiles.length}`);
+      supabaseLogger.data(`✅ Total archivos reales encontrados: ${allFiles.length}`);
       const data = allFiles;
 
       if (error) {
-        console.error('❌ Error listando archivos:', error);
+        supabaseLogger.error(' Error listando archivos:', error);
         return { success: false, error, files: [] };
       }
 
       // DEBUG: Mostrar datos raw de Supabase
-      console.log('🔍 DEBUG - Datos raw de Supabase:', data);
-      
+      supabaseLogger.loading(' DEBUG - Datos raw de Supabase:', data);
+
       // DEBUG: Verificar si realmente hay archivos en el bucket
-      console.log('🔍 DEBUG - Verificando bucket completo...');
+      supabaseLogger.loading(' DEBUG - Verificando bucket completo...');
       const { data: bucketContents, error: allError } = await this.supabase.storage
         .from('project-files')
         .list('', {
           limit: 1000,
           offset: 0
         });
-      
+
       if (allError) {
-        console.error('❌ Error listando bucket completo:', allError);
+        supabaseLogger.error(' Error listando bucket completo:', allError);
       } else {
-        console.log('🔍 DEBUG - Todos los archivos en el bucket:', bucketContents);
+        supabaseLogger.loading(' DEBUG - Todos los archivos en el bucket:', bucketContents);
       }
 
       // Convertir archivos de Storage a formato esperado
       const files = (data || []).map(file => {
         // CORRECCIÓN: Usar la ruta completa del archivo (carpeta + nombre)
-        const filePath = file.folderPath 
+        const filePath = file.folderPath
           ? `${file.folderPath}/${file.name}`
           : file.name;
-          
+
         const { data: publicData } = this.supabase.storage
           .from('project-files')
           .getPublicUrl(filePath);
 
         // CORRECCIÓN: Obtener tamaño del archivo desde metadata.size (que es donde Supabase lo guarda)
-        const fileSize = file.metadata?.size || 
-                        file.metadata?.file_size || 
-                        file.size || 
-                        0;
+        const fileSize = file.metadata?.size ||
+          file.metadata?.file_size ||
+          file.size ||
+          0;
 
         // CORRECCIÓN: Usar created_at directamente (que es la fecha real de Supabase)
-        const uploadDate = file.created_at || 
-                          file.updated_at || 
-                          file.metadata?.created_at || 
-                          new Date().toISOString();
+        const uploadDate = file.created_at ||
+          file.updated_at ||
+          file.metadata?.created_at ||
+          new Date().toISOString();
 
         // DEBUG: Mostrar qué valores estamos obteniendo
-        console.log(`🔍 DEBUG - Procesando archivo ${file.name}:`, {
+        supabaseLogger.data(`🔍 DEBUG - Procesando archivo ${file.name}:`, {
           'filePath': filePath,
           'file.metadata?.size': file.metadata?.size,
           'file.metadata?.file_size': file.metadata?.file_size,
@@ -2556,9 +2557,9 @@ class SupabaseService {
         });
 
         // CORRECCIÓN: Usar el nombre original del archivo si está disponible en metadata
-        const originalFileName = file.metadata?.originalName || 
-                                file.metadata?.name || 
-                                file.name;
+        const originalFileName = file.metadata?.originalName ||
+          file.metadata?.name ||
+          file.name;
 
         return {
           id: `file-${file.name.split('.')[0]}`,
@@ -2584,10 +2585,10 @@ class SupabaseService {
         };
       });
 
-      console.log(`✅ ${files.length} archivos encontrados en Storage`);
-      
+      supabaseLogger.data(`✅ ${files.length} archivos encontrados en Storage`);
+
       // DEBUG: Mostrar detalles de los archivos para diagnosticar
-      console.log('🔍 DEBUG - Archivos encontrados:', files.map(f => ({
+      supabaseLogger.loading(' DEBUG - Archivos encontrados:', files.map(f => ({
         fileName: f.fileName,
         fileSize: f.fileSize,
         uploadDate: f.uploadDate,
@@ -2595,11 +2596,11 @@ class SupabaseService {
         publicUrl: f.publicUrl,
         originalFile: f.metadata?.originalFile
       })));
-      
+
       return { success: true, files };
 
     } catch (error) {
-      console.error('❌ Error inesperado listando archivos:', error);
+      supabaseLogger.error(' Error inesperado listando archivos:', error);
       return { success: false, error, files: [] };
     }
   }
@@ -2608,7 +2609,7 @@ class SupabaseService {
   async getSignedUrl(filePath, expiresIn = 3600) {
     try {
       if (!this.currentUser) {
-        console.warn('⚠️ No se puede obtener URL firmada: usuario no autenticado');
+        supabaseLogger.warning('⚠️ No se puede obtener URL firmada: usuario no autenticado');
         return { success: false, error: 'No autenticado' };
       }
 
@@ -2617,15 +2618,15 @@ class SupabaseService {
         .createSignedUrl(filePath, expiresIn);
 
       if (error) {
-        console.error('❌ Error obteniendo URL firmada:', error);
+        supabaseLogger.error(' Error obteniendo URL firmada:', error);
         return { success: false, error };
       }
 
-      console.log('✅ URL firmada obtenida exitosamente');
+      supabaseLogger.success(' URL firmada obtenida exitosamente');
       return { success: true, signedUrl: data.signedUrl };
 
     } catch (error) {
-      console.error('❌ Error inesperado obteniendo URL firmada:', error);
+      supabaseLogger.error(' Error inesperado obteniendo URL firmada:', error);
       return { success: false, error };
     }
   }
@@ -2635,17 +2636,17 @@ class SupabaseService {
   // Crear backup completo de la base de datos
   async createDatabaseBackup() {
     try {
-      console.log('🔄 Iniciando backup de base de datos...');
-      
+      supabaseLogger.update(' Iniciando backup de base de datos...');
+
       // Obtener fecha actual para el nombre del archivo
       const now = new Date();
       const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
       const timestamp = now.toISOString().replace(/[:.]/g, '-'); // Para timestamp único
-      
+
       // Definir tablas a respaldar
       const tables = [
         'organizations',
-        'users', 
+        'users',
         'projects',
         'risks',
         'tasks',
@@ -2656,7 +2657,7 @@ class SupabaseService {
         'resources',
         'resource_assignments'
       ];
-      
+
       const backupData = {
         metadata: {
           timestamp: now.toISOString(),
@@ -2667,66 +2668,66 @@ class SupabaseService {
         },
         data: {}
       };
-      
+
       // Consultar cada tabla
       for (const tableName of tables) {
         try {
-          console.log(`📊 Respaldo tabla: ${tableName}`);
-          
+          supabaseLogger.data(`📊 Respaldo tabla: ${tableName}`);
+
           let query = this.supabase.from(tableName).select('*');
-          
+
           // Aplicar filtros RLS si es necesario
           if (tableName !== 'organizations' && this.organizationId) {
             query = query.eq('organization_id', this.organizationId);
           }
-          
+
           const { data, error } = await query;
-          
+
           if (error) {
-            console.warn(`⚠️ Error consultando tabla ${tableName}:`, error);
+            supabaseLogger.warning(`⚠️ Error consultando tabla ${tableName}:`, error);
             backupData.data[tableName] = [];
           } else {
             backupData.data[tableName] = data || [];
-            console.log(`✅ Tabla ${tableName}: ${data?.length || 0} registros`);
+            supabaseLogger.data(`✅ Tabla ${tableName}: ${data?.length || 0} registros`);
           }
         } catch (tableError) {
-          console.error(`❌ Error procesando tabla ${tableName}:`, tableError);
+          supabaseLogger.error(`❌ Error procesando tabla ${tableName}:`, tableError);
           backupData.data[tableName] = [];
         }
       }
-      
+
       // Crear nombre del archivo con prefijo DatabaseSt
       const fileName = `DatabaseSt_${dateStr}.json`;
-      
+
       // Convertir a JSON
       const jsonData = JSON.stringify(backupData, null, 2);
-      
+
       // Crear blob y descargar
       const blob = new Blob([jsonData], { type: 'application/json' });
       const url = window.URL.createObjectURL(blob);
-      
+
       // Crear elemento de descarga
       const link = document.createElement('a');
       link.href = url;
       link.download = fileName;
       document.body.appendChild(link);
       link.click();
-      
+
       // Limpiar
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      
-      console.log(`✅ Backup completado: ${fileName}`);
-      
+
+      supabaseLogger.data(`✅ Backup completado: ${fileName}`);
+
       return {
         success: true,
         fileName,
         recordCount: Object.values(backupData.data).reduce((total, tableData) => total + tableData.length, 0),
         tables: tables.length
       };
-      
+
     } catch (error) {
-      console.error('❌ Error creando backup:', error);
+      supabaseLogger.error(' Error creando backup:', error);
       return {
         success: false,
         error: error.message
@@ -2737,14 +2738,14 @@ class SupabaseService {
   // Crear backup silencioso (sin descarga automática)
   async createSilentBackup() {
     try {
-      console.log('🔄 Creando backup silencioso...');
-      
+      supabaseLogger.update(' Creando backup silencioso...');
+
       const backupData = await this._generateBackupData();
-      
+
       if (!backupData.success) {
         return backupData;
       }
-      
+
       // Guardar en localStorage con timestamp
       const backupKey = `strategiapm_backup_${new Date().toISOString().split('T')[0]}`;
       const backupInfo = {
@@ -2756,11 +2757,11 @@ class SupabaseService {
           version: '1.0'
         }
       };
-      
+
       try {
         localStorage.setItem(backupKey, JSON.stringify(backupInfo));
-        console.log(`✅ Backup silencioso guardado: ${backupData.recordCount} registros`);
-        
+        supabaseLogger.data(`✅ Backup silencioso guardado: ${backupData.recordCount} registros`);
+
         return {
           success: true,
           recordCount: backupData.recordCount,
@@ -2768,7 +2769,7 @@ class SupabaseService {
           stored: true
         };
       } catch (storageError) {
-        console.warn('⚠️ Error guardando en localStorage:', storageError);
+        supabaseLogger.warning('⚠️ Error guardando en localStorage:', storageError);
         return {
           success: true,
           recordCount: backupData.recordCount,
@@ -2777,9 +2778,9 @@ class SupabaseService {
           warning: 'Backup creado pero no guardado localmente'
         };
       }
-      
+
     } catch (error) {
-      console.error('❌ Error creando backup silencioso:', error);
+      supabaseLogger.error(' Error creando backup silencioso:', error);
       return {
         success: false,
         error: error.message
@@ -2793,7 +2794,7 @@ class SupabaseService {
       // Obtener datos de todas las tablas críticas
       const tables = [
         'organizations',
-        'users', 
+        'users',
         'projects',
         'risks',
         'tasks',
@@ -2804,7 +2805,7 @@ class SupabaseService {
         'resources',
         'resource_assignments'
       ];
-      
+
       const backupData = {
         metadata: {
           timestamp: new Date().toISOString(),
@@ -2814,44 +2815,44 @@ class SupabaseService {
         },
         data: {}
       };
-      
+
       let totalRecords = 0;
-      
+
       // Obtener datos de cada tabla
       for (const tableName of tables) {
         try {
           let query = this.supabase.from(tableName).select('*');
-          
+
           // Aplicar filtros RLS si es necesario
           if (tableName !== 'organizations' && this.organizationId) {
             query = query.eq('organization_id', this.organizationId);
           }
-          
+
           const { data, error } = await query;
-          
+
           if (error) {
-            console.warn(`⚠️ Error obteniendo datos de ${tableName}:`, error);
+            supabaseLogger.warning(`⚠️ Error obteniendo datos de ${tableName}:`, error);
             backupData.data[tableName] = [];
           } else {
             backupData.data[tableName] = data || [];
             totalRecords += (data || []).length;
-            console.log(`✅ ${tableName}: ${(data || []).length} registros`);
+            supabaseLogger.data(`✅ ${tableName}: ${(data || []).length} registros`);
           }
         } catch (tableError) {
-          console.warn(`⚠️ Error procesando tabla ${tableName}:`, tableError);
+          supabaseLogger.warning(`⚠️ Error procesando tabla ${tableName}:`, tableError);
           backupData.data[tableName] = [];
         }
       }
-      
+
       return {
         success: true,
         data: backupData,
         recordCount: totalRecords,
         tables
       };
-      
+
     } catch (error) {
-      console.error('❌ Error generando datos de backup:', error);
+      supabaseLogger.error(' Error generando datos de backup:', error);
       return {
         success: false,
         error: error.message
@@ -2864,7 +2865,7 @@ class SupabaseService {
     try {
       const tables = [
         'organizations',
-        'users', 
+        'users',
         'projects',
         'risks',
         'tasks',
@@ -2875,42 +2876,42 @@ class SupabaseService {
         'resources',
         'resource_assignments'
       ];
-      
+
       const stats = {};
       let totalRecords = 0;
-      
+
       for (const tableName of tables) {
         try {
           let query = this.supabase.from(tableName).select('*', { count: 'exact', head: true });
-          
+
           if (tableName !== 'organizations' && this.organizationId) {
             query = query.eq('organization_id', this.organizationId);
           }
-          
+
           const { count, error } = await query;
-          
+
           if (error) {
-            console.warn(`⚠️ Error contando tabla ${tableName}:`, error);
+            supabaseLogger.warning(`⚠️ Error contando tabla ${tableName}:`, error);
             stats[tableName] = 0;
           } else {
             stats[tableName] = count || 0;
             totalRecords += count || 0;
           }
         } catch (tableError) {
-          console.error(`❌ Error contando tabla ${tableName}:`, tableError);
+          supabaseLogger.error(`❌ Error contando tabla ${tableName}:`, tableError);
           stats[tableName] = 0;
         }
       }
-      
+
       return {
         success: true,
         stats,
         totalRecords,
         tablesCount: tables.length
       };
-      
+
     } catch (error) {
-      console.error('❌ Error obteniendo estadísticas:', error);
+      supabaseLogger.error(' Error obteniendo estadísticas:', error);
       return {
         success: false,
         error: error.message
@@ -2924,11 +2925,11 @@ class SupabaseService {
   async loadMinutasByProject(projectId) {
     try {
       if (!this.currentUser || !this.organizationId) {
-        console.warn('⚠️ No se pueden cargar minutas: usuario no autenticado');
+        supabaseLogger.warning('⚠️ No se pueden cargar minutas: usuario no autenticado');
         return { success: false, error: 'No autenticado', minutas: [] };
       }
 
-      console.log(`📋 Cargando minutas para proyecto: ${projectId}`);
+      supabaseLogger.data(`📋 Cargando minutas para proyecto: ${projectId}`);
 
       const { data, error } = await this.supabase
         .from('minute_tasks')
@@ -2938,7 +2939,7 @@ class SupabaseService {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('❌ Error cargando minutas:', error);
+        supabaseLogger.error(' Error cargando minutas:', error);
         return { success: false, error, minutas: [] };
       }
 
@@ -2953,11 +2954,11 @@ class SupabaseService {
         fechaCreacion: minuta.created_at
       }));
 
-      console.log(`✅ Minutas cargadas: ${minutasMapeadas.length}`);
+      supabaseLogger.data(`✅ Minutas cargadas: ${minutasMapeadas.length}`);
       return { success: true, minutas: minutasMapeadas };
 
     } catch (error) {
-      console.error('❌ Error inesperado cargando minutas:', error);
+      supabaseLogger.error(' Error inesperado cargando minutas:', error);
       return { success: false, error, minutas: [] };
     }
   }
@@ -2966,15 +2967,15 @@ class SupabaseService {
   async saveMinutas(projectId, minutaTasks) {
     try {
       if (!this.currentUser || !this.organizationId) {
-        console.warn('⚠️ No se pueden guardar minutas: usuario no autenticado');
+        supabaseLogger.warning('⚠️ No se pueden guardar minutas: usuario no autenticado');
         return { success: false, error: 'No autenticado' };
       }
 
-      console.log(`💾 Guardando ${minutaTasks.length} minutas para proyecto: ${projectId}`);
+      supabaseLogger.data(`💾 Guardando ${minutaTasks.length} minutas para proyecto: ${projectId}`);
 
       // Función para generar UUID válido si no existe
       const generateUUID = () => {
-        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
           const r = Math.random() * 16 | 0;
           const v = c === 'x' ? r : (r & 0x3 | 0x8);
           return v.toString(16);
@@ -2982,14 +2983,14 @@ class SupabaseService {
       };
 
       // Preparar datos para insertar/actualizar
-      const minutasToUpsert = minutaTasks.map(minuta => {
+      let minutasToUpsert = minutaTasks.map(minuta => {
         // Verificar si el ID es un UUID válido
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
         const minutaId = uuidRegex.test(minuta.id) ? minuta.id : generateUUID();
-        
+
         // Log si se generó un nuevo UUID
         if (minutaId !== minuta.id) {
-          console.log(`🔄 Generando nuevo UUID para minuta "${minuta.tarea}": ${minuta.id} → ${minutaId}`);
+          supabaseLogger.data(`🔄 Generando nuevo UUID para minuta "${minuta.tarea}": ${minuta.id} → ${minutaId}`);
         }
 
         return {
@@ -3019,9 +3020,9 @@ class SupabaseService {
       });
 
       if (duplicateIds.length > 0) {
-        console.warn(`⚠️ DUPLICADOS DETECTADOS EN MINUTAS ANTES DE ENVIAR:`, duplicateIds);
-        console.warn(`⚠️ Total duplicados: ${duplicateIds.length} de ${minutasToUpsert.length} minutas`);
-        
+        supabaseLogger.warning(`⚠️ DUPLICADOS DETECTADOS EN MINUTAS ANTES DE ENVIAR:`, duplicateIds);
+        supabaseLogger.warning(`⚠️ Total duplicados: ${duplicateIds.length} de ${minutasToUpsert.length} minutas`);
+
         // Remover duplicados manteniendo solo la primera ocurrencia
         const uniqueMinutas = [];
         const processedIds = new Set();
@@ -3031,23 +3032,23 @@ class SupabaseService {
             uniqueMinutas.push(minuta);
           }
         });
-        
-        console.log(`🔄 Removiendo ${duplicateIds.length} minutas duplicadas, procesando ${uniqueMinutas.length} únicas`);
+
+        supabaseLogger.data(`🔄 Removiendo ${duplicateIds.length} minutas duplicadas, procesando ${uniqueMinutas.length} únicas`);
         minutasToUpsert = uniqueMinutas;
       }
 
       // Usar upsert para manejar duplicados sin eliminar minutas existentes
       const { data, error } = await this.supabase
         .from('minute_tasks')
-        .upsert(minutasToUpsert, { 
+        .upsert(minutasToUpsert, {
           onConflict: 'id',
-          ignoreDuplicates: false 
+          ignoreDuplicates: false
         })
         .select('*');
 
       if (error) {
-        console.error('❌ Error guardando minutas:', error);
-        console.error('❌ Detalles del error:', {
+        supabaseLogger.error(' Error guardando minutas:', error);
+        supabaseLogger.error(' Detalles del error:', {
           code: error.code,
           message: error.message,
           details: error.details,
@@ -3056,7 +3057,7 @@ class SupabaseService {
         return { success: false, error };
       }
 
-      console.log(`✅ Minutas guardadas/actualizadas: ${data?.length || 0}`);
+      supabaseLogger.data(`✅ Minutas guardadas/actualizadas: ${data?.length || 0}`);
 
       // Verificar si se guardaron correctamente
       try {
@@ -3069,21 +3070,21 @@ class SupabaseService {
         if (!verifyError && savedMinutas) {
           const savedCount = savedMinutas.length;
           const expectedCount = minutasToUpsert.length;
-          
+
           if (savedCount >= expectedCount) {
-            console.log(`✅ Verificación exitosa: ${savedCount} minutas en Supabase para proyecto ${projectId}`);
+            supabaseLogger.data(`✅ Verificación exitosa: ${savedCount} minutas en Supabase para proyecto ${projectId}`);
           } else {
-            console.warn(`⚠️ Posible discrepancia: Esperadas ${expectedCount}, Encontradas ${savedCount} minutas`);
+            supabaseLogger.warning(`⚠️ Posible discrepancia: Esperadas ${expectedCount}, Encontradas ${savedCount} minutas`);
           }
         }
       } catch (verifyError) {
-        console.warn(`⚠️ Error verificando minutas guardadas:`, verifyError);
+        supabaseLogger.warning(`⚠️ Error verificando minutas guardadas:`, verifyError);
       }
 
       return { success: true, data };
 
     } catch (error) {
-      console.error('❌ Error inesperado guardando minutas:', error);
+      supabaseLogger.error(' Error inesperado guardando minutas:', error);
       return { success: false, error };
     }
   }
@@ -3092,11 +3093,11 @@ class SupabaseService {
   async updateMinutaStatus(minutaId, newStatus) {
     try {
       if (!this.currentUser) {
-        console.warn('⚠️ No se puede actualizar minuta: usuario no autenticado');
+        supabaseLogger.warning('⚠️ No se puede actualizar minuta: usuario no autenticado');
         return { success: false, error: 'No autenticado' };
       }
 
-      console.log(`🔄 Actualizando estatus de minuta ${minutaId} a: ${newStatus}`);
+      supabaseLogger.data(`🔄 Actualizando estatus de minuta ${minutaId} a: ${newStatus}`);
 
       const { data, error } = await this.supabase
         .from('minute_tasks')
@@ -3109,15 +3110,15 @@ class SupabaseService {
         .select('*');
 
       if (error) {
-        console.error('❌ Error actualizando minuta:', error);
+        supabaseLogger.error(' Error actualizando minuta:', error);
         return { success: false, error };
       }
 
-      console.log(`✅ Minuta actualizada`);
+      supabaseLogger.data(`✅ Minuta actualizada`);
       return { success: true, data };
 
     } catch (error) {
-      console.error('❌ Error inesperado actualizando minuta:', error);
+      supabaseLogger.error(' Error inesperado actualizando minuta:', error);
       return { success: false, error };
     }
   }
@@ -3126,11 +3127,11 @@ class SupabaseService {
   async updateMinuta(minutaId, updateData) {
     try {
       if (!this.currentUser) {
-        console.warn('⚠️ No se puede actualizar minuta: usuario no autenticado');
+        supabaseLogger.warning('⚠️ No se puede actualizar minuta: usuario no autenticado');
         return { success: false, error: 'No autenticado' };
       }
 
-      console.log(`🔄 Actualizando minuta ${minutaId}:`, updateData);
+      supabaseLogger.data(`🔄 Actualizando minuta ${minutaId}:`, updateData);
 
       const { data, error } = await this.supabase
         .from('minute_tasks')
@@ -3143,17 +3144,17 @@ class SupabaseService {
         .select('*');
 
       if (error) {
-        console.error('❌ Error actualizando minuta:', error);
+        supabaseLogger.error(' Error actualizando minuta:', error);
         return { success: false, error };
       }
 
-      console.log(`✅ Minuta actualizada completamente`);
+      supabaseLogger.data(`✅ Minuta actualizada completamente`);
 
 
       return { success: true, data };
 
     } catch (error) {
-      console.error('❌ Error inesperado actualizando minuta:', error);
+      supabaseLogger.error(' Error inesperado actualizando minuta:', error);
       return { success: false, error };
     }
   }
@@ -3162,11 +3163,11 @@ class SupabaseService {
   async deleteMinuta(minutaId) {
     try {
       if (!this.currentUser) {
-        console.warn('⚠️ No se puede eliminar minuta: usuario no autenticado');
+        supabaseLogger.warning('⚠️ No se puede eliminar minuta: usuario no autenticado');
         return { success: false, error: 'No autenticado' };
       }
 
-      console.log(`🗑️ Eliminando minuta: ${minutaId}`);
+      supabaseLogger.data(`🗑️ Eliminando minuta: ${minutaId}`);
 
       const { error } = await this.supabase
         .from('minute_tasks')
@@ -3175,15 +3176,15 @@ class SupabaseService {
         .eq('user_id', this.currentUser.id);
 
       if (error) {
-        console.error('❌ Error eliminando minuta:', error);
+        supabaseLogger.error(' Error eliminando minuta:', error);
         return { success: false, error };
       }
 
-      console.log(`✅ Minuta eliminada`);
+      supabaseLogger.data(`✅ Minuta eliminada`);
       return { success: true };
 
     } catch (error) {
-      console.error('❌ Error inesperado eliminando minuta:', error);
+      supabaseLogger.error(' Error inesperado eliminando minuta:', error);
       return { success: false, error };
     }
   }
@@ -3194,7 +3195,7 @@ class SupabaseService {
   async saveAuditEvents(projectId, auditEvents) {
     try {
       if (!this.currentUser || !this.organizationId) {
-        console.warn('⚠️ No se pueden guardar eventos de auditoría: usuario no autenticado');
+        supabaseLogger.warning('⚠️ No se pueden guardar eventos de auditoría: usuario no autenticado');
         return { success: false, error: 'No autenticado' };
       }
 
@@ -3202,7 +3203,7 @@ class SupabaseService {
         return { success: true, data: [] };
       }
 
-      console.log(`📋 Guardando ${auditEvents.length} eventos de auditoría para proyecto: ${projectId}`);
+      supabaseLogger.data(`📋 Guardando ${auditEvents.length} eventos de auditoría para proyecto: ${projectId}`);
 
       // Preparar eventos para insertar con estructura simple
       const eventsToInsert = auditEvents.map(event => ({
@@ -3228,15 +3229,15 @@ class SupabaseService {
         .select('*');
 
       if (error) {
-        console.error('❌ Error guardando eventos de auditoría:', error);
+        supabaseLogger.error(' Error guardando eventos de auditoría:', error);
         return { success: false, error };
       }
 
-      console.log(`✅ Eventos de auditoría guardados: ${data?.length || 0}`);
+      supabaseLogger.data(`✅ Eventos de auditoría guardados: ${data?.length || 0}`);
       return { success: true, data };
 
     } catch (error) {
-      console.error('❌ Error inesperado guardando eventos de auditoría:', error);
+      supabaseLogger.error(' Error inesperado guardando eventos de auditoría:', error);
       return { success: false, error };
     }
   }
@@ -3245,11 +3246,11 @@ class SupabaseService {
   async loadAuditEvents(projectId) {
     try {
       if (!this.currentUser) {
-        console.warn('⚠️ No se pueden cargar eventos de auditoría: usuario no autenticado');
+        supabaseLogger.warning('⚠️ No se pueden cargar eventos de auditoría: usuario no autenticado');
         return { success: false, error: 'No autenticado', events: [] };
       }
 
-      console.log(`📋 Cargando eventos de auditoría para proyecto: ${projectId}`);
+      supabaseLogger.data(`📋 Cargando eventos de auditoría para proyecto: ${projectId}`);
 
       const { data, error } = await this.supabase
         .from('project_audit_events')
@@ -3259,7 +3260,7 @@ class SupabaseService {
         .order('timestamp', { ascending: false });
 
       if (error) {
-        console.error('❌ Error cargando eventos de auditoría:', error);
+        supabaseLogger.error(' Error cargando eventos de auditoría:', error);
         return { success: false, error, events: [] };
       }
 
@@ -3276,11 +3277,11 @@ class SupabaseService {
         user: event.event_user
       }));
 
-      console.log(`✅ Eventos de auditoría cargados: ${events.length}`);
+      supabaseLogger.data(`✅ Eventos de auditoría cargados: ${events.length}`);
       return { success: true, events };
 
     } catch (error) {
-      console.error('❌ Error inesperado cargando eventos de auditoría:', error);
+      supabaseLogger.error(' Error inesperado cargando eventos de auditoría:', error);
       return { success: false, error, events: [] };
     }
   }
@@ -3301,7 +3302,7 @@ class SupabaseService {
       }
 
       const { metadata } = backupData;
-      
+
       // Verificar campos requeridos en metadata
       if (!metadata.timestamp || !metadata.version || !metadata.source) {
         return { valid: false, error: 'Archivo no válido: metadata incompleta' };
@@ -3328,7 +3329,7 @@ class SupabaseService {
       const missingTables = expectedTables.filter(table => !availableTables.includes(table));
 
       if (missingTables.length > 0) {
-        console.warn(`⚠️ Tablas faltantes en backup: ${missingTables.join(', ')}`);
+        supabaseLogger.warning(`⚠️ Tablas faltantes en backup: ${missingTables.join(', ')}`);
       }
 
       // Calcular estadísticas
@@ -3358,8 +3359,8 @@ class SupabaseService {
   // Restaurar datos desde archivo de backup
   async restoreFromBackup(backupData, options = {}) {
     try {
-      console.log('🔄 Iniciando restauración de backup...');
-      
+      supabaseLogger.update(' Iniciando restauración de backup...');
+
       // Validar archivo
       const validation = this.validateBackupFile(backupData);
       if (!validation.valid) {
@@ -3369,7 +3370,7 @@ class SupabaseService {
         };
       }
 
-      console.log(`✅ Archivo válido: ${validation.totalRecords} registros en ${validation.tablesCount} tablas`);
+      supabaseLogger.data(`✅ Archivo válido: ${validation.totalRecords} registros en ${validation.tablesCount} tablas`);
 
       const results = {
         success: true,
@@ -3396,30 +3397,30 @@ class SupabaseService {
       // Procesar cada tabla en orden
       for (const tableName of restoreOrder) {
         if (!backupData.data[tableName]) {
-          console.log(`⏭️ Saltando tabla ${tableName}: no presente en backup`);
+          supabaseLogger.data(`⏭️ Saltando tabla ${tableName}: no presente en backup`);
           continue;
         }
 
         const tableData = backupData.data[tableName];
         if (!Array.isArray(tableData) || tableData.length === 0) {
-          console.log(`⏭️ Saltando tabla ${tableName}: sin datos`);
+          supabaseLogger.data(`⏭️ Saltando tabla ${tableName}: sin datos`);
           results.details[tableName] = { processed: 0, errors: 0 };
           continue;
         }
 
-        console.log(`📊 Restaurando tabla ${tableName}: ${tableData.length} registros`);
+        supabaseLogger.data(`📊 Restaurando tabla ${tableName}: ${tableData.length} registros`);
 
         try {
           // Limpiar tabla si se especifica
           if (options.clearExisting) {
-            console.log(`🗑️ Limpiando tabla ${tableName}...`);
+            supabaseLogger.data(`🗑️ Limpiando tabla ${tableName}...`);
             const { error: deleteError } = await this.supabase
               .from(tableName)
               .delete()
               .neq('id', '00000000-0000-0000-0000-000000000000'); // Condición que siempre es verdadera
-            
+
             if (deleteError) {
-              console.warn(`⚠️ Error limpiando tabla ${tableName}:`, deleteError);
+              supabaseLogger.warning(`⚠️ Error limpiando tabla ${tableName}:`, deleteError);
             }
           }
 
@@ -3430,13 +3431,13 @@ class SupabaseService {
 
           for (let i = 0; i < tableData.length; i += batchSize) {
             const batch = tableData.slice(i, i + batchSize);
-            
+
             const { data, error } = await this.supabase
               .from(tableName)
               .insert(batch);
 
             if (error) {
-              console.error(`❌ Error insertando lote en ${tableName}:`, error);
+              supabaseLogger.error(`❌ Error insertando lote en ${tableName}:`, error);
               errors += batch.length;
               results.errors.push({
                 table: tableName,
@@ -3456,10 +3457,10 @@ class SupabaseService {
           }
 
           results.details[tableName] = { processed, errors };
-          console.log(`✅ Tabla ${tableName}: ${processed} procesados, ${errors} errores`);
+          supabaseLogger.data(`✅ Tabla ${tableName}: ${processed} procesados, ${errors} errores`);
 
         } catch (tableError) {
-          console.error(`❌ Error procesando tabla ${tableName}:`, tableError);
+          supabaseLogger.error(`❌ Error procesando tabla ${tableName}:`, tableError);
           results.errors.push({
             table: tableName,
             error: tableError.message
@@ -3468,12 +3469,12 @@ class SupabaseService {
         }
       }
 
-      console.log(`✅ Restauración completada: ${results.processed} registros procesados`);
-      
+      supabaseLogger.data(`✅ Restauración completada: ${results.processed} registros procesados`);
+
       return results;
 
     } catch (error) {
-      console.error('❌ Error en restauración:', error);
+      supabaseLogger.error(' Error en restauración:', error);
       return {
         success: false,
         error: error.message

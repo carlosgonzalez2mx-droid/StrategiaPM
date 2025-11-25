@@ -1,3 +1,5 @@
+import { logger } from '../utils/logger';
+
 /**
  * PortfolioStrategic.js
  *
@@ -88,7 +90,7 @@ const PortfolioStrategic = ({
         setOrganizationId(portfolio?.organization?.id);
       }
     } catch (error) {
-      console.error('Error obteniendo organizationId:', error);
+      logger.error('Error obteniendo organizationId:', error);
     }
   }, []);
 
@@ -97,10 +99,10 @@ const PortfolioStrategic = ({
   useEffect(() => {
     const handleMinutaStatusChanged = (event) => {
       const { tareaId, newStatus, projectId, timestamp } = event.detail;
-      console.log('🔄 PortfolioStrategic: Evento minutaStatusChanged recibido:', { tareaId, newStatus, projectId, timestamp });
+      logger.debug('🔄 PortfolioStrategic: Evento minutaStatusChanged recibido:', { tareaId, newStatus, projectId, timestamp });
       
       // Forzar re-render del componente para actualizar el Dashboard resumen
-      console.log('🔄 PortfolioStrategic: Forzando re-render del Dashboard resumen...');
+      logger.debug('🔄 PortfolioStrategic: Forzando re-render del Dashboard resumen...');
       // El componente se re-renderizará automáticamente cuando cambien los datos
     };
 
@@ -119,9 +121,9 @@ const PortfolioStrategic = ({
   const canArchiveProject = (project) => {
     const validations = [];
     
-    console.log('🔍 VALIDANDO ARCHIVADO para proyecto:', project.name);
-    console.log('📊 Progreso del proyecto:', project.progress);
-    console.log('📋 Total de tareas disponibles:', tasks.length);
+    logger.debug('🔍 VALIDANDO ARCHIVADO para proyecto:', project.name);
+    logger.debug('📊 Progreso del proyecto:', project.progress);
+    logger.debug('📋 Total de tareas disponibles:', tasks.length);
     
     // 1. Verificar que el proyecto esté completado (100% de progreso)
     if (project.progress < 100) {
@@ -134,13 +136,13 @@ const PortfolioStrategic = ({
       task.workPackageId === project.id || task.projectId === project.id
     );
     
-    console.log('📋 Tareas del proyecto:', projectTasks.length);
+    logger.debug('📋 Tareas del proyecto:', projectTasks.length);
     
     const incompleteTasks = projectTasks.filter(task => 
       task.progress < 100 && task.status !== 'completed'
     );
     
-    console.log('❌ Tareas incompletas:', incompleteTasks.length);
+    logger.debug('❌ Tareas incompletas:', incompleteTasks.length);
     
     if (incompleteTasks.length > 0) {
       validations.push(`Todas las tareas deben estar completadas (${incompleteTasks.length} tareas pendientes)`);
@@ -203,8 +205,8 @@ const PortfolioStrategic = ({
       validations.push(`Aprobaciones pendientes: ${pendingApprovals.join(', ')}`);
     }
     
-    console.log('✅ Validaciones encontradas:', validations);
-    console.log('🎯 Puede archivar:', validations.length === 0);
+    logger.debug('✅ Validaciones encontradas:', validations);
+    logger.debug('🎯 Puede archivar:', validations.length === 0);
     
     return {
       canArchive: validations.length === 0,
@@ -342,11 +344,11 @@ const PortfolioStrategic = ({
   };
 
   const handleDuplicateProject = (projectId) => {
-    console.log('📋 Duplicando proyecto con ID:', projectId);
+    logger.debug('📋 Duplicando proyecto con ID:', projectId);
 
     const projectToDuplicate = projects.find(p => p.id === projectId);
     if (!projectToDuplicate) {
-      console.error('❌ Proyecto no encontrado para duplicar');
+      logger.error('❌ Proyecto no encontrado para duplicar');
       return;
     }
 
@@ -368,7 +370,7 @@ const PortfolioStrategic = ({
       progress: projectToDuplicate.progress
     };
 
-    console.log('📋 Proyecto duplicado creado:', duplicatedProject);
+    logger.debug('📋 Proyecto duplicado creado:', duplicatedProject);
 
     // Agregar el proyecto duplicado
     createProject(duplicatedProject);
@@ -571,16 +573,16 @@ const PortfolioStrategic = ({
           {activeTab === 'weekly-planning' && (
             <>
               {(() => {
-                console.log('🔍 DEBUG - Datos que se pasan a WeeklyPlanningTab:');
-                console.log('  📊 projects:', projects);
-                console.log('  📊 tasksByProject:', tasksByProject);
-                console.log('  📊 minutasByProject:', minutasByProject);
-                console.log('  📊 Estructura minutasByProject:', Object.keys(minutasByProject || {}));
+                logger.debug('🔍 DEBUG - Datos que se pasan a WeeklyPlanningTab:');
+                logger.debug('  📊 projects:', projects);
+                logger.debug('  📊 tasksByProject:', tasksByProject);
+                logger.debug('  📊 minutasByProject:', minutasByProject);
+                logger.debug('  📊 Estructura minutasByProject:', Object.keys(minutasByProject || {}));
 
                 // Ver ejemplo de minutas de un proyecto
                 const firstProjectId = Object.keys(minutasByProject || {})[0];
                 if (firstProjectId) {
-                  console.log(`  📊 Ejemplo minutas proyecto ${firstProjectId}:`, minutasByProject[firstProjectId]);
+                  logger.debug(`  📊 Ejemplo minutas proyecto ${firstProjectId}:`, minutasByProject[firstProjectId]);
                 }
                 return null;
               })()}

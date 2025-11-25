@@ -1,3 +1,5 @@
+import { logger } from '../utils/logger';
+
 import React, { useState, useMemo, useEffect } from 'react';
 import useAuditLog from '../hooks/useAuditLog';
 import subscriptionService from '../services/SubscriptionService';
@@ -8,7 +10,7 @@ const toISO = (d) => {
   if (!d) return new Date().toISOString().split('T')[0];
   const date = new Date(d);
   if (isNaN(date.getTime())) {
-    console.warn('Invalid date in toISO:', d);
+    logger.warn('Invalid date in toISO:', d);
     return new Date().toISOString().split('T')[0];
   }
   return date.toISOString().split('T')[0];
@@ -129,10 +131,10 @@ const FinancialManagement = ({
           const editPermission = await subscriptionService.canEdit(currentProject.organizationId);
           setIsReadOnlyMode(!editPermission.allowed);
           if (!editPermission.allowed) {
-            console.warn('[READ-ONLY MODE] Edición financiera deshabilitada:', editPermission.message);
+            logger.warn('[READ-ONLY MODE] Edición financiera deshabilitada:', editPermission.message);
           }
         } catch (error) {
-          console.error('[READ-ONLY MODE] Error verificando permisos:', error);
+          logger.error('[READ-ONLY MODE] Error verificando permisos:', error);
           setIsReadOnlyMode(false);
         }
       }
@@ -144,7 +146,7 @@ const FinancialManagement = ({
   const syncWithSchedule = (scheduleUpdates) => {
     if (!scheduleUpdates || !scheduleUpdates.tasks) return;
     
-    console.log('🔄 Sincronizando métricas financieras con cronograma...');
+    logger.debug('🔄 Sincronizando métricas financieras con cronograma...');
     
     // Actualizar work packages basado en progreso del cronograma
     const updatedWorkPackages = workPackages.map(wp => {
@@ -173,7 +175,7 @@ const FinancialManagement = ({
     });
     
     setWorkPackages(updatedWorkPackages);
-    console.log('✅ Work packages actualizados desde cronograma');
+    logger.debug('✅ Work packages actualizados desde cronograma');
   };
 
   // Sincronizar cuando cambien los datos del cronograma
@@ -237,7 +239,7 @@ const FinancialManagement = ({
     const safeAdvances = Array.isArray(advances) ? advances : [];
     const safeInvoices = Array.isArray(invoices) ? invoices : [];
 
-    console.log('🔍 FINANCIAL METRICS DEBUG:', {
+    logger.debug('🔍 FINANCIAL METRICS DEBUG:', {
       purchaseOrdersType: typeof purchaseOrders,
       purchaseOrdersIsArray: Array.isArray(purchaseOrders),
       purchaseOrdersLength: safePurchaseOrders.length,
@@ -364,7 +366,7 @@ const FinancialManagement = ({
       ? financialMetrics.AC / deliveredValue
       : 0;
 
-    console.log('📊 VALUE METRICS DEBUG:', {
+    logger.debug('📊 VALUE METRICS DEBUG:', {
       plannedBusinessValue,
       deliveredValue,
       VEI,
@@ -389,7 +391,7 @@ const FinancialManagement = ({
 
   // Handlers para órdenes de compra
   const handleSavePO = () => {
-    console.log('💾 GUARDANDO OC - editingPO:', editingPO);
+    logger.debug('💾 GUARDANDO OC - editingPO:', editingPO);
     
     // Validación: Si está aprobada, debe tener fecha de aprobación
     if (editingPO.status === 'approved' && (!editingPO.approvalDate || editingPO.approvalDate.trim() === '')) {
@@ -403,7 +405,7 @@ const FinancialManagement = ({
     if (editingPO.id) {
       // Editar orden existente
       const updatedOrders = currentOrders.map(po => po.id === editingPO.id ? editingPO : po);
-      console.log('📝 EDITANDO OC EXISTENTE:', editingPO.id, 'Total órdenes:', updatedOrders.length);
+      logger.debug('📝 EDITANDO OC EXISTENTE:', editingPO.id, 'Total órdenes:', updatedOrders.length);
       setPurchaseOrders(updatedOrders);
     } else {
       // Crear nueva orden
@@ -421,7 +423,7 @@ const FinancialManagement = ({
         projectId: editingPO.projectId
       };
       const newOrders = [...currentOrders, newPO];
-      console.log('➕ CREANDO NUEVA OC:', newPO.id, 'Total órdenes:', newOrders.length);
+      logger.debug('➕ CREANDO NUEVA OC:', newPO.id, 'Total órdenes:', newOrders.length);
       setPurchaseOrders(newOrders);
       
       // Registrar evento de auditoría
@@ -446,15 +448,15 @@ const FinancialManagement = ({
           // Si se eliminó correctamente de Supabase, eliminar del estado local
           const currentOrders = Array.isArray(purchaseOrders) ? purchaseOrders : [];
           const filteredOrders = currentOrders.filter(po => po.id !== id);
-          console.log('🗑️ ELIMINANDO OC:', id, 'Órdenes restantes:', filteredOrders.length);
+          logger.debug('🗑️ ELIMINANDO OC:', id, 'Órdenes restantes:', filteredOrders.length);
           setPurchaseOrders(filteredOrders);
-          console.log('✅ Orden de compra eliminada localmente y de Supabase');
+          logger.debug('✅ Orden de compra eliminada localmente y de Supabase');
         } else {
-          console.error('❌ Error eliminando orden de compra de Supabase:', result.error);
+          logger.error('❌ Error eliminando orden de compra de Supabase:', result.error);
           alert('Error eliminando la orden de compra. Inténtalo de nuevo.');
         }
       } catch (error) {
-        console.error('❌ Error inesperado eliminando orden de compra:', error);
+        logger.error('❌ Error inesperado eliminando orden de compra:', error);
         alert('Error inesperado eliminando la orden de compra. Inténtalo de nuevo.');
       }
     }
@@ -503,13 +505,13 @@ const FinancialManagement = ({
           const currentAdvances = Array.isArray(advances) ? advances : [];
           const filteredAdvances = currentAdvances.filter(adv => adv.id !== id);
           setAdvances(filteredAdvances);
-          console.log('✅ Anticipo eliminado localmente y de Supabase');
+          logger.debug('✅ Anticipo eliminado localmente y de Supabase');
         } else {
-          console.error('❌ Error eliminando anticipo de Supabase:', result.error);
+          logger.error('❌ Error eliminando anticipo de Supabase:', result.error);
           alert('Error eliminando el anticipo. Inténtalo de nuevo.');
         }
       } catch (error) {
-        console.error('❌ Error inesperado eliminando anticipo:', error);
+        logger.error('❌ Error inesperado eliminando anticipo:', error);
         alert('Error inesperado eliminando el anticipo. Inténtalo de nuevo.');
       }
     }
@@ -558,13 +560,13 @@ const FinancialManagement = ({
           const currentInvoices = Array.isArray(invoices) ? invoices : [];
           const filteredInvoices = currentInvoices.filter(inv => inv.id !== id);
           setInvoices(filteredInvoices);
-          console.log('✅ Factura eliminada localmente y de Supabase');
+          logger.debug('✅ Factura eliminada localmente y de Supabase');
         } else {
-          console.error('❌ Error eliminando factura de Supabase:', result.error);
+          logger.error('❌ Error eliminando factura de Supabase:', result.error);
           alert('Error eliminando la factura. Inténtalo de nuevo.');
         }
       } catch (error) {
-        console.error('❌ Error inesperado eliminando factura:', error);
+        logger.error('❌ Error inesperado eliminando factura:', error);
         alert('Error inesperado eliminando la factura. Inténtalo de nuevo.');
       }
     }
@@ -1680,11 +1682,10 @@ const FinancialManagement = ({
                       number: editingInvoice.number,
                       supplier: editingInvoice.supplier,
                       amount: editingInvoice.amount,
-                      status: editingInvoice.status,
                       receivedDate: editingInvoice.receivedDate,
                       dueDate: editingInvoice.dueDate,
                       description: editingInvoice.description,
-                      projectId: editingInvoice.projectId, status: e.target.value})}
+                      status: e.target.value})}
                   >
                     <option value="pending">Pendiente</option>
                     <option value="paid">Pagada</option>

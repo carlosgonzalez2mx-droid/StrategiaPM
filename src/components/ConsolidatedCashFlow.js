@@ -1,3 +1,5 @@
+import { logger } from '../utils/logger';
+
 import React, { useState, useMemo } from 'react';
 import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
@@ -20,7 +22,7 @@ const ConsolidatedCashFlow = ({
   const activeProjects = projects.filter(p => p.status === 'active');
   
   // Logs de depuración
-  console.log('🔍 CONSOLIDATED CASHFLOW DEBUG:', {
+  logger.debug('🔍 CONSOLIDATED CASHFLOW DEBUG:', {
     projects: projects?.length || 0,
     activeProjects: activeProjects.length,
     tasksByProject: Object.keys(tasksByProject || {}).length,
@@ -33,7 +35,7 @@ const ConsolidatedCashFlow = ({
   // Log detallado de órdenes de compra
   Object.keys(purchaseOrdersByProject || {}).forEach(projectId => {
     const pos = purchaseOrdersByProject[projectId] || [];
-    console.log(`🔍 ÓRDENES DE COMPRA para proyecto ${projectId}:`, {
+    logger.debug(`🔍 ÓRDENES DE COMPRA para proyecto ${projectId}:`, {
       total: pos.length,
       orders: pos.map(po => ({
         id: po.id,
@@ -67,14 +69,14 @@ const ConsolidatedCashFlow = ({
   
   // Calcular gasto comprometido del mes (ordenes de compra aprobadas)
   const calculateMonthCommittedExpense = (purchaseOrders, monthDate) => {
-    console.log('🔍 CALCULANDO GASTO COMPROMETIDO - Iniciando función:', {
+    logger.debug('🔍 CALCULANDO GASTO COMPROMETIDO - Iniciando función:', {
       purchaseOrdersLength: purchaseOrders?.length || 0,
       monthDate: monthDate.toISOString().substring(0, 7),
       purchaseOrders: purchaseOrders
     });
     
     if (!purchaseOrders || purchaseOrders.length === 0) {
-      console.log('🔍 No hay órdenes de compra para calcular gasto comprometido');
+      logger.debug('🔍 No hay órdenes de compra para calcular gasto comprometido');
       return 0;
     }
     
@@ -85,7 +87,7 @@ const ConsolidatedCashFlow = ({
     monthStart.setHours(0, 0, 0, 0);
     monthEnd.setHours(23, 59, 59, 999);
     
-    console.log('🔍 Calculando gasto comprometido para mes:', {
+    logger.debug('🔍 Calculando gasto comprometido para mes:', {
       month: monthDate.toISOString().substring(0, 7),
       monthStart: monthStart.toISOString().split('T')[0],
       monthEnd: monthEnd.toISOString().split('T')[0],
@@ -93,9 +95,9 @@ const ConsolidatedCashFlow = ({
     });
     
     // Log detallado de cada orden de compra ANTES del reduce
-    console.log('🔍 DETALLE COMPLETO DE ÓRDENES DE COMPRA:');
+    logger.debug('🔍 DETALLE COMPLETO DE ÓRDENES DE COMPRA:');
     purchaseOrders.forEach((po, index) => {
-      console.log(`🔍 OC ${index + 1}:`, {
+      logger.debug(`🔍 OC ${index + 1}:`, {
         id: po.id,
         number: po.number,
         approvalDate: po.approvalDate,
@@ -118,7 +120,7 @@ const ConsolidatedCashFlow = ({
       } else if (po.date && po.date.trim() !== '') {
         poDate = new Date(po.date + 'T00:00:00');
       } else {
-        console.log('⚠️ OC sin fecha válida:', {
+        logger.debug('⚠️ OC sin fecha válida:', {
           id: po.id,
           number: po.number,
           approvalDate: po.approvalDate,
@@ -129,7 +131,7 @@ const ConsolidatedCashFlow = ({
       
       // Verificar que la fecha sea válida
       if (isNaN(poDate.getTime())) {
-        console.log('⚠️ OC con fecha inválida:', {
+        logger.debug('⚠️ OC con fecha inválida:', {
           id: po.id,
           number: po.number,
           approvalDate: po.approvalDate,
@@ -141,7 +143,7 @@ const ConsolidatedCashFlow = ({
       
       const isInMonth = poDate >= monthStart && poDate <= monthEnd;
       
-      console.log('🔍 Evaluando OC:', {
+      logger.debug('🔍 Evaluando OC:', {
         id: po.id,
         number: po.number,
         approvalDate: po.approvalDate,
@@ -157,7 +159,7 @@ const ConsolidatedCashFlow = ({
       });
       
       if (isInMonth) {
-        console.log(`✅ INCLUYENDO OC ${po.number}: $${po.totalAmount} en mes ${monthDate.toISOString().substring(0, 7)}`);
+        logger.debug(`✅ INCLUYENDO OC ${po.number}: $${po.totalAmount} en mes ${monthDate.toISOString().substring(0, 7)}`);
         return total + (po.totalAmount || 0);
       }
       return total;
@@ -234,7 +236,7 @@ const ConsolidatedCashFlow = ({
         const projectAdvances = advancesByProject[project.id] || [];
         const projectInvoices = invoicesByProject[project.id] || [];
         
-        console.log(`🔍 Proyecto ${project.id} (${project.name}):`, {
+        logger.debug(`🔍 Proyecto ${project.id} (${project.name}):`, {
           tasks: projectTasks.length,
           purchaseOrders: projectPurchaseOrders.length,
           advances: projectAdvances.length,
@@ -246,16 +248,16 @@ const ConsolidatedCashFlow = ({
         totalPlannedExpense += monthPlannedExpense;
         
         // Calcular gasto comprometido del mes (ordenes de compra aprobadas)
-        console.log(`🔍 LLAMANDO calculateMonthCommittedExpense para proyecto ${project.id} en mes ${monthKey}`);
+        logger.debug(`🔍 LLAMANDO calculateMonthCommittedExpense para proyecto ${project.id} en mes ${monthKey}`);
         const monthCommittedExpense = calculateMonthCommittedExpense(projectPurchaseOrders, monthDate);
-        console.log(`🔍 RESULTADO calculateMonthCommittedExpense: $${monthCommittedExpense}`);
+        logger.debug(`🔍 RESULTADO calculateMonthCommittedExpense: $${monthCommittedExpense}`);
         totalCommittedExpense += monthCommittedExpense;
         
         // Calcular gasto real del mes (anticipos pagados + facturas pagadas)
         const monthRealExpense = calculateMonthRealExpense(projectAdvances, projectInvoices, monthDate);
         totalRealExpense += monthRealExpense;
         
-        console.log(`🔍 Gastos del mes ${monthKey} para proyecto ${project.id}:`, {
+        logger.debug(`🔍 Gastos del mes ${monthKey} para proyecto ${project.id}:`, {
           planned: monthPlannedExpense,
           committed: monthCommittedExpense,
           real: monthRealExpense

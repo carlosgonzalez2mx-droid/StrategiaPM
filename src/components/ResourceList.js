@@ -403,14 +403,13 @@ const ResourceList = ({
                     value={newResource.name}
                     onChange={(e) => setNewResource({
                       id: newResource.id,
-                      name: newResource.name,
                       role: newResource.role,
                       email: newResource.email,
                       skills: newResource.skills,
                       availability: newResource.availability,
                       hourlyRate: newResource.hourlyRate,
                       status: newResource.status,
-                      projectId: newResource.projectId, name: e.target.value})}
+                      name: e.target.value})}
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Nombre completo"
                   />
@@ -424,13 +423,12 @@ const ResourceList = ({
                     onChange={(e) => setNewResource({
                       id: newResource.id,
                       name: newResource.name,
-                      role: newResource.role,
                       email: newResource.email,
                       skills: newResource.skills,
                       availability: newResource.availability,
                       hourlyRate: newResource.hourlyRate,
                       status: newResource.status,
-                      projectId: newResource.projectId, role: e.target.value})}
+                      role: e.target.value})}
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="Ej: Project Manager, Desarrollador, etc."
                   />
@@ -445,12 +443,11 @@ const ResourceList = ({
                       id: newResource.id,
                       name: newResource.name,
                       role: newResource.role,
-                      email: newResource.email,
                       skills: newResource.skills,
                       availability: newResource.availability,
                       hourlyRate: newResource.hourlyRate,
                       status: newResource.status,
-                      projectId: newResource.projectId, email: e.target.value})}
+                      email: e.target.value})}
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="email@empresa.com"
                   />
@@ -466,11 +463,10 @@ const ResourceList = ({
                       name: newResource.name,
                       role: newResource.role,
                       email: newResource.email,
-                      skills: newResource.skills,
                       availability: newResource.availability,
                       hourlyRate: newResource.hourlyRate,
                       status: newResource.status,
-                      projectId: newResource.projectId, skills: e.target.value})}
+                      skills: e.target.value})}
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="React, JavaScript, PMBOK, etc."
                   />
@@ -490,10 +486,9 @@ const ResourceList = ({
                       role: newResource.role,
                       email: newResource.email,
                       skills: newResource.skills,
-                      availability: newResource.availability,
                       hourlyRate: newResource.hourlyRate,
                       status: newResource.status,
-                      projectId: newResource.projectId, availability: Number(e.target.value)})}
+                      availability: Number(e.target.value)})}
                       className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
@@ -511,9 +506,8 @@ const ResourceList = ({
                       email: newResource.email,
                       skills: newResource.skills,
                       availability: newResource.availability,
-                      hourlyRate: newResource.hourlyRate,
                       status: newResource.status,
-                      projectId: newResource.projectId, hourlyRate: Number(e.target.value)})}
+                      hourlyRate: Number(e.target.value)})}
                       className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
@@ -531,8 +525,7 @@ const ResourceList = ({
                       skills: newResource.skills,
                       availability: newResource.availability,
                       hourlyRate: newResource.hourlyRate,
-                      status: newResource.status,
-                      projectId: newResource.projectId, status: e.target.value})}
+                      status: e.target.value})}
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="active">Activo</option>
@@ -577,14 +570,13 @@ const ResourceList = ({
                     value={editingResource.name}
                     onChange={(e) => setEditingResource({
                       id: editingResource.id,
-                      name: editingResource.name,
                       role: editingResource.role,
                       email: editingResource.email,
                       skills: editingResource.skills,
                       availability: editingResource.availability,
                       hourlyRate: editingResource.hourlyRate,
                       status: editingResource.status,
-                      projectId: editingResource.projectId, name: e.target.value})}
+                      name: e.target.value})}
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
@@ -597,13 +589,12 @@ const ResourceList = ({
                     onChange={(e) => setEditingResource({
                       id: editingResource.id,
                       name: editingResource.name,
-                      role: editingResource.role,
                       email: editingResource.email,
                       skills: editingResource.skills,
                       availability: editingResource.availability,
                       hourlyRate: editingResource.hourlyRate,
                       status: editingResource.status,
-                      projectId: editingResource.projectId, role: e.target.value})}
+                      role: e.target.value})}
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
@@ -617,12 +608,11 @@ const ResourceList = ({
                       id: editingResource.id,
                       name: editingResource.name,
                       role: editingResource.role,
-                      email: editingResource.email,
                       skills: editingResource.skills,
                       availability: editingResource.availability,
                       hourlyRate: editingResource.hourlyRate,
                       status: editingResource.status,
-                      projectId: editingResource.projectId, email: e.target.value})}
+                      email: e.target.value})}
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
@@ -637,11 +627,10 @@ const ResourceList = ({
                       name: editingResource.name,
                       role: editingResource.role,
                       email: editingResource.email,
-                      skills: editingResource.skills,
                       availability: editingResource.availability,
                       hourlyRate: editingResource.hourlyRate,
                       status: editingResource.status,
-                      projectId: editingResource.projectId, skills: e.target.value})}
+                      skills: e.target.value})}
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
@@ -660,10 +649,9 @@ const ResourceList = ({
                       role: editingResource.role,
                       email: editingResource.email,
                       skills: editingResource.skills,
-                      availability: editingResource.availability,
                       hourlyRate: editingResource.hourlyRate,
                       status: editingResource.status,
-                      projectId: editingResource.projectId, availability: Number(e.target.value)})}
+                      availability: Number(e.target.value)})}
                       className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
@@ -681,9 +669,8 @@ const ResourceList = ({
                       email: editingResource.email,
                       skills: editingResource.skills,
                       availability: editingResource.availability,
-                      hourlyRate: editingResource.hourlyRate,
                       status: editingResource.status,
-                      projectId: editingResource.projectId, hourlyRate: Number(e.target.value)})}
+                      hourlyRate: Number(e.target.value)})}
                       className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
@@ -701,8 +688,7 @@ const ResourceList = ({
                       skills: editingResource.skills,
                       availability: editingResource.availability,
                       hourlyRate: editingResource.hourlyRate,
-                      status: editingResource.status,
-                      projectId: editingResource.projectId, status: e.target.value})}
+                      status: e.target.value})}
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     <option value="active">Activo</option>

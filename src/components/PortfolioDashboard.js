@@ -1,3 +1,5 @@
+import { logger } from '../utils/logger';
+
 /**
  * PortfolioDashboard.js
  *
@@ -210,8 +212,8 @@ const PortfolioDashboard = ({
 
   // Función para manejar la edición de proyecto
   const handleEditProject = (project) => {
-    console.log('🔍 Proyecto original para editar:', project);
-    console.log('🔍 Estado del proyecto original:', project.status);
+    logger.debug('🔍 Proyecto original para editar:', project);
+    logger.debug('🔍 Estado del proyecto original:', project.status);
     
     // Preservar el estado actual del proyecto al editar
     // NO usar valores por defecto que sobrescriban el estado real
@@ -227,8 +229,8 @@ const PortfolioDashboard = ({
       // Estos deben mantenerse exactamente como están en el proyecto original
     };
     
-    console.log('🔍 Proyecto preparado para editar:', projectToEdit);
-    console.log('🔍 Estado del proyecto preparado:', projectToEdit.status);
+    logger.debug('🔍 Proyecto preparado para editar:', projectToEdit);
+    logger.debug('🔍 Estado del proyecto preparado:', projectToEdit.status);
     
     setEditingProject(projectToEdit);
     setErrors({});
@@ -284,12 +286,12 @@ const PortfolioDashboard = ({
 
         if (orgId) {
           setOrganizationId(orgId);
-          console.log('✅ PortfolioDashboard - Organization ID cargado:', orgId);
+          logger.debug('✅ PortfolioDashboard - Organization ID cargado:', orgId);
         } else {
-          console.warn('⚠️ PortfolioDashboard - No se encontró organization ID');
+          logger.warn('⚠️ PortfolioDashboard - No se encontró organization ID');
         }
       } catch (error) {
-        console.error('❌ Error obteniendo organizationId:', error);
+        logger.error('❌ Error obteniendo organizationId:', error);
       }
     };
 
@@ -299,7 +301,7 @@ const PortfolioDashboard = ({
     // Si no se encuentra, reintentar después de 1 segundo
     const timer = setTimeout(() => {
       if (!organizationId) {
-        console.log('🔄 PortfolioDashboard - Reintentando obtener organization ID...');
+        logger.debug('🔄 PortfolioDashboard - Reintentando obtener organization ID...');
         fetchOrganizationId();
       }
     }, 1000);
@@ -355,25 +357,25 @@ const PortfolioDashboard = ({
 
     // Validar límites de suscripción si es un proyecto nuevo
     if (!editingProject.id && organizationId) {
-      console.log('🔍 Validando límites de suscripción para organizationId:', organizationId);
+      logger.debug('🔍 Validando límites de suscripción para organizationId:', organizationId);
       try {
         const canCreate = await subscriptionService.canCreateProject(organizationId);
-        console.log('📊 Resultado de validación:', canCreate);
+        logger.debug('📊 Resultado de validación:', canCreate);
 
         if (!canCreate.allowed) {
-          console.warn('⛔ Límite alcanzado - Mostrando modal de upgrade');
+          logger.warn('⛔ Límite alcanzado - Mostrando modal de upgrade');
           // Guardar información del límite para mostrar en el modal
           setSubscriptionLimit(canCreate);
           setShowUpgradeModal(true);
           return;
         }
-        console.log('✅ Validación pasada - Puede crear proyecto');
+        logger.debug('✅ Validación pasada - Puede crear proyecto');
       } catch (error) {
-        console.error('❌ Error verificando límites de suscripción:', error);
+        logger.error('❌ Error verificando límites de suscripción:', error);
         // Continuar con la creación en caso de error (fail-safe)
       }
     } else {
-      console.warn('⚠️ No se validó suscripción - editingProject.id:', editingProject.id, 'organizationId:', organizationId);
+      logger.warn('⚠️ No se validó suscripción - editingProject.id:', editingProject.id, 'organizationId:', organizationId);
     }
 
     // Si no hay errores, proceder a guardar

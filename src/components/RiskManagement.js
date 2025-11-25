@@ -1,3 +1,5 @@
+import { logger } from '../utils/logger';
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import FileManager from './FileManager';
 import useAuditLog from '../hooks/useAuditLog';
@@ -49,9 +51,9 @@ const RiskManagement = ({
   useSupabase = false
 }) => {
   // Los riesgos ahora vienen como props desde App.js
-  console.log('RiskManagement - risks recibidos:', risks);
-  console.log('RiskManagement - tipo de risks:', typeof risks);
-  console.log('RiskManagement - es array:', Array.isArray(risks));
+  logger.debug('RiskManagement - risks recibidos:', risks);
+  logger.debug('RiskManagement - tipo de risks:', typeof risks);
+  logger.debug('RiskManagement - es array:', Array.isArray(risks));
 
   // Estados para gestión de riesgos
   const [selectedRisk, setSelectedRisk] = useState(null);
@@ -164,7 +166,7 @@ const RiskManagement = ({
           const editPermission = await subscriptionService.canEdit(currentProject.organizationId);
           setIsReadOnlyMode(!editPermission.allowed);
         } catch (error) {
-          console.error('[READ-ONLY MODE] Error verificando permisos:', error);
+          logger.error('[READ-ONLY MODE] Error verificando permisos:', error);
           setIsReadOnlyMode(false);
         }
       }
@@ -290,14 +292,14 @@ const RiskManagement = ({
           // Si se eliminó correctamente de Supabase, eliminar del estado local
           if (risks && Array.isArray(risks)) {
             setRisks(risks.filter(r => r.id !== riskId));
-            console.log('✅ Riesgo eliminado localmente y de Supabase');
+            logger.debug('✅ Riesgo eliminado localmente y de Supabase');
           }
         } else {
-          console.error('❌ Error eliminando riesgo de Supabase:', result.error);
+          logger.error('❌ Error eliminando riesgo de Supabase:', result.error);
           alert('Error eliminando el riesgo. Inténtalo de nuevo.');
         }
       } catch (error) {
-        console.error('❌ Error inesperado eliminando riesgo:', error);
+        logger.error('❌ Error inesperado eliminando riesgo:', error);
         alert('Error inesperado eliminando el riesgo. Inténtalo de nuevo.');
       }
     }
@@ -427,9 +429,9 @@ const RiskManagement = ({
     // Calcular reserva de gestión basada en P95 de Monte Carlo
     const p95Management = Math.max(0, monteCarloResults.p95 - monteCarloResults.p80);
     
-    console.log('🔄 Actualizando reservas basándose en Monte Carlo:');
-    console.log('📊 P80 Contingency:', p80Contingency);
-    console.log('📊 P95 Management:', p95Management);
+    logger.debug('🔄 Actualizando reservas basándose en Monte Carlo:');
+    logger.debug('📊 P80 Contingency:', p80Contingency);
+    logger.debug('📊 P95 Management:', p95Management);
     
     // 🔄 ACTUALIZAR EL PROYECTO CON NUEVAS RESERVAS
     if (currentProject && setProjects) {
@@ -462,7 +464,7 @@ const RiskManagement = ({
 
 Las reservas se han actualizado en el proyecto y se reflejarán en todos los módulos.`);
       
-      console.log('✅ Proyecto actualizado con nuevas reservas de Monte Carlo');
+      logger.debug('✅ Proyecto actualizado con nuevas reservas de Monte Carlo');
     }
   };
 

@@ -1,3 +1,5 @@
+import { logger } from '../utils/logger';
+
 import React, { useState, useMemo } from 'react';
 import useAuditLog from '../hooks/useAuditLog';
 
@@ -15,14 +17,14 @@ const CashFlowProjection = ({
   // Generar ID único para esta instancia del componente
   const componentId = useMemo(() => Math.random().toString(36).substr(2, 9), []);
   
-  console.log(`🔍 CASHFLOW COMPONENT - INSTANCIA ${componentId} INICIANDO:`, {
+  logger.debug(`🔍 CASHFLOW COMPONENT - INSTANCIA ${componentId} INICIANDO:`, {
     currentProject: currentProject?.name,
     tasksCount: tasks?.length || 0,
     timestamp: new Date().toISOString()
   });
   
   // DEBUG: Logging detallado de las tareas recibidas
-  console.log(`🔍 CASHFLOW COMPONENT [${componentId}] - TAREAS RECIBIDAS:`, {
+  logger.debug(`🔍 CASHFLOW COMPONENT [${componentId}] - TAREAS RECIBIDAS:`, {
     totalTasks: tasks?.length || 0,
     tasksWithCosts: tasks?.filter(t => t.cost > 0).length || 0,
     tasksWithCostsDetails: tasks?.filter(t => t.cost > 0).map(t => ({
@@ -47,8 +49,8 @@ const CashFlowProjection = ({
   const { addAuditEvent } = useAuditLog(currentProjectId);
 
   // Usar el proyecto actual que se pasa como prop (ya procesado por ProjectManagementTabs)
-  console.log('🔍 CASHFLOW DEBUG - currentProject recibido:', currentProject);
-  console.log('🔍 CASHFLOW DEBUG - currentProjectId:', currentProjectId);
+  logger.debug('🔍 CASHFLOW DEBUG - currentProject recibido:', currentProject);
+  logger.debug('🔍 CASHFLOW DEBUG - currentProjectId:', currentProjectId);
 
   // Calcular progreso del proyecto
   const calculateProjectProgress = (date) => {
@@ -69,7 +71,7 @@ const CashFlowProjection = ({
   // Calcular gasto planificado del mes basado en costos del cronograma
   const calculateMonthPlannedExpense = (monthDate) => {
     if (!currentProject || !tasks) {
-      console.log('🔍 CashFlow: No hay proyecto o tareas:', { currentProject: !!currentProject, tasks: !!tasks });
+      logger.debug('🔍 CashFlow: No hay proyecto o tareas:', { currentProject: !!currentProject, tasks: !!tasks });
       return 0;
     }
 
@@ -80,7 +82,7 @@ const CashFlowProjection = ({
     const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
     monthEnd.setHours(23, 59, 59, 999);
     
-    console.log('🔍 CashFlow: Calculando gasto planificado para mes:', {
+    logger.debug('🔍 CashFlow: Calculando gasto planificado para mes:', {
       month: monthDate.toLocaleDateString('es-ES', { year: 'numeric', month: 'long' }),
       monthStart: monthStart.toISOString().split('T')[0],
       monthEnd: monthEnd.toISOString().split('T')[0],
@@ -89,8 +91,8 @@ const CashFlowProjection = ({
     
     // DEBUG: Mostrar todas las tareas con costos para julio 2026
     if (monthDate.getMonth() === 6 && monthDate.getFullYear() === 2026) {
-      console.log('🔍 DEBUG JULIO 2026 - ANÁLISIS COMPLETO DE TAREAS:');
-      console.log('🔍 Rango del mes julio 2026:', {
+      logger.debug('🔍 DEBUG JULIO 2026 - ANÁLISIS COMPLETO DE TAREAS:');
+      logger.debug('🔍 Rango del mes julio 2026:', {
         monthStart: monthStart.toISOString().split('T')[0],
         monthEnd: monthEnd.toISOString().split('T')[0]
       });
@@ -129,7 +131,7 @@ const CashFlowProjection = ({
 
           if (isInMonth) {
             tareasEnJulio++;
-            console.log(`  ✅ INCLUIDA - Tarea ${index + 1}:`, {
+            logger.debug(`  ✅ INCLUIDA - Tarea ${index + 1}:`, {
               name: task.name || task.title,
               cost: task.cost,
               startDate: task.startDate,
@@ -155,7 +157,7 @@ const CashFlowProjection = ({
         }
       });
 
-      console.log('🔍 JULIO 2026 - Resumen:', {
+      logger.debug('🔍 JULIO 2026 - Resumen:', {
         totalTareas: tasks.length,
         tareasConCosto: tasks.filter(t => t.cost > 0).length,
         tareasEnJulio: tareasEnJulio,
@@ -163,7 +165,7 @@ const CashFlowProjection = ({
         costoPromedioPorTarea: totalCostoEsperado / tasks.filter(t => t.cost > 0).length
       });
 
-      console.log('🔍 JULIO 2026 - Tareas EXCLUIDAS (posibles causas del error):', tareasExcluidasJulio);
+      logger.debug('🔍 JULIO 2026 - Tareas EXCLUIDAS (posibles causas del error):', tareasExcluidasJulio);
     }
     
     let plannedExpense = 0;
@@ -172,7 +174,7 @@ const CashFlowProjection = ({
     
     // Calcular gasto planificado basado en tareas del cronograma que se ejecutan en este mes
     tasks.forEach((task, index) => {
-      console.log(`🔍 CashFlow: Tarea ${index + 1}:`, {
+      logger.debug(`🔍 CashFlow: Tarea ${index + 1}:`, {
         name: task.name || task.title,
         cost: task.cost,
         startDate: task.startDate,
@@ -186,7 +188,7 @@ const CashFlowProjection = ({
       // DEBUG ESPECÍFICO: Para la tarea 45 (hito problemático)
       if (index === 44) { // Tarea 45 (índice 44)
         const monthName = monthDate.toLocaleDateString('es-ES', { year: 'numeric', month: 'long' });
-        console.log('🚨 DEBUG TAREA 45 ESPECÍFICA:', {
+        logger.debug('🚨 DEBUG TAREA 45 ESPECÍFICA:', {
           taskName: task.name || task.title,
           taskCost: task.cost,
           taskStartDate: task.startDate,
@@ -200,7 +202,7 @@ const CashFlowProjection = ({
         
         // DEBUG: Logging específico para agosto 2026
         if (monthName === 'agosto de 2026' && task.cost > 0) {
-          console.log(`🔍 CASHFLOW [${componentId}] - TAREA CON COSTO EN AGOSTO 2026:`, {
+          logger.debug(`🔍 CASHFLOW [${componentId}] - TAREA CON COSTO EN AGOSTO 2026:`, {
             taskIndex: index,
             taskId: task.id,
             taskName: task.name,
@@ -237,7 +239,7 @@ const CashFlowProjection = ({
         // DEBUG: Logging específico para julio y agosto 2026
         const monthName = monthDate.toLocaleDateString('es-ES', { year: 'numeric', month: 'long' });
         if ((monthName === 'julio de 2026' || monthName === 'agosto de 2026') && task.cost > 0) {
-          console.log(`🔍 CASHFLOW [${componentId}] - TAREA CON COSTO EN ${monthName.toUpperCase()}:`, {
+          logger.debug(`🔍 CASHFLOW [${componentId}] - TAREA CON COSTO EN ${monthName.toUpperCase()}:`, {
             taskIndex: index,
             taskId: task.id,
             taskName: task.name,
@@ -262,7 +264,7 @@ const CashFlowProjection = ({
           
   // DEBUG: Logging detallado solo para tareas con costos altos y meses específicos
   if (task.cost > 0 && (monthName === 'julio de 2026' || monthName === 'agosto de 2026')) {
-    console.log(`🎯 DEBUG HITO [${componentId}] - Verificación de mes:`, {
+    logger.debug(`🎯 DEBUG HITO [${componentId}] - Verificación de mes:`, {
       taskName: task.name || task.title,
       taskStartDate: task.startDate,
       taskStart: taskStart.toISOString().split('T')[0],
@@ -293,7 +295,7 @@ const CashFlowProjection = ({
             const taskCostInMonth = task.cost || 0;
             plannedExpense += taskCostInMonth;
             
-            console.log(`💰 CashFlow: HITO "${task.name || task.title}" en mes:`, {
+            logger.debug(`💰 CashFlow: HITO "${task.name || task.title}" en mes:`, {
               taskCost: task.cost,
               isMilestone: true,
               startDate: task.startDate,
@@ -303,7 +305,7 @@ const CashFlowProjection = ({
             
             // DEBUG ESPECÍFICO: Para el hito problemático
             if (task.cost && task.cost > 300000) {
-              console.log('🚨 DEBUG HITO PROBLEMÁTICO:', {
+              logger.debug('🚨 DEBUG HITO PROBLEMÁTICO:', {
                 taskName: task.name || task.title,
                 taskCost: task.cost,
                 taskStartDate: task.startDate,
@@ -330,7 +332,7 @@ const CashFlowProjection = ({
               const taskCostInMonth = (task.cost || 0) * percentageInMonth;
               plannedExpense += taskCostInMonth;
               
-              console.log(`💰 CashFlow: Tarea "${task.name || task.title}" en mes:`, {
+              logger.debug(`💰 CashFlow: Tarea "${task.name || task.title}" en mes:`, {
                 taskCost: task.cost,
                 percentageInMonth: (percentageInMonth * 100).toFixed(1) + '%',
                 costInMonth: taskCostInMonth.toFixed(2)
@@ -341,7 +343,7 @@ const CashFlowProjection = ({
       }
     });
     
-    console.log('🔍 CashFlow: Resumen del mes:', {
+    logger.debug('🔍 CashFlow: Resumen del mes:', {
       totalTasks: tasks.length,
       tasksWithCosts,
       tasksInMonth,
@@ -350,7 +352,7 @@ const CashFlowProjection = ({
 
     // DEBUG ESPECÍFICO PARA JULIO 2026
     if (monthDate.getMonth() === 6 && monthDate.getFullYear() === 2026) {
-      console.log('🎯 JULIO 2026 - VALOR FINAL CALCULADO:', {
+      logger.debug('🎯 JULIO 2026 - VALOR FINAL CALCULADO:', {
         plannedExpense: plannedExpense,
         plannedExpenseFixed: plannedExpense.toFixed(3),
         valorEsperadoPorUsuario: 385953.528,
@@ -366,7 +368,7 @@ const CashFlowProjection = ({
   const calculateMonthCommittedExpense = (monthDate, daysToPayment) => {
     if (!currentProject) return 0;
 
-    console.log('🔍 CASHFLOW PROJECTION - calculateMonthCommittedExpense iniciando:', {
+    logger.debug('🔍 CASHFLOW PROJECTION - calculateMonthCommittedExpense iniciando:', {
       monthDate: monthDate.toISOString().substring(0, 7),
       purchaseOrdersLength: purchaseOrders?.length || 0,
       purchaseOrders: purchaseOrders
@@ -374,7 +376,7 @@ const CashFlowProjection = ({
 
     // DEBUG: Mostrar todas las órdenes de compra aprobadas
     const approvedPOs = purchaseOrders?.filter(po => po.status === 'approved') || [];
-    console.log('🔍 CASHFLOW PROJECTION - Órdenes de compra aprobadas:', approvedPOs.map(po => ({
+    logger.debug('🔍 CASHFLOW PROJECTION - Órdenes de compra aprobadas:', approvedPOs.map(po => ({
       id: po.id,
       number: po.number,
       status: po.status,
@@ -393,7 +395,7 @@ const CashFlowProjection = ({
     const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
     monthEnd.setHours(23, 59, 59, 999);
 
-    console.log('🔍 CASHFLOW PROJECTION - Rango de fechas:', {
+    logger.debug('🔍 CASHFLOW PROJECTION - Rango de fechas:', {
       monthStart: monthStart.toISOString().split('T')[0],
       monthEnd: monthEnd.toISOString().split('T')[0]
     });
@@ -404,7 +406,7 @@ const CashFlowProjection = ({
       
       // SOLO usar approvalDate - si no existe, no incluir la orden
       if (!po.approvalDate || po.approvalDate.trim() === '') {
-        console.log('⚠️ CASHFLOW PROJECTION - OC sin fecha de aprobación:', {
+        logger.debug('⚠️ CASHFLOW PROJECTION - OC sin fecha de aprobación:', {
           id: po.id,
           number: po.number,
           status: po.status,
@@ -429,7 +431,7 @@ const CashFlowProjection = ({
       
       const isInMonth = adjustedDate >= monthStart && adjustedDate <= monthEnd;
       
-      console.log('🔍 CASHFLOW PROJECTION - Evaluando OC:', {
+      logger.debug('🔍 CASHFLOW PROJECTION - Evaluando OC:', {
         id: po.id,
         number: po.number,
         approvalDate: po.approvalDate,
@@ -449,11 +451,11 @@ const CashFlowProjection = ({
 
     // Sumar el total de las órdenes de compra del mes
     committedExpense += monthPOs.reduce((sum, po) => {
-      console.log(`✅ CASHFLOW PROJECTION - INCLUYENDO OC ${po.number}: $${po.totalAmount}`);
+      logger.debug(`✅ CASHFLOW PROJECTION - INCLUYENDO OC ${po.number}: $${po.totalAmount}`);
       return sum + (po.totalAmount || 0);
     }, 0);
 
-    console.log('🔍 CASHFLOW PROJECTION - Resultado final:', {
+    logger.debug('🔍 CASHFLOW PROJECTION - Resultado final:', {
       monthPOsCount: monthPOs.length,
       committedExpense
     });
@@ -515,7 +517,7 @@ const CashFlowProjection = ({
   const cashFlowProjection = useMemo(() => {
     if (!currentProject) return null;
 
-    console.log(`🔄 CASHFLOW PROJECTION [${componentId}] - FORZANDO RECÁLCULO COMPLETO:`, {
+    logger.debug(`🔄 CASHFLOW PROJECTION [${componentId}] - FORZANDO RECÁLCULO COMPLETO:`, {
       currentProject: currentProject?.name,
       projectionPeriod,
       projectionStartDate,
@@ -543,7 +545,7 @@ const CashFlowProjection = ({
     const daysToPayment = paymentTerms[projectionSettings.paymentTerms];
 
     // DEBUG: Mostrar configuración de proyección
-    console.log('🔍 CASHFLOW PROJECTION - CONFIGURACIÓN COMPLETA:', {
+    logger.debug('🔍 CASHFLOW PROJECTION - CONFIGURACIÓN COMPLETA:', {
       startDate: startDate.toISOString().split('T')[0],
       months: months,
       projectionStartDate: projectionStartDate,
@@ -562,21 +564,21 @@ const CashFlowProjection = ({
         month: 'long'
       });
 
-      console.log(`🔍 CASHFLOW PROJECTION - Procesando mes ${i + 1}: ${monthKey} (${monthLabel})`);
+      logger.debug(`🔍 CASHFLOW PROJECTION - Procesando mes ${i + 1}: ${monthKey} (${monthLabel})`);
 
       // DEBUG ESPECÍFICO: Alertar cuando procesamos julio 2026
       if (monthKey === '2026-07') {
-        console.log('🎯 JULIO 2026 DETECTADO - Iniciando cálculo detallado...');
+        logger.debug('🎯 JULIO 2026 DETECTADO - Iniciando cálculo detallado...');
       }
 
       // Calcular gasto planificado del mes
       const monthPlannedExpense = calculateMonthPlannedExpense(currentDate);
-      console.log(`🔍 CASHFLOW PROJECTION [${componentId}] - RESULTADO calculateMonthPlannedExpense para ${monthKey}: $${monthPlannedExpense}`);
+      logger.debug(`🔍 CASHFLOW PROJECTION [${componentId}] - RESULTADO calculateMonthPlannedExpense para ${monthKey}: $${monthPlannedExpense}`);
       
       // Calcular gasto comprometido del mes (OCs)
-      console.log(`🔍 CASHFLOW PROJECTION - LLAMANDO calculateMonthCommittedExpense para mes ${monthKey}`);
+      logger.debug(`🔍 CASHFLOW PROJECTION - LLAMANDO calculateMonthCommittedExpense para mes ${monthKey}`);
       const monthCommittedExpense = calculateMonthCommittedExpense(currentDate, daysToPayment);
-      console.log(`🔍 CASHFLOW PROJECTION - RESULTADO calculateMonthCommittedExpense: $${monthCommittedExpense}`);
+      logger.debug(`🔍 CASHFLOW PROJECTION - RESULTADO calculateMonthCommittedExpense: $${monthCommittedExpense}`);
       
       // Calcular gasto real del mes (anticipos pagados + facturas pagadas)
       const monthRealExpense = calculateMonthRealExpense(currentDate);
@@ -604,7 +606,7 @@ const CashFlowProjection = ({
       
       // DEBUG: Logging específico para julio y agosto 2026
       if (monthKey === '2026-07' || monthKey === '2026-08') {
-        console.log(`🔍 CASHFLOW PROJECTION [${componentId}] - ASIGNANDO VALORES para ${monthKey}:`, {
+        logger.debug(`🔍 CASHFLOW PROJECTION [${componentId}] - ASIGNANDO VALORES para ${monthKey}:`, {
           monthPlannedExpense: monthPlannedExpense,
           revenue: monthProjection.revenue,
           monthLabel: monthProjection.monthLabel,
@@ -616,7 +618,7 @@ const CashFlowProjection = ({
     }
 
     // DEBUG: Logging final de la proyección completa
-    console.log(`🔍 CASHFLOW PROJECTION [${componentId}] - PROYECCIÓN FINAL COMPLETA:`, {
+    logger.debug(`🔍 CASHFLOW PROJECTION [${componentId}] - PROYECCIÓN FINAL COMPLETA:`, {
       totalMonths: projection.length,
       julio2026: projection.find(m => m.monthKey === '2026-07'),
       agosto2026: projection.find(m => m.monthKey === '2026-08'),
@@ -920,7 +922,7 @@ const CashFlowProjection = ({
                   {cashFlowProjection.map((month) => {
                     // DEBUG: Logging específico para julio y agosto 2026 en el renderizado
                     if (month.monthKey === '2026-07' || month.monthKey === '2026-08') {
-                      console.log(`🔍 CASHFLOW RENDER [${componentId}] - RENDERIZANDO ${month.monthKey}:`, {
+                      logger.debug(`🔍 CASHFLOW RENDER [${componentId}] - RENDERIZANDO ${month.monthKey}:`, {
                         monthLabel: month.monthLabel,
                         revenue: month.revenue,
                         formattedRevenue: formatCurrency(month.revenue),

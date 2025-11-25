@@ -16,6 +16,9 @@ import { FinancialProvider, useFinancial } from './contexts/FinancialContext';
 import { TasksProvider, useTasks } from './contexts/TasksContext';
 import { ConfigProvider, useConfig } from './contexts/ConfigContext';
 
+// Logger
+import { logger } from './utils/logger';
+
 // Hooks
 import usePermissions from './hooks/usePermissions';
 
@@ -71,30 +74,30 @@ const sortTasksByWbsCode = (tasks) => {
     // Función mejorada para manejar diferentes formatos de wbsCode
     const getNumericValue = (wbsCode) => {
       if (!wbsCode) return 0;
-      
+
       // Si es un número directo
       if (typeof wbsCode === 'number') return wbsCode;
-      
+
       // Si es string, extraer solo los números
       const numericMatch = String(wbsCode).match(/\d+/);
       if (numericMatch) {
         return parseInt(numericMatch[0], 10);
       }
-      
+
       // Si contiene "Sin predecesoras" o similar, poner al final
       if (String(wbsCode).toLowerCase().includes('sin')) return 999999;
-      
+
       return 0;
     };
-    
+
     const aNum = getNumericValue(a.wbsCode);
     const bNum = getNumericValue(b.wbsCode);
-    
+
     // Si los números son iguales, mantener orden original
     if (aNum === bNum) {
       return 0;
     }
-    
+
     return aNum - bNum;
   });
 };
@@ -201,7 +204,7 @@ function MainApp() {
   // useEffect(() => {
   //   if (process.env.NODE_ENV === 'development') {
   //     import('./debug-file-storage').catch(err => {
-  //       console.warn('No se pudo cargar el script de diagnóstico:', err);
+  //       logger.warn('No se pudo cargar el script de diagnóstico:', err);
   //     });
   //   }
   // }, []);
@@ -215,36 +218,36 @@ function MainApp() {
   // Sistema de auto-guardado con debouncing
   const debouncedSave = useCallback(
     debounce(async (dataToSave) => {
-      console.log('🔍 DEBUG - debouncedSave ejecutándose');
-      console.log('   useSupabase:', useSupabase);
-      console.log('   isAuthenticated:', supabaseService.isAuthenticated());
+      logger.debug(' DEBUG - debouncedSave ejecutándose');
+      logger.debug('   useSupabase:', useSupabase);
+      logger.debug('   isAuthenticated:', supabaseService.isAuthenticated());
 
       if (!useSupabase || !supabaseService.isAuthenticated()) {
-        console.log('⏭️ Saltando guardado - No autenticado o Supabase deshabilitado');
-        console.log('   Razón: useSupabase =', useSupabase, ', isAuthenticated =', supabaseService.isAuthenticated());
+        logger.debug(' Saltando guardado - No autenticado o Supabase deshabilitado');
+        logger.debug('   Razón: useSupabase =', useSupabase, ', isAuthenticated =', supabaseService.isAuthenticated());
         return;
       }
-      
-      console.log('💾 Auto-guardando cambios...');
+
+      logger.debug(' Auto-guardando cambios...');
       const saveStartTime = Date.now();
-      
+
       try {
         const success = await supabaseService.savePortfolioData(dataToSave);
-        
+
         if (success) {
           const duration = Date.now() - saveStartTime;
-          console.log(`✅ Auto-guardado exitoso en ${duration}ms`);
-          
+          logger.debug(`✅ Auto-guardado exitoso en ${duration}ms`);
+
           // Disparar evento para actualizar UI
-          const event = new CustomEvent('autoSaveComplete', { 
-            detail: { duration, timestamp: new Date().toISOString() } 
+          const event = new CustomEvent('autoSaveComplete', {
+            detail: { duration, timestamp: new Date().toISOString() }
           });
           window.dispatchEvent(event);
         } else {
-          console.warn('⚠️ Auto-guardado falló');
+          logger.warn('⚠️ Auto-guardado falló');
         }
       } catch (error) {
-        console.error('❌ Error en auto-guardado:', error);
+        logger.error('❌ Error en auto-guardado:', error);
       }
     }, 2000), // Esperar 2 segundos después del último cambio
     [useSupabase]
@@ -263,7 +266,7 @@ function MainApp() {
   // Función para limpiar duplicados en Supabase
   const cleanDuplicatesInSupabase = async () => {
     if (useSupabase && supabaseService.isAuthenticated()) {
-      console.log('🧹 Iniciando limpieza de duplicados en Supabase...');
+      logger.debug(' Iniciando limpieza de duplicados en Supabase...');
       const success = await supabaseService.cleanDuplicatesInSupabase();
       if (success) {
         alert('✅ Duplicados limpiados exitosamente en Supabase');
@@ -281,12 +284,12 @@ function MainApp() {
   const cleanDuplicateTasks = () => {
     const currentTasks = getCurrentProjectTasks();
     if (!Array.isArray(currentTasks) || currentTasks.length === 0) {
-      console.log('✅ No hay tareas para verificar duplicados');
+      logger.debug(' No hay tareas para verificar duplicados');
       return;
     }
 
-    console.log(`🔍 Verificando duplicados en proyecto ${currentProjectId}...`);
-    console.log(`📊 Total de tareas: ${currentTasks.length}`);
+    logger.debug(`🔍 Verificando duplicados en proyecto ${currentProjectId}...`);
+    logger.debug(`📊 Total de tareas: ${currentTasks.length}`);
 
     // Detectar duplicados REALES (mismo ID)
     const taskIds = new Set();
@@ -297,36 +300,36 @@ function MainApp() {
       if (taskIds.has(task.id)) {
         duplicateIds.push(task.id);
         duplicateDetails.push(`ID: ${task.id}, Nombre: ${task.name}`);
-        console.warn(`🚨 DUPLICADO REAL detectado: ${task.id} - ${task.name}`);
+        logger.warn(`🚨 DUPLICADO REAL detectado: ${task.id} - ${task.name}`);
       } else {
         taskIds.add(task.id);
       }
     }
 
     if (duplicateIds.length > 0) {
-      console.warn(`🚨 DUPLICADOS REALES detectados: ${duplicateIds.length}`);
-      console.warn('📋 Detalles:', duplicateDetails);
-      
+      logger.warn(`🚨 DUPLICADOS REALES detectados: ${duplicateIds.length}`);
+      logger.warn('📋 Detalles:', duplicateDetails);
+
       // Crear backup antes de limpiar
       const backup = JSON.stringify(currentTasks);
       localStorage.setItem(`duplicates-backup-${currentProjectId}-${Date.now()}`, backup);
-      console.log('💾 Backup de tareas duplicadas creado');
-      
+      logger.debug(' Backup de tareas duplicadas creado');
+
       // Limpiar solo duplicados reales (mantener la primera ocurrencia)
       const uniqueTasks = [];
       const seenIds = new Set();
-      
+
       for (const task of currentTasks) {
         if (!seenIds.has(task.id)) {
           uniqueTasks.push(task);
           seenIds.add(task.id);
         }
       }
-      
-      console.log(`🧹 Limpiados ${duplicateIds.length} duplicados reales`);
+
+      logger.debug(`🧹 Limpiados ${duplicateIds.length} duplicados reales`);
       updateCurrentProjectTasks(uniqueTasks);
     } else {
-      console.log('✅ Sin duplicados reales detectados');
+      logger.debug(' Sin duplicados reales detectados');
     }
   };
 
@@ -359,14 +362,14 @@ function MainApp() {
   // NOTA: dataLoaded ahora viene de ConfigContext (via useConfig hook)
 
   // ===== SISTEMA DE PERSISTENCIA =====
-  
+
   // Función para guardar y cerrar
   // Funciones de autenticación
   const handleAuthSuccess = async (user) => {
-    console.log('✅ Usuario autenticado:', user);
+    logger.debug(' Usuario autenticado:', user);
     setUseSupabase(true);
     setShowAuthModal(false);
-    
+
     // Recargar datos desde Supabase
     const savedData = await supabaseService.loadPortfolioData();
     if (savedData) {
@@ -389,15 +392,15 @@ function MainApp() {
   };
 
   const handleAuthCancel = () => {
-    console.log('❌ Usuario canceló autenticación, usando modo local');
+    logger.error(' Usuario canceló autenticación, usando modo local');
     setShowAuthModal(false);
     setUseSupabase(false);
   };
 
   const handleSaveAndClose = async () => {
     try {
-      console.log('💾 Guardando datos antes de cerrar...');
-      
+      logger.debug(' Guardando datos antes de cerrar...');
+
       // Crear objeto con todos los datos actuales
       const dataToSave = {
         projects,
@@ -417,71 +420,71 @@ function MainApp() {
 
       // Guardar usando Supabase si está disponible, sino usar localStorage
       if (useSupabase && supabaseService.isAuthenticated()) {
-        console.log('💾 Guardando en Supabase...');
+        logger.debug(' Guardando en Supabase...');
         const success = await supabaseService.savePortfolioData(dataToSave);
         if (success) {
-          console.log('✅ Datos guardados exitosamente en Supabase');
+          logger.debug(' Datos guardados exitosamente en Supabase');
           alert('✅ Datos guardados exitosamente en la nube. Puedes cerrar la aplicación manualmente.');
         } else {
           throw new Error('Error guardando en Supabase');
         }
       } else {
-        console.log('💾 Guardando en localStorage...');
+        logger.debug(' Guardando en localStorage...');
         await filePersistenceService.saveData(dataToSave);
-        console.log('✅ Datos guardados exitosamente en localStorage');
+        logger.debug(' Datos guardados exitosamente en localStorage');
         alert('✅ Datos guardados exitosamente en archivo local. Puedes cerrar la aplicación manualmente.');
       }
-      
+
     } catch (error) {
-      console.error('❌ Error guardando datos:', error);
+      logger.error('❌ Error guardando datos:', error);
       alert('❌ Error al guardar los datos. Por favor, inténtalo de nuevo.');
     }
   };
-  
+
   // Cargar datos del localStorage o Supabase al iniciar
   useEffect(() => {
     const loadData = async () => {
       try {
-        console.log('🚀 Iniciando carga de datos...');
-        
+        logger.debug(' Iniciando carga de datos...');
+
         // Inicializar Supabase primero
-        console.log('🔧 Inicializando Supabase...');
+        logger.debug(' Inicializando Supabase...');
         const supabaseReady = await supabaseService.initialize();
         setSupabaseInitialized(supabaseReady);
-        
+
         if (supabaseReady) {
           if (supabaseService.getCurrentUser()) {
-            console.log('✅ Supabase inicializado con usuario autenticado');
+            logger.debug(' Supabase inicializado con usuario autenticado');
             setUseSupabase(true);
-            
+
             // Cargar datos desde Supabase
-            console.log('🔍 Cargando datos desde Supabase...');
+            logger.debug(' Cargando datos desde Supabase...');
             const savedData = await supabaseService.loadPortfolioData();
-            console.log('🔍 Resultado de loadPortfolioData():', savedData);
+            logger.debug(' Resultado de loadPortfolioData():', savedData);
 
             if (!savedData) {
-              console.warn('⚠️ Error cargando datos desde Supabase');
-              console.warn('⚠️ Continuando con datos locales...');
+              logger.warn('⚠️ Error cargando datos desde Supabase');
+              logger.warn('⚠️ Continuando con datos locales...');
               // Solo deshabilitar si hay ERROR real, no si es usuario nuevo sin datos
               setUseSupabase(false);
             } else if (!savedData.organization) {
-              console.error('❌ Usuario autenticado pero sin organización');
-              console.error('❌ Esto no debería suceder - verificar RLS y membresías');
+              logger.error('❌ Usuario autenticado pero sin organización');
+              logger.error('❌ Esto no debería suceder - verificar RLS y membresías');
               setUseSupabase(false);
             } else {
               // Usuario tiene organización - puede o no tener proyectos
-              console.log('✅ Organización detectada en Supabase:', savedData.organization.name);
-              console.log('📂 Proyectos encontrados:', savedData.projects?.length || 0);
+              logger.debug(' Organización detectada en Supabase:', savedData.organization.name);
+              logger.debug(' Proyectos encontrados:', savedData.projects?.length || 0);
 
               // MANTENER useSupabase = true incluso si no hay proyectos (usuario nuevo)
               // Esto permite guardar nuevos proyectos que se creen
 
               // Usar datos de Supabase si existen
               if (savedData.projects && Array.isArray(savedData.projects) && savedData.projects.length > 0) {
-                console.log('📂 Cargando proyectos desde Supabase:', savedData.projects.length);
+                logger.debug(' Cargando proyectos desde Supabase:', savedData.projects.length);
                 setProjects(savedData.projects);
               } else {
-                console.log('📂 Usuario nuevo sin proyectos - listo para crear el primero');
+                logger.debug(' Usuario nuevo sin proyectos - listo para crear el primero');
                 setProjects([]); // Usuario nuevo comienza con array vacío
               }
               if (savedData.currentProjectId) {
@@ -514,36 +517,36 @@ function MainApp() {
               setDataLoaded(true);
               return;
             }
-        } else {
-          console.log('⚠️ Supabase disponible pero sin usuario autenticado');
-          // Mostrar modal de autenticación inmediatamente
-          setShowAuthModal(true);
+          } else {
+            logger.warn(' Supabase disponible pero sin usuario autenticado');
+            // Mostrar modal de autenticación inmediatamente
+            setShowAuthModal(true);
+          }
         }
-        }
-        
+
         // Fallback: usar localStorage si Supabase no está disponible
-        console.log('⚠️ Supabase no disponible, usando localStorage...');
+        logger.warn(' Supabase no disponible, usando localStorage...');
         setUseSupabase(false);
-        
+
         // Inicializar servicio de persistencia local
-        console.log('🔧 Inicializando filePersistenceService...');
+        logger.debug(' Inicializando filePersistenceService...');
         await filePersistenceService.initialize();
-        console.log('✅ filePersistenceService inicializado');
-        
+        logger.debug(' filePersistenceService inicializado');
+
         // Cargar datos desde el servicio local
-        console.log('🔍 Llamando a filePersistenceService.loadData()...');
+        logger.debug(' Llamando a filePersistenceService.loadData()...');
         const savedData = await filePersistenceService.loadData();
-        console.log('🔍 Resultado de loadData():', savedData);
-        
+        logger.debug(' Resultado de loadData():', savedData);
+
         if (savedData) {
-          console.log('📂 Datos encontrados, cargando...');
-          console.log('📂 globalResources en datos guardados:', savedData.globalResources);
-          
+          logger.debug(' Datos encontrados, cargando...');
+          logger.debug(' globalResources en datos guardados:', savedData.globalResources);
+
           if (savedData.projects && Array.isArray(savedData.projects) && savedData.projects.length > 0) {
-            console.log('📂 Cargando proyectos guardados:', savedData.projects.length);
+            logger.debug(' Cargando proyectos guardados:', savedData.projects.length);
             setProjects(savedData.projects);
           } else {
-            console.log('📂 No hay proyectos guardados válidos, manteniendo proyectos iniciales');
+            logger.debug(' No hay proyectos guardados válidos, manteniendo proyectos iniciales');
           }
           if (savedData.currentProjectId) {
             setCurrentProjectId(savedData.currentProjectId);
@@ -573,7 +576,7 @@ function MainApp() {
             setContractsByProject(savedData.contractsByProject);
           }
           if (savedData.globalResources) {
-            console.log('📂 Estableciendo globalResources:', savedData.globalResources);
+            logger.debug(' Estableciendo globalResources:', savedData.globalResources);
             setGlobalResources(savedData.globalResources);
           }
           if (savedData.resourceAssignmentsByProject) {
@@ -583,19 +586,19 @@ function MainApp() {
             setAuditLogsByProject(savedData.auditLogsByProject);
           }
         } else {
-          console.log('📂 No se encontraron datos guardados');
-          console.log('📂 savedData es:', savedData);
+          logger.debug(' No se encontraron datos guardados');
+          logger.debug(' savedData es:', savedData);
         }
 
         // NOTA: La limpieza de datos corruptos ahora se hace automáticamente
         // en TasksContext via safeSetTasksByProject
 
         // Marcar que los datos iniciales se han cargado
-        console.log('✅ Marcando dataLoaded como true');
+        logger.debug(' Marcando dataLoaded como true');
         setDataLoaded(true);
       } catch (error) {
-        console.error('❌ Error al cargar datos:', error);
-        console.error('❌ Stack trace:', error.stack);
+        logger.error('❌ Error al cargar datos:', error);
+        logger.error('❌ Stack trace:', error.stack);
         // Marcar como cargado incluso si hay error para evitar bloqueo
         setDataLoaded(true);
       }
@@ -612,9 +615,9 @@ function MainApp() {
 
     const reloadProjectData = async () => {
       try {
-        console.log('🔄 Recargando datos para el proyecto actual:', currentProjectId);
+        logger.debug(' Recargando datos para el proyecto actual:', currentProjectId);
         const savedData = await supabaseService.loadPortfolioData();
-        
+
         if (savedData) {
           // Actualizar solo los datos específicos del proyecto actual
           if (savedData.purchaseOrdersByProject) {
@@ -637,7 +640,7 @@ function MainApp() {
           }
         }
       } catch (error) {
-        console.error('❌ Error recargando datos del proyecto:', error);
+        logger.error('❌ Error recargando datos del proyecto:', error);
       }
     };
 
@@ -648,7 +651,7 @@ function MainApp() {
   useEffect(() => {
     const handleDataRestore = (event) => {
       const { data } = event.detail;
-      
+
       if (data.projects) setProjects(data.projects);
       if (data.currentProjectId) setCurrentProjectId(data.currentProjectId);
       if (data.tasksByProject) safeSetTasksByProject(data.tasksByProject);
@@ -666,7 +669,7 @@ function MainApp() {
 
     const handleDataImport = (event) => {
       const { data } = event.detail;
-      
+
       if (data.projects) setProjects(data.projects);
       if (data.currentProjectId) setCurrentProjectId(data.currentProjectId);
       if (data.tasksByProject) safeSetTasksByProject(data.tasksByProject);
@@ -684,22 +687,22 @@ function MainApp() {
 
     const handleToggleSupabase = (event) => {
       const { useSupabase: newUseSupabase } = event.detail;
-      console.log('🔄 Toggle Supabase desde ProjectManagementTabs:', newUseSupabase);
+      logger.debug(' Toggle Supabase desde ProjectManagementTabs:', newUseSupabase);
       setUseSupabase(newUseSupabase);
     };
 
     const handleRequestSupabaseAuth = (event) => {
       const { action } = event.detail;
-      console.log('🔐 Solicitud de autenticación Supabase:', action);
-      
+      logger.debug(' Solicitud de autenticación Supabase:', action);
+
       if (action === 'activate') {
         // Verificar si ya está autenticado
         if (supabaseService.isAuthenticated()) {
-          console.log('✅ Ya está autenticado, activando Supabase...');
+          logger.debug(' Ya está autenticado, activando Supabase...');
           setUseSupabase(true);
           alert('✅ Supabase activado\n\nLos datos se sincronizarán automáticamente con la base de datos en la nube.');
         } else {
-          console.log('🔐 No está autenticado, mostrando modal...');
+          logger.debug(' No está autenticado, mostrando modal...');
           setShowAuthModal(true);
         }
       }
@@ -719,7 +722,7 @@ function MainApp() {
   }, []);
 
   // ===== SISTEMA DE GUARDADO CON THROTTLING =====
-  
+
   // Ref para controlar el throttling y evitar bucles infinitos
   const saveTimeoutRef = useRef(null);
   const lastSaveDataRef = useRef(null);
@@ -728,7 +731,7 @@ function MainApp() {
   // Función para comparar si los datos han cambiado realmente
   const hasDataChanged = (newData, oldData) => {
     if (!oldData) return true;
-    
+
     // Comparar solo los campos esenciales para evitar guardados innecesarios
     const essentialFields = [
       'projects', 'currentProjectId', 'tasksByProject', 'risksByProject',
@@ -736,36 +739,36 @@ function MainApp() {
       'invoicesByProject', 'contractsByProject', 'resourceAssignmentsByProject',
       'auditLogsByProject'
     ];
-    
+
     return essentialFields.some(field => {
       const newValue = newData[field];
       const oldValue = oldData[field];
-      
+
       // Para tareas, verificar cambios más específicos y robustos
       if (field === 'tasksByProject') {
         if (!newValue || !oldValue) return newValue !== oldValue;
-        
+
         // Verificar si el número de tareas cambió
         const newTaskCount = Object.values(newValue).reduce((total, tasks) => total + (tasks?.length || 0), 0);
         const oldTaskCount = Object.values(oldValue).reduce((total, tasks) => total + (tasks?.length || 0), 0);
-        
+
         if (newTaskCount !== oldTaskCount) {
-          console.log(`📊 Cambio detectado en tareas: ${oldTaskCount} → ${newTaskCount}`);
+          logger.debug(`📊 Cambio detectado en tareas: ${oldTaskCount} → ${newTaskCount}`);
           return true;
         }
-        
+
         // Verificar cambios en tareas específicas por proyecto
         for (const projectId in newValue) {
           const newTasks = newValue[projectId] || [];
           const oldTasks = oldValue[projectId] || [];
-          
+
           if (newTasks.length !== oldTasks.length) {
-            console.log(`📊 Cambio en número de tareas del proyecto ${projectId}: ${oldTasks.length} → ${newTasks.length}`);
+            logger.debug(`📊 Cambio en número de tareas del proyecto ${projectId}: ${oldTasks.length} → ${newTasks.length}`);
             return true;
           }
-          
+
           // Crear hashes de contenido para comparación más eficiente
-          const newTaskHashes = newTasks.map(task => 
+          const newTaskHashes = newTasks.map(task =>
             JSON.stringify({
               id: task.id,
               name: task.name,
@@ -778,8 +781,8 @@ function MainApp() {
               successors: task.successors
             })
           ).sort();
-          
-          const oldTaskHashes = oldTasks.map(task => 
+
+          const oldTaskHashes = oldTasks.map(task =>
             JSON.stringify({
               id: task.id,
               name: task.name,
@@ -792,24 +795,24 @@ function MainApp() {
               successors: task.successors
             })
           ).sort();
-          
+
           // Comparar hashes ordenados
           if (JSON.stringify(newTaskHashes) !== JSON.stringify(oldTaskHashes)) {
-            console.log(`📊 Cambio detectado en contenido de tareas del proyecto ${projectId}`);
+            logger.debug(`📊 Cambio detectado en contenido de tareas del proyecto ${projectId}`);
             return true;
           }
         }
         return false;
       }
-      
-      if (field === 'projects' || field === 'risksByProject' || 
-          field === 'globalResources' || field === 'purchaseOrdersByProject' || 
-          field === 'advancesByProject' || field === 'invoicesByProject' || 
-          field === 'contractsByProject' || field === 'resourceAssignmentsByProject' || 
-          field === 'auditLogsByProject' || field === 'minutasByProject') {
+
+      if (field === 'projects' || field === 'risksByProject' ||
+        field === 'globalResources' || field === 'purchaseOrdersByProject' ||
+        field === 'advancesByProject' || field === 'invoicesByProject' ||
+        field === 'contractsByProject' || field === 'resourceAssignmentsByProject' ||
+        field === 'auditLogsByProject' || field === 'minutasByProject') {
         return JSON.stringify(newValue) !== JSON.stringify(oldValue);
       }
-      
+
       return newValue !== oldValue;
     });
   };
@@ -823,13 +826,13 @@ function MainApp() {
 
     // Verificar si los datos han cambiado realmente
     if (!hasDataChanged(dataToSave, lastSaveDataRef.current)) {
-      console.log('⏭️ Datos sin cambios, omitiendo guardado');
+      logger.debug(' Datos sin cambios, omitiendo guardado');
       return;
     }
 
     // Verificar que no esté guardando ya
     if (isSavingRef.current) {
-      console.log('⏳ Ya hay un guardado en progreso, omitiendo');
+      logger.debug('⏳ Ya hay un guardado en progreso, omitiendo');
       return;
     }
 
@@ -838,59 +841,59 @@ function MainApp() {
     const totalTasks = Object.values(tasksByProject).reduce((total, tasks) => total + (tasks?.length || 0), 0);
     const projectCount = Object.keys(tasksByProject).length;
     const avgTasksPerProject = projectCount > 0 ? totalTasks / projectCount : 0;
-    
+
     // Detectar duplicación masiva: muchas tareas en pocos proyectos (ratio sospechoso)
     const isMassiveDuplication = totalTasks > 1000 && avgTasksPerProject > 800;
-    
+
     if (isMassiveDuplication) {
-      console.error(`🚨 ALERTA: Posible duplicación masiva detectada:`);
-      console.error(`  • Total tareas: ${totalTasks}`);
-      console.error(`  • Proyectos: ${projectCount}`);
-      console.error(`  • Promedio por proyecto: ${avgTasksPerProject.toFixed(1)}`);
-      console.error(`  • Cancelando guardado por seguridad`);
+      logger.error(`🚨 ALERTA: Posible duplicación masiva detectada:`);
+      logger.error(`  • Total tareas: ${totalTasks}`);
+      logger.error(`  • Proyectos: ${projectCount}`);
+      logger.error(`  • Promedio por proyecto: ${avgTasksPerProject.toFixed(1)}`);
+      logger.error(`  • Cancelando guardado por seguridad`);
       return;
     }
-    
+
     // Log informativo para proyectos grandes legítimos
     if (totalTasks > 500) {
-      console.log(`📊 Proyecto grande detectado: ${totalTasks} tareas en ${projectCount} proyectos (promedio: ${avgTasksPerProject.toFixed(1)} tareas/proyecto)`);
+      logger.debug(`📊 Proyecto grande detectado: ${totalTasks} tareas en ${projectCount} proyectos (promedio: ${avgTasksPerProject.toFixed(1)} tareas/proyecto)`);
     }
 
     // Guardar con throttling de 1 segundo y cola de guardado
     saveTimeoutRef.current = setTimeout(async () => {
       try {
         isSavingRef.current = true;
-        
-        console.log('💾 Guardando datos con throttling...');
-        console.log('🔍 DEBUG - Estado antes de guardar:');
-        console.log('   useSupabase:', useSupabase);
-        console.log('   isAuthenticated:', supabaseService.isAuthenticated());
+
+        logger.debug(' Guardando datos con throttling...');
+        logger.debug(' DEBUG - Estado antes de guardar:');
+        logger.debug('   useSupabase:', useSupabase);
+        logger.debug('   isAuthenticated:', supabaseService.isAuthenticated());
 
         // Guardar usando Supabase si está disponible, sino usar localStorage
         if (useSupabase && supabaseService.isAuthenticated()) {
-          console.log('💾 Guardando en Supabase...');
+          logger.debug(' Guardando en Supabase...');
           const success = await supabaseService.savePortfolioData(dataToSave);
           if (!success) {
             throw new Error('Error guardando en Supabase');
           }
-          console.log('✅ Datos guardados en Supabase');
+          logger.debug(' Datos guardados en Supabase');
         } else {
-          console.log('⏭️ NO guardando en Supabase - Usando localStorage');
-          console.log('   Razón: useSupabase =', useSupabase, ', isAuthenticated =', supabaseService.isAuthenticated());
+          logger.debug(' NO guardando en Supabase - Usando localStorage');
+          logger.debug('   Razón: useSupabase =', useSupabase, ', isAuthenticated =', supabaseService.isAuthenticated());
           // Fallback: usar localStorage y archivo local
           try {
             localStorage.setItem('mi-dashboard-portfolio', JSON.stringify(dataToSave));
-            console.log('✅ Datos guardados en localStorage');
+            logger.debug(' Datos guardados en localStorage');
           } catch (error) {
-            console.error('❌ Error guardando en localStorage:', error);
+            logger.error('❌ Error guardando en localStorage:', error);
             // Si localStorage falla, intentar limpiar datos antiguos
             if (error.name === 'QuotaExceededError') {
-              console.log('🧹 Espacio insuficiente, limpiando datos antiguos...');
+              logger.debug(' Espacio insuficiente, limpiando datos antiguos...');
               // Aquí podrías implementar limpieza de datos antiguos
             }
             throw error;
           }
-          
+
           // Guardar en archivo local (persistente) con reintentos
           let retries = 3;
           while (retries > 0) {
@@ -900,32 +903,32 @@ function MainApp() {
             } catch (error) {
               retries--;
               if (retries === 0) throw error;
-              console.log(`🔄 Reintentando guardado... (${retries} intentos restantes)`);
+              logger.debug(`🔄 Reintentando guardado... (${retries} intentos restantes)`);
               await new Promise(resolve => setTimeout(resolve, 1000));
             }
           }
         }
-        
+
         // Actualizar referencia de último guardado
         lastSaveDataRef.current = dataToSave;
-        
-        console.log('✅ Datos guardados exitosamente');
-        
+
+        logger.debug(' Datos guardados exitosamente');
+
         // Disparar evento de sincronización SOLO si es necesario
         // y no estamos en el proceso de carga inicial
         if (dataLoaded) {
-          const syncEvent = new CustomEvent('dataSync', { 
-            detail: { 
-              type: 'portfolio_data_saved', 
+          const syncEvent = new CustomEvent('dataSync', {
+            detail: {
+              type: 'portfolio_data_saved',
               timestamp: new Date().toISOString(),
               source: 'throttled_save'
-            } 
+            }
           });
           window.dispatchEvent(syncEvent);
         }
-        
+
       } catch (error) {
-        console.error('❌ Error guardando datos:', error);
+        logger.error('❌ Error guardando datos:', error);
       } finally {
         isSavingRef.current = false;
       }
@@ -936,11 +939,11 @@ function MainApp() {
   useEffect(() => {
     // No guardar hasta que se hayan cargado los datos iniciales
     if (!dataLoaded) {
-      console.log('⏳ Esperando a que se carguen los datos iniciales...');
+      logger.debug('⏳ Esperando a que se carguen los datos iniciales...');
       return;
     }
 
-    console.log('🔄 useEffect GUARDADO - EJECUTÁNDOSE:', {
+    logger.debug(' useEffect GUARDADO - EJECUTÁNDOSE:', {
       tasksByProjectKeys: Object.keys(tasksByProject),
       tasksForCurrentProject: tasksByProject[currentProjectId] ? tasksByProject[currentProjectId].length : 'UNDEFINED',
       currentProjectId,
@@ -980,31 +983,31 @@ function MainApp() {
   // Actualizar progreso automático de proyectos cuando cambien las tareas
   useEffect(() => {
     if (!dataLoaded || !tasksByProject) return;
-    
-    console.log('🔄 ACTUALIZANDO PROGRESO AUTOMÁTICO DE PROYECTOS');
-    
+
+    logger.debug(' ACTUALIZANDO PROGRESO AUTOMÁTICO DE PROYECTOS');
+
     // Actualizar progreso de todos los proyectos activos
     let hasUpdates = false;
     const updates = [];
-    
+
     projects.forEach(project => {
       if (project.status === 'active') {
         const newProgress = calculateProjectProgress(project.id);
-        
+
         // Solo actualizar si el progreso ha cambiado
         if (newProgress !== project.progress) {
-          console.log(`📊 Actualizando progreso del proyecto ${project.name}: ${project.progress}% → ${newProgress}%`);
+          logger.debug(`📊 Actualizando progreso del proyecto ${project.name}: ${project.progress}% → ${newProgress}%`);
           updates.push({ id: project.id, progress: newProgress });
           hasUpdates = true;
         }
       }
     });
-    
+
     // Aplicar todas las actualizaciones de una vez
     if (hasUpdates) {
       setProjects(prev => prev.map(p => {
         const update = updates.find(u => u.id === p.id);
-        return update 
+        return update
           ? { ...p, progress: update.progress, updatedAt: new Date().toISOString() }
           : p;
       }));
@@ -1012,11 +1015,11 @@ function MainApp() {
   }, [tasksByProject, dataLoaded]); // Removido 'projects' de las dependencias para evitar bucle infinito
 
   // ===== FUNCIONES DE GESTIÓN DE PROYECTOS =====
-  
+
   // Función helper segura para obtener datos del proyecto actual
   const getCurrentProjectData = (dataType) => {
     if (!currentProjectId) return [];
-    
+
     switch (dataType) {
       case 'tasks':
         return tasksByProject[currentProjectId] || [];
@@ -1040,45 +1043,45 @@ function MainApp() {
         return [];
     }
   };
-  
+
   // Función para calcular el progreso automático del proyecto basado en sus tareas
   const calculateProjectProgress = (projectId) => {
     const projectTasks = tasksByProject[projectId] || [];
-    
+
     if (projectTasks.length === 0) {
       return 0;
     }
-    
+
     // Calcular progreso promedio de todas las tareas (excluyendo hitos)
     const regularTasks = projectTasks.filter(task => !task.isMilestone);
-    
+
     if (regularTasks.length === 0) {
       return 0;
     }
-    
+
     const totalProgress = regularTasks.reduce((sum, task) => sum + (task.progress || 0), 0);
     const averageProgress = Math.round(totalProgress / regularTasks.length);
-    
-    console.log('🔄 CÁLCULO PROGRESO AUTOMÁTICO:', {
+
+    logger.debug(' CÁLCULO PROGRESO AUTOMÁTICO:', {
       projectId,
       totalTasks: projectTasks.length,
       regularTasks: regularTasks.length,
       totalProgress,
       averageProgress,
-      tasksDetails: regularTasks.map(t => ({ 
-        name: t.name, 
+      tasksDetails: regularTasks.map(t => ({
+        name: t.name,
         progress: t.progress,
         isMilestone: t.isMilestone
       }))
     });
-    
+
     return Math.min(100, Math.max(0, averageProgress));
   };
-  
+
   const createProject = (projectData) => {
     // Generar UUID válido para el proyecto
     const generateUUID = () => {
-      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
         const r = Math.random() * 16 | 0;
         const v = c === 'x' ? r : (r & 0x3 | 0x8);
         return v.toString(16);
@@ -1111,63 +1114,63 @@ function MainApp() {
       version: '1.0.0',
       progress: 0
     };
-    
+
     setProjects(prev => {
       const updatedProjects = prev.slice();
       updatedProjects.push(newProject);
       return updatedProjects;
     });
-    
+
     // Work Packages eliminados - ya no se usan
-    
+
     setTasksByProject(prev => {
       const updatedProjects = Object.assign({}, prev);
       updatedProjects[newProject.id] = [];
       return updatedProjects;
     });
-    
+
     setIncludeWeekendsByProject(prev => {
       const updatedProjects = Object.assign({}, prev);
       updatedProjects[newProject.id] = false; // Por defecto: solo días laborales
       return updatedProjects;
     });
-    
+
     setRisksByProject(prev => {
       const updatedProjects = Object.assign({}, prev);
       updatedProjects[newProject.id] = [];
       return updatedProjects;
     });
-    
+
     return newProject;
   };
 
   const updateProject = (projectId, updates) => {
     // Calcular progreso automático si no se proporciona explícitamente
     const autoProgress = updates.progress !== undefined ? updates.progress : calculateProjectProgress(projectId);
-    
+
     setProjects(prev => prev.map(project =>
       project.id === projectId
         ? {
-            id: project.id,
-            name: updates.name || project.name,
-            description: updates.description || project.description,
-            startDate: updates.startDate || project.startDate,
-            endDate: updates.endDate || project.endDate,
-            budget: updates.budget || project.budget,
-            plannedValue: updates.plannedValue !== undefined ? updates.plannedValue : project.plannedValue,
-            status: updates.status || project.status,
-            priority: updates.priority || project.priority,
-            manager: updates.manager || project.manager,
-            sponsor: updates.sponsor || project.sponsor,
-            irr: updates.irr !== undefined ? updates.irr : project.irr,
-            objective: updates.objective || project.objective,
-            businessCase: updates.businessCase || project.businessCase,
-            team: updates.team || project.team,
-            createdAt: project.createdAt,
-            updatedAt: new Date().toISOString(),
-            version: project.version,
-            progress: autoProgress
-          }
+          id: project.id,
+          name: updates.name || project.name,
+          description: updates.description || project.description,
+          startDate: updates.startDate || project.startDate,
+          endDate: updates.endDate || project.endDate,
+          budget: updates.budget || project.budget,
+          plannedValue: updates.plannedValue !== undefined ? updates.plannedValue : project.plannedValue,
+          status: updates.status || project.status,
+          priority: updates.priority || project.priority,
+          manager: updates.manager || project.manager,
+          sponsor: updates.sponsor || project.sponsor,
+          irr: updates.irr !== undefined ? updates.irr : project.irr,
+          objective: updates.objective || project.objective,
+          businessCase: updates.businessCase || project.businessCase,
+          team: updates.team || project.team,
+          createdAt: project.createdAt,
+          updatedAt: new Date().toISOString(),
+          version: project.version,
+          progress: autoProgress
+        }
         : project
     ));
   };
@@ -1175,26 +1178,26 @@ function MainApp() {
   const deleteProject = async (projectId) => {
     // Eliminar de Supabase si está autenticado
     if (useSupabase && supabaseService.isAuthenticated()) {
-      console.log(`🗑️ Eliminando proyecto ${projectId} de Supabase...`);
+      logger.debug(`🗑️ Eliminando proyecto ${projectId} de Supabase...`);
       const success = await supabaseService.deleteProject(projectId);
       if (success) {
-        console.log(`✅ Proyecto ${projectId} eliminado de Supabase`);
+        logger.debug(`✅ Proyecto ${projectId} eliminado de Supabase`);
       } else {
-        console.warn(`⚠️ Error eliminando proyecto ${projectId} de Supabase`);
+        logger.warn(`⚠️ Error eliminando proyecto ${projectId} de Supabase`);
       }
     }
 
     // Eliminar localmente
     setProjects(prev => prev.filter(project => project.id !== projectId));
-    
+
     // Work Packages eliminados - ya no se usan
-    
+
     setTasksByProject(prev => {
       const newData = Object.assign({}, prev);
       delete newData[projectId];
       return newData;
     });
-    
+
     setRisksByProject(prev => {
       const newData = Object.assign({}, prev);
       delete newData[projectId];
@@ -1203,11 +1206,11 @@ function MainApp() {
   };
 
   // ===== FUNCIONES DE WORK PACKAGES =====
-  
+
   // Work Packages eliminados - ya no se usan
 
   // ===== MÉTRICAS DEL PORTAFOLIO =====
-  
+
   const portfolioMetrics = useMemo(() => {
     const totalProjects = projects.length;
     const activeProjects = projects.filter(p => p.status === 'active').length;
@@ -1215,7 +1218,7 @@ function MainApp() {
     const totalBudget = projects.reduce((sum, p) => sum + (p.budget || 0), 0);
     const totalProgress = projects.reduce((sum, p) => sum + (p.progress || 0), 0);
     const averageProgress = totalProjects > 0 ? totalProgress / totalProjects : 0;
-    
+
     return {
       totalProjects,
       activeProjects,
@@ -1227,7 +1230,7 @@ function MainApp() {
   }, [projects]);
 
   // ===== FUNCIONES DE IMPORTACIÓN/EXPORTACIÓN =====
-  
+
   const importData = (data) => {
     try {
       if (data.projects) setProjects(data.projects);
@@ -1244,19 +1247,19 @@ function MainApp() {
       if (data.globalResources) setGlobalResources(data.globalResources);
       if (data.resourceAssignmentsByProject) setResourceAssignmentsByProject(data.resourceAssignmentsByProject);
       if (data.auditLogsByProject) setAuditLogsByProject(data.auditLogsByProject);
-      
+
       // Disparar evento de sincronización
-      const syncEvent = new CustomEvent('dataSync', { 
-        detail: { 
-          type: 'data_imported', 
-          timestamp: new Date().toISOString() 
-        } 
+      const syncEvent = new CustomEvent('dataSync', {
+        detail: {
+          type: 'data_imported',
+          timestamp: new Date().toISOString()
+        }
       });
       window.dispatchEvent(syncEvent);
-      
+
       return true;
-      } catch (error) {
-      console.error('Error al importar datos:', error);
+    } catch (error) {
+      logger.error('Error al importar datos:', error);
       return false;
     }
   };
@@ -1308,7 +1311,7 @@ function MainApp() {
       const currentSection = activeSection;
       const isReadOnlyUser = isReadOnly();
 
-      console.log('🔍 Verificando redirección automática:', {
+      logger.debug(' Verificando redirección automática:', {
         userRole,
         isReadOnlyUser,
         currentSection,
@@ -1317,7 +1320,7 @@ function MainApp() {
 
       // Solo redirigir usuarios de solo lectura desde secciones restringidas
       if (isReadOnlyUser && (currentSection === 'portfolio' || currentSection === 'user-management')) {
-        console.log('🔄 Redirigiendo usuario de solo lectura de', currentSection, 'a Dashboard Ejecutivo');
+        logger.debug(' Redirigiendo usuario de solo lectura de', currentSection, 'a Dashboard Ejecutivo');
         setActiveSection('executive');
       }
       // NOTA: Usuarios con permisos completos tienen navegación libre - NO redirigir
@@ -1328,21 +1331,21 @@ function MainApp() {
   useEffect(() => {
     const handleMinutaStatusChanged = (event) => {
       const { tareaId, newStatus, projectId, timestamp } = event.detail;
-      console.log('🔄 Evento minutaStatusChanged recibido:', { tareaId, newStatus, projectId, timestamp });
-      
+      logger.debug(' Evento minutaStatusChanged recibido:', { tareaId, newStatus, projectId, timestamp });
+
       // Forzar recálculo del Dashboard resumen
-      console.log('🔄 Forzando recálculo del Dashboard resumen...');
+      logger.debug(' Forzando recálculo del Dashboard resumen...');
       // El Dashboard se actualizará automáticamente cuando cambien los datos
     };
 
     const handleAutoSaveTrigger = (event) => {
       const { source, data } = event.detail;
-      console.log('🔄 Evento autoSaveTrigger recibido:', { source, data });
-      
+      logger.debug(' Evento autoSaveTrigger recibido:', { source, data });
+
       // Activar el auto-save existente
       if (source === 'minutaUpdate') {
-        console.log('🔄 Activando auto-save por actualización de minuta...');
-        
+        logger.debug(' Activando auto-save por actualización de minuta...');
+
         // 🚀 NUEVO: Activar el auto-save manualmente
         const dataToSave = {
           projects,
@@ -1354,8 +1357,8 @@ function MainApp() {
           contractsByProject,
           minutasByProject: data?.minutasTasks || minutasByProject
         };
-        
-        console.log('🔄 Ejecutando auto-save manual para minutas...');
+
+        logger.debug(' Ejecutando auto-save manual para minutas...');
         debouncedSave(dataToSave);
       }
     };
@@ -1380,7 +1383,7 @@ function MainApp() {
   const [editingInvoice, setEditingInvoice] = useState(null);
 
   // ===== RENDERIZADO =====
-  
+
   const currentProject = getCurrentProject();
 
   // Validar que hay un proyecto seleccionado
@@ -1404,7 +1407,7 @@ function MainApp() {
   if (!currentProject && projects.length === 0) {
     // No hacer return aquí - dejar que se renderice la interfaz normal
     // El PortfolioStrategic manejará la pantalla vacía con su propio mensaje
-    console.log('👋 Usuario nuevo sin proyectos - mostrando interfaz de portfolio');
+    logger.debug('👋 Usuario nuevo sin proyectos - mostrando interfaz de portfolio');
   }
 
   return (
@@ -1416,13 +1419,13 @@ function MainApp() {
           onAuthCancel={handleAuthCancel}
         />
       )}
-      
-      <SyncIndicator 
+
+      <SyncIndicator
         useSupabase={useSupabase}
         supabaseInitialized={supabaseInitialized}
         isAuthenticated={supabaseService.isAuthenticated()}
       />
-      
+
       {/* Botón para mostrar modal de Supabase */}
       {!useSupabase && supabaseInitialized && (
         <div className="fixed top-20 right-4 z-40">
@@ -1469,7 +1472,7 @@ function MainApp() {
             )}
             {/* Dashboard Ejecutivo */}
             {activeSection === 'executive' && (
-              <ConsolidatedDashboard 
+              <ConsolidatedDashboard
                 projects={projects}
                 portfolioMetrics={portfolioMetrics}
                 workPackages={[]}
@@ -1494,18 +1497,18 @@ function MainApp() {
             )}
 
             {/* Portafolio de Proyectos */}
-        {activeSection === 'portfolio' && (
-          <PortfolioStrategic
-            projects={projects}
-            currentProjectId={currentProjectId}
-            setCurrentProjectId={setCurrentProjectId}
+            {activeSection === 'portfolio' && (
+              <PortfolioStrategic
+                projects={projects}
+                currentProjectId={currentProjectId}
+                setCurrentProjectId={setCurrentProjectId}
                 workPackages={[]}
                 risks={getCurrentProjectRisks()}
                 globalResources={globalResources}
                 setGlobalResources={setGlobalResources}
-            createProject={createProject}
-            updateProject={updateProject}
-            deleteProject={deleteProject}
+                createProject={createProject}
+                updateProject={updateProject}
+                deleteProject={deleteProject}
                 tasks={getCurrentProjectTasks()}
                 tasksByProject={tasksByProject}
                 minutasByProject={minutasByProject}
@@ -1522,43 +1525,43 @@ function MainApp() {
             )}
 
             {/* Gestión de Proyectos */}
-        {activeSection === 'project-management' && (
-          <ProjectManagementTabs
-            projects={projects}
-            currentProjectId={currentProjectId}
-            setCurrentProjectId={setCurrentProjectId}
-            workPackages={[]}
-            setWorkPackages={() => {}}
-            risks={getCurrentProjectRisks()}
-            setRisks={updateCurrentProjectRisks}
-            reportingDate={reportingDate}
-            setReportingDate={setReportingDate}
-            tasks={getCurrentProjectTasks()}
-            setTasks={(newTasksOrUpdater) => {
-              // Si es una función (setter de React), ejecutarla para obtener el array
-              if (typeof newTasksOrUpdater === 'function') {
-                const currentTasks = getCurrentProjectTasks();
-                const newTasks = newTasksOrUpdater(currentTasks);
-                updateCurrentProjectTasks(newTasks);
-              } else {
-                // Si es directamente un array, pasarlo
-                updateCurrentProjectTasks(newTasksOrUpdater);
-              }
-            }}
-            importTasks={importTasksToCurrentProject}
-            includeWeekends={getCurrentProjectIncludeWeekends()}
-            setIncludeWeekends={updateCurrentProjectIncludeWeekends}
-            purchaseOrders={getCurrentProjectPurchaseOrders()}
-            setPurchaseOrders={updateCurrentProjectPurchaseOrders}
-            advances={getCurrentProjectAdvances()}
-            setAdvances={updateCurrentProjectAdvances}
-            invoices={getCurrentProjectInvoices()}
-            setInvoices={updateCurrentProjectInvoices}
-            contracts={getCurrentProjectContracts()}
-            setContracts={updateCurrentProjectContracts}
-            resourceAssignments={getCurrentProjectResourceAssignments()}
-            useSupabase={useSupabase}
-            updateProjectMinutas={updateProjectMinutas}
+            {activeSection === 'project-management' && (
+              <ProjectManagementTabs
+                projects={projects}
+                currentProjectId={currentProjectId}
+                setCurrentProjectId={setCurrentProjectId}
+                workPackages={[]}
+                setWorkPackages={() => { }}
+                risks={getCurrentProjectRisks()}
+                setRisks={updateCurrentProjectRisks}
+                reportingDate={reportingDate}
+                setReportingDate={setReportingDate}
+                tasks={getCurrentProjectTasks()}
+                setTasks={(newTasksOrUpdater) => {
+                  // Si es una función (setter de React), ejecutarla para obtener el array
+                  if (typeof newTasksOrUpdater === 'function') {
+                    const currentTasks = getCurrentProjectTasks();
+                    const newTasks = newTasksOrUpdater(currentTasks);
+                    updateCurrentProjectTasks(newTasks);
+                  } else {
+                    // Si es directamente un array, pasarlo
+                    updateCurrentProjectTasks(newTasksOrUpdater);
+                  }
+                }}
+                importTasks={importTasksToCurrentProject}
+                includeWeekends={getCurrentProjectIncludeWeekends()}
+                setIncludeWeekends={updateCurrentProjectIncludeWeekends}
+                purchaseOrders={getCurrentProjectPurchaseOrders()}
+                setPurchaseOrders={updateCurrentProjectPurchaseOrders}
+                advances={getCurrentProjectAdvances()}
+                setAdvances={updateCurrentProjectAdvances}
+                invoices={getCurrentProjectInvoices()}
+                setInvoices={updateCurrentProjectInvoices}
+                contracts={getCurrentProjectContracts()}
+                setContracts={updateCurrentProjectContracts}
+                resourceAssignments={getCurrentProjectResourceAssignments()}
+                useSupabase={useSupabase}
+                updateProjectMinutas={updateProjectMinutas}
               />
             )}
 
@@ -1568,14 +1571,14 @@ function MainApp() {
                 currentProject={currentProject}
                 useSupabase={useSupabase}
                 onMemberAdded={() => {
-                  console.log('✅ Nuevo miembro agregado a la organización');
+                  logger.debug(' Nuevo miembro agregado a la organización');
                   // Aquí podrías agregar lógica adicional si es necesario
                 }}
               />
             )}
           </div>
         </main>
-        </div>
+      </div>
 
       {/* Upgrade Modal */}
       {showUpgradeModal && organizationId && (

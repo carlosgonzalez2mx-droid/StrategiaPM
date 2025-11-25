@@ -1,3 +1,5 @@
+import { logger } from '../utils/logger';
+
 import React, { useState, useEffect } from 'react';
 import useAuditLog from '../hooks/useAuditLog';
 import supabaseService from '../services/SupabaseService';
@@ -69,7 +71,7 @@ const OrganizationMembers = ({
 
   // 🔍 LOGS DE DEBUG PARA DIAGNOSTICAR
   useEffect(() => {
-    console.log('🔍 OrganizationMembers - Estado actual:', {
+    logger.debug('🔍 OrganizationMembers - Estado actual:', {
       hasCurrentProject: !!currentProject,
       currentProjectOrgId: currentProject?.organization_id,
       organizationId: organizationId,
@@ -91,16 +93,16 @@ const OrganizationMembers = ({
 
   // Cargar miembros de la organización
   const loadOrganizationMembers = async () => {
-    console.log('🔄 loadOrganizationMembers ejecutándose', { useSupabase, organizationId });
+    logger.debug('🔄 loadOrganizationMembers ejecutándose', { useSupabase, organizationId });
     
     if (!useSupabase) {
-      console.warn('⚠️ Supabase no está habilitado, no se cargarán miembros');
+      logger.warn('⚠️ Supabase no está habilitado, no se cargarán miembros');
       return;
     }
     
     if (!organizationId) {
-      console.warn('⚠️ organizationId es null/undefined, esperando detección...');
-      console.warn('⚠️ Estado actual:', { 
+      logger.warn('⚠️ organizationId es null/undefined, esperando detección...');
+      logger.warn('⚠️ Estado actual:', { 
         orgLoading, 
         orgError,
         currentProjectOrgId: currentProject?.organization_id 
@@ -108,7 +110,7 @@ const OrganizationMembers = ({
       return;
     }
     
-    console.log('✅ Iniciando carga de miembros para organization_id:', organizationId);
+    logger.debug('✅ Iniciando carga de miembros para organization_id:', organizationId);
 
     try {
       setIsLoading(true);
@@ -145,9 +147,9 @@ const OrganizationMembers = ({
           setInvitations(pendingInvitations);
           
           // Logs de verificación
-          console.log('✅ Total de miembros cargados:', membersData?.length || 0);
-          console.log('✅ Miembros activos:', activeMembers.length);
-          console.log('⏳ Invitaciones pendientes:', pendingInvitations.length);
+          logger.debug('✅ Total de miembros cargados:', membersData?.length || 0);
+          logger.debug('✅ Miembros activos:', activeMembers.length);
+          logger.debug('⏳ Invitaciones pendientes:', pendingInvitations.length);
           
           debugLog('OrganizationMembers', 'Miembros activos', activeMembers);
           debugLog('OrganizationMembers', 'Invitaciones pendientes', pendingInvitations);
@@ -191,7 +193,7 @@ const OrganizationMembers = ({
         return;
       }
     } catch (limitError) {
-      console.error('Error verificando límites:', limitError);
+      logger.error('Error verificando límites:', limitError);
       // En caso de error, permitir continuar (fail-safe)
     }
 
@@ -288,7 +290,7 @@ const OrganizationMembers = ({
         }
       }
     } catch (error) {
-      console.error('Error invitando miembro:', error);
+      logger.error('Error invitando miembro:', error);
       setError(`Error invitando miembro: ${error.message}`);
     } finally {
       setIsLoading(false);
@@ -302,7 +304,7 @@ const OrganizationMembers = ({
       if (!invitation) return;
 
       // Lógica para reenviar el email de invitación
-      console.log('Reenviando invitación:', invitationId);
+      logger.debug('Reenviando invitación:', invitationId);
       
       const registrationUrl = window.location.hostname === 'localhost' 
         ? 'https://strategiapm.vercel.app' 
@@ -319,7 +321,7 @@ Una vez registrado con ese email, tendrá acceso automáticamente.`);
       
       // TODO: Implementar envío de email real
     } catch (error) {
-      console.error('Error reenviando invitación:', error);
+      logger.error('Error reenviando invitación:', error);
       alert('Error al reenviar invitación');
     }
   };
@@ -334,7 +336,7 @@ Una vez registrado con ese email, tendrá acceso automáticamente.`);
       
       if (!confirmed) return;
       
-      console.log('🗑️ Cancelando invitación:', invitationId);
+      logger.debug('🗑️ Cancelando invitación:', invitationId);
       
       // Eliminar la invitación
       const { error } = await supabaseService.supabase
@@ -343,19 +345,19 @@ Una vez registrado con ese email, tendrá acceso automáticamente.`);
         .eq('id', invitationId);
       
       if (error) {
-        console.error('❌ Error cancelando invitación:', error);
+        logger.error('❌ Error cancelando invitación:', error);
         alert(`Error al cancelar invitación: ${error.message}`);
         return;
       }
       
-      console.log('✅ Invitación cancelada exitosamente');
+      logger.debug('✅ Invitación cancelada exitosamente');
       alert('✅ Invitación cancelada');
       
       // Recargar la lista de miembros
       loadOrganizationMembers();
       
     } catch (err) {
-      console.error('❌ Error inesperado:', err);
+      logger.error('❌ Error inesperado:', err);
       alert(`Error: ${err.message}`);
     }
   };
@@ -407,7 +409,7 @@ Una vez registrado con ese email, tendrá acceso automáticamente.`);
           .eq('organization_id', organizationId);
 
         if (rolesError) {
-          console.warn('⚠️ Error eliminando de user_organization_roles (puede no existir):', rolesError);
+          logger.warn('⚠️ Error eliminando de user_organization_roles (puede no existir):', rolesError);
           // No lanzar error aquí, ya que la tabla puede no existir
         }
 
@@ -421,7 +423,7 @@ Una vez registrado con ese email, tendrá acceso automáticamente.`);
           .eq('assigned_to', memberEmail);
 
         if (tasksError) {
-          console.warn('⚠️ Error actualizando tareas:', tasksError);
+          logger.warn('⚠️ Error actualizando tareas:', tasksError);
         }
 
         // Eliminar riesgos asignados al usuario (si los hay)
@@ -431,7 +433,7 @@ Una vez registrado con ese email, tendrá acceso automáticamente.`);
           .eq('owner', memberEmail);
 
         if (risksError) {
-          console.warn('⚠️ Error actualizando riesgos:', risksError);
+          logger.warn('⚠️ Error actualizando riesgos:', risksError);
         }
 
         // PASO 4: Limpiar caché local del usuario eliminado
@@ -453,12 +455,12 @@ Una vez registrado con ese email, tendrá acceso automáticamente.`);
                 const parsedData = JSON.parse(data);
                 // Si los datos contienen referencias al usuario eliminado, limpiarlos
                 if (JSON.stringify(parsedData).includes(memberEmail)) {
-                  console.log(`🗑️ Limpiando localStorage key: ${key}`);
+                  logger.debug(`🗑️ Limpiando localStorage key: ${key}`);
                   localStorage.removeItem(key);
                 }
               } catch (e) {
                 // Si no se puede parsear, eliminar directamente
-                console.log(`🗑️ Limpiando localStorage key (raw): ${key}`);
+                logger.debug(`🗑️ Limpiando localStorage key (raw): ${key}`);
                 localStorage.removeItem(key);
               }
             }
@@ -474,7 +476,7 @@ Una vez registrado con ese email, tendrá acceso automáticamente.`);
           sessionStorageKeys.forEach(key => {
             const data = sessionStorage.getItem(key);
             if (data && data.includes(memberEmail)) {
-              console.log(`🗑️ Limpiando sessionStorage key: ${key}`);
+              logger.debug(`🗑️ Limpiando sessionStorage key: ${key}`);
               sessionStorage.removeItem(key);
             }
           });
@@ -526,7 +528,7 @@ Solo así verá que ya no tiene acceso a la organización.`;
         await loadOrganizationMembers();
       }
     } catch (error) {
-      console.error('❌ Error eliminando miembro:', error);
+      logger.error('❌ Error eliminando miembro:', error);
       setError(`Error eliminando miembro: ${error.message}`);
       alert(`❌ Error eliminando usuario: ${error.message}\n\nPor favor, intenta nuevamente o contacta al administrador.`);
     } finally {
@@ -591,7 +593,7 @@ Solo así verá que ya no tiene acceso a la organización.`;
         setNewRole('');
       }
     } catch (error) {
-      console.error('Error actualizando rol:', error);
+      logger.error('Error actualizando rol:', error);
       setError(`Error actualizando rol: ${error.message}`);
     } finally {
       setIsLoading(false);
@@ -613,7 +615,7 @@ Solo así verá que ya no tiene acceso a la organización.`;
         .eq('organization_id', organizationId);
 
       if (error) {
-        console.error('Error actualizando rol funcional:', error);
+        logger.error('Error actualizando rol funcional:', error);
         alert('Error actualizando rol funcional: ' + error.message);
         return;
       }
@@ -627,7 +629,7 @@ Solo así verá que ya no tiene acceso a la organización.`;
       
       alert('Rol funcional actualizado exitosamente');
     } catch (error) {
-      console.error('Error actualizando rol funcional:', error);
+      logger.error('Error actualizando rol funcional:', error);
       alert('Error actualizando rol funcional');
     } finally {
       setIsLoading(false);

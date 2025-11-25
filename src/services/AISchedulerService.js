@@ -8,6 +8,7 @@
 
 // import aiLearningEngine from './AILearningEngine'; // DEPRECATED - eliminado en v1.0
 import TemplateBasedSchedulerService from './TemplateBasedSchedulerService.js';
+import { scheduleLogger } from '../utils/logger';
 
 class SmartSchedulerService {
   constructor() {
@@ -21,11 +22,11 @@ class SmartSchedulerService {
     this.supabase = supabase;
     this.organizationId = organizationId;
     this.currentUser = currentUser;
-    
+
     // DEPRECATED: Sin inicialización de motor de aprendizaje en v1.0
     // await aiLearningEngine.initialize(supabase, organizationId, currentUser?.id);
-    
-    console.log('🤖 SmartSchedulerService inicializado:', { organizationId, userId: currentUser?.id });
+
+    scheduleLogger.debug('🤖 SmartSchedulerService inicializado:', { organizationId, userId: currentUser?.id });
   }
 
   /**
@@ -35,56 +36,56 @@ class SmartSchedulerService {
    */
   async generateSmartSchedule(wizardData) {
     try {
-      console.log('🤖 AISchedulerService: Generando cronograma inteligente:', wizardData);
-      console.log('🔍 AISchedulerService: projectType =', wizardData.projectType);
-      console.log('🔍 AISchedulerService: projectType === "equipment_installation"?', wizardData.projectType === 'equipment_installation');
+      scheduleLogger.debug('🤖 AISchedulerService: Generando cronograma inteligente:', wizardData);
+      scheduleLogger.debug('🔍 AISchedulerService: projectType =', wizardData.projectType);
+      scheduleLogger.debug('🔍 AISchedulerService: projectType === "equipment_installation"?', wizardData.projectType === 'equipment_installation');
 
       // Si es un proyecto de compra de equipos, usar el template real
       if (wizardData.projectType === 'equipment_installation') {
-        console.log('🏭 AISchedulerService: Proyecto de compra de equipos detectado - usando template real');
+        scheduleLogger.debug('🏭 AISchedulerService: Proyecto de compra de equipos detectado - usando template real');
         return await TemplateBasedSchedulerService.generateTemplateBasedSchedule(wizardData);
       }
 
       // 1. Obtener template base (sin lógica de aprendizaje)
       const template = await this.getBaseTemplate(wizardData);
-      console.log('📋 Template seleccionado:', template?.name);
-      
+      scheduleLogger.debug('📋 Template seleccionado:', template?.name);
+
       if (!template) {
         throw new Error('No se pudo seleccionar un template válido');
       }
 
       // 2. Ajustar actividades por contexto del proyecto
-      console.log('🔍 Template antes de ajustar actividades:', {
+      scheduleLogger.debug('🔍 Template antes de ajustar actividades:', {
         hasTemplateData: !!template.template_data,
         hasActivities: !!template.activities,
         activitiesLength: template.activities?.length || 0,
         templateKeys: Object.keys(template)
       });
-      
+
       // Usar actividades del template base
-      console.log('📋 Usando actividades del template base');
+      scheduleLogger.debug('📋 Usando actividades del template base');
       const activitiesToAdjust = await this.extractActivitiesFromTemplate(template, wizardData);
-      
+
       const adjustedActivities = await this.adjustActivitiesByContext(template, wizardData, activitiesToAdjust);
-      console.log('⚙️ Actividades ajustadas:', adjustedActivities.length);
+      scheduleLogger.debug('⚙️ Actividades ajustadas:', adjustedActivities.length);
 
       // 3. Generar hitos inteligentes
       const smartMilestones = await this.generateSmartMilestones(adjustedActivities, wizardData);
-      console.log('🎯 Hitos generados:', smartMilestones.length);
+      scheduleLogger.debug('🎯 Hitos generados:', smartMilestones.length);
 
       // 4. Calcular ruta crítica
       const criticalPath = this.calculateCriticalPath(adjustedActivities);
-      console.log('🔗 Ruta crítica calculada:', criticalPath.length, 'actividades');
+      scheduleLogger.debug('🔗 Ruta crítica calculada:', criticalPath.length, 'actividades');
 
       // 5. Generar recomendaciones
       const recommendations = this.generateRecommendations(wizardData, adjustedActivities);
-      console.log('💡 Recomendaciones generadas:', recommendations.length);
+      scheduleLogger.debug('💡 Recomendaciones generadas:', recommendations.length);
 
       // 6. Ordenar actividades lógicamente para maquinaria
       let finalActivities = adjustedActivities;
       if (wizardData.projectType === 'equipment_installation') {
         finalActivities = this.sortMachineryActivities(adjustedActivities, wizardData);
-        console.log('📋 Actividades ordenadas lógicamente');
+        scheduleLogger.debug('📋 Actividades ordenadas lógicamente');
       }
 
       // 7. Crear el cronograma final
@@ -106,11 +107,11 @@ class SmartSchedulerService {
       // 7. Guardar en historial para aprendizaje
       await this.saveGenerationHistory(wizardData, generatedSchedule);
 
-      console.log('✅ Cronograma generado exitosamente');
+      scheduleLogger.debug('✅ Cronograma generado exitosamente');
       return generatedSchedule;
 
     } catch (error) {
-      console.error('❌ Error generando cronograma:', error);
+      scheduleLogger.error('❌ Error generando cronograma:', error);
       throw new Error(`Error generando cronograma: ${error.message}`);
     }
   }
@@ -125,7 +126,7 @@ class SmartSchedulerService {
       const { projectType, industry, methodology } = wizardData;
 
       if (!this.supabase) {
-        console.log('📋 Usando template genérico (Sin Supabase)');
+        scheduleLogger.debug('📋 Usando template genérico (Sin Supabase)');
         const genericTemplate = {
           id: 'generic-template',
           name: 'Template Genérico de Proyecto',
@@ -135,13 +136,13 @@ class SmartSchedulerService {
           methodology: wizardData.methodology || 'waterfall',
           template_data: this.getGenericTemplateData(wizardData)
         };
-        
+
         // Extraer actividades de las fases para el aprendizaje
         if (genericTemplate.template_data && genericTemplate.template_data.phases) {
           genericTemplate.activities = this.extractActivitiesFromPhases(genericTemplate.template_data.phases);
           genericTemplate.milestones = this.extractMilestonesFromPhases(genericTemplate.template_data.phases);
         }
-        
+
         return genericTemplate;
       }
 
@@ -149,7 +150,7 @@ class SmartSchedulerService {
       let query = this.supabase
         .from('schedule_templates')
         .select('*');
-      
+
       // Solo filtrar por organization_id si está definido
       if (this.organizationId) {
         query = query.or(`organization_id.eq.${this.organizationId},organization_id.is.null`);
@@ -175,33 +176,33 @@ class SmartSchedulerService {
       const { data: templates, error } = await query;
 
       if (error) {
-        console.error('Error obteniendo templates:', error);
+        scheduleLogger.error('Error obteniendo templates:', error);
         throw error;
       }
 
-      console.log('📋 Templates encontrados:', templates?.length || 0);
+      scheduleLogger.debug('📋 Templates encontrados:', templates?.length || 0);
 
       if (!templates || templates.length === 0) {
-        console.warn('No se encontraron templates específicos, usando template genérico');
+        scheduleLogger.warn('No se encontraron templates específicos, usando template genérico');
         // Buscar template genérico o el más usado
         let genericQuery = this.supabase
           .from('schedule_templates')
           .select('*');
-        
+
         if (this.organizationId) {
           genericQuery = genericQuery.or(`organization_id.eq.${this.organizationId},organization_id.is.null`);
         } else {
           genericQuery = genericQuery.is('organization_id', null);
         }
-        
+
         const { data: genericTemplates } = await genericQuery.limit(1);
-        
+
         if (genericTemplates?.[0]) {
           return genericTemplates[0];
         }
-        
+
         // Si no hay templates en la base de datos, crear uno genérico
-        console.log('📋 Creando template genérico para el proyecto');
+        scheduleLogger.debug('📋 Creando template genérico para el proyecto');
         const genericTemplate = {
           id: 'generic-template',
           name: 'Template Genérico de Proyecto',
@@ -211,29 +212,29 @@ class SmartSchedulerService {
           methodology: wizardData.methodology || 'waterfall',
           template_data: this.getGenericTemplateData(wizardData)
         };
-        
+
         // Extraer actividades de las fases para el aprendizaje
         if (genericTemplate.template_data && genericTemplate.template_data.phases) {
           genericTemplate.activities = this.extractActivitiesFromPhases(genericTemplate.template_data.phases);
           genericTemplate.milestones = this.extractMilestonesFromPhases(genericTemplate.template_data.phases);
         }
-        
+
         return genericTemplate;
       }
 
       // Seleccionar el template más apropiado
       const bestTemplate = this.rankTemplates(templates, wizardData)[0];
-      
+
       // Extraer actividades de las fases para el aprendizaje
       if (bestTemplate && bestTemplate.template_data && bestTemplate.template_data.phases) {
         bestTemplate.activities = this.extractActivitiesFromPhases(bestTemplate.template_data.phases);
         bestTemplate.milestones = this.extractMilestonesFromPhases(bestTemplate.template_data.phases);
       }
-      
+
       return bestTemplate;
 
     } catch (error) {
-      console.error('Error obteniendo template base:', error);
+      scheduleLogger.error('Error obteniendo template base:', error);
       return null;
     }
   }
@@ -243,7 +244,7 @@ class SmartSchedulerService {
    */
   async adjustActivitiesByContext(template, context, activitiesToAdjust = null) {
     if (!template) {
-      console.warn('Template no válido para ajustar actividades');
+      scheduleLogger.warn('Template no válido para ajustar actividades');
       return [];
     }
 
@@ -255,9 +256,9 @@ class SmartSchedulerService {
         activities = this.extractActivitiesFromPhases(template.template_data.phases);
       }
     }
-    
+
     if (!activities || activities.length === 0) {
-      console.warn('No hay actividades disponibles en el template');
+      scheduleLogger.warn('No hay actividades disponibles en el template');
       return [];
     }
 
@@ -266,22 +267,22 @@ class SmartSchedulerService {
 
     // Ajustar duraciones basado en el tamaño del equipo
     const teamSizeMultiplier = this.calculateTeamSizeMultiplier(context.teamSize);
-    
+
     // Ajustar duraciones basado en la experiencia del equipo
     const experienceMultiplier = this.calculateExperienceMultiplier(context.teamExperience);
 
     activities.forEach((activity, activityIndex) => {
       // Calcular duración ajustada
       let adjustedDuration = activity.duration;
-      
+
       // Aplicar multiplicadores
       adjustedDuration = Math.ceil(adjustedDuration * teamSizeMultiplier * experienceMultiplier);
-      
+
       // Aplicar ajustes específicos para maquinaria
       if (context.projectType === 'equipment_installation') {
         adjustedDuration = this.adjustMachineryActivityDuration(activity, adjustedDuration, context);
       }
-      
+
       // Aplicar buffer de riesgo si es necesario
       if (context.riskTolerance === 'low') {
         adjustedDuration = Math.ceil(adjustedDuration * 1.2); // 20% más tiempo
@@ -320,7 +321,7 @@ class SmartSchedulerService {
       } else if (index > 0) {
         // Si no tiene dependencias y no es la primera actividad, crear dependencia secuencial
         activity.dependencies = [adjustedActivities[index - 1].id];
-        console.log(`🔗 Agregando dependencia secuencial: ${activity.name} depende de ${adjustedActivities[index - 1].name}`);
+        scheduleLogger.debug(`🔗 Agregando dependencia secuencial: ${activity.name} depende de ${adjustedActivities[index - 1].name}`);
       }
     });
 
@@ -381,9 +382,9 @@ class SmartSchedulerService {
     // Implementación simplificada de CPM
     const criticalActivities = activities.filter(activity => {
       // Actividades con alta prioridad o sin flexibilidad en fechas
-      return activity.priority === 'high' || 
-             activity.dependencies.length > 2 ||
-             activity.estimatedCost > 10000;
+      return activity.priority === 'high' ||
+        activity.dependencies.length > 2 ||
+        activity.estimatedCost > 10000;
     });
 
     return criticalActivities.map(activity => activity.id);
@@ -463,12 +464,12 @@ class SmartSchedulerService {
         .insert(generationRecord);
 
       if (error) {
-        console.error('Error guardando historial de generación:', error);
+        scheduleLogger.error('Error guardando historial de generación:', error);
       } else {
-        console.log('✅ Historial de generación guardado');
+        scheduleLogger.debug('✅ Historial de generación guardado');
       }
     } catch (error) {
-      console.error('Error guardando historial:', error);
+      scheduleLogger.error('Error guardando historial:', error);
     }
   }
 
@@ -504,11 +505,11 @@ class SmartSchedulerService {
    */
   generateActivityDescription(activity, context) {
     const baseDescription = activity.description || `Ejecutar ${activity.name}`;
-    
+
     if (context.projectDescription) {
       return `${baseDescription} para el proyecto: ${context.projectDescription}`;
     }
-    
+
     return baseDescription;
   }
 
@@ -528,7 +529,7 @@ class SmartSchedulerService {
    */
   suggestAssignee(activity, context) {
     if (context.projectManager) return context.projectManager;
-    
+
     // Sugerencias basadas en categoría
     switch (activity.category) {
       case 'planning': return 'Project Manager';
@@ -545,10 +546,10 @@ class SmartSchedulerService {
   adjustDependencies(dependencies, existingActivities) {
     // CORRECCIÓN: Asegurar que siempre devuelva un array válido
     if (!dependencies || !Array.isArray(dependencies)) {
-      console.log('🔗 Dependencias no definidas o inválidas, usando array vacío');
+      scheduleLogger.debug('🔗 Dependencias no definidas o inválidas, usando array vacío');
       return [];
     }
-    
+
     // Convertir nombres de dependencias a IDs si es necesario
     const adjustedDeps = dependencies.map(dep => {
       // Si es un ID (string o número), mantenerlo
@@ -558,19 +559,19 @@ class SmartSchedulerService {
       if (typeof dep === 'number') {
         return dep;
       }
-      
+
       // Si es un nombre, buscar la actividad correspondiente
       const existingActivity = existingActivities.find(a => a.name === dep);
       if (existingActivity) {
-        console.log(`🔗 Mapeando dependencia "${dep}" a ID "${existingActivity.id}"`);
+        scheduleLogger.debug(`🔗 Mapeando dependencia "${dep}" a ID "${existingActivity.id}"`);
         return existingActivity.id;
       }
-      
-      console.warn(`⚠️ Dependencia "${dep}" no encontrada en actividades existentes`);
+
+      scheduleLogger.warn(`⚠️ Dependencia "${dep}" no encontrada en actividades existentes`);
       return null;
     }).filter(dep => dep !== null); // Filtrar dependencias nulas
-    
-    console.log(`🔗 Dependencias ajustadas: [${adjustedDeps.join(', ')}]`);
+
+    scheduleLogger.debug(`🔗 Dependencias ajustadas: [${adjustedDeps.join(', ')}]`);
     return adjustedDeps;
   }
 
@@ -581,7 +582,7 @@ class SmartSchedulerService {
     const baseCost = activity.estimatedCost || 1000;
     const teamSize = context.teamSize || 1;
     const duration = activity.duration || 1;
-    
+
     return baseCost * teamSize * duration * 0.1; // Estimación simplificada
   }
 
@@ -590,15 +591,15 @@ class SmartSchedulerService {
    */
   calculateConfidence(activity, context) {
     let confidence = 0.7; // Base confidence
-    
+
     // Aumentar confianza si hay template específico
     if (context.projectType && context.industry) confidence += 0.2;
-    
+
     // Aumentar confianza si hay experiencia en el equipo
     if (context.teamExperience === 'senior' || context.teamExperience === 'expert') {
       confidence += 0.1;
     }
-    
+
     return Math.min(1.0, confidence);
   }
 
@@ -634,7 +635,7 @@ class SmartSchedulerService {
           confidence: 0.9
         });
         break;
-        
+
       case 'development':
         specificMilestones.push({
           id: `milestone-${milestoneId++}`,
@@ -669,17 +670,17 @@ class SmartSchedulerService {
    */
   assessComplexity(wizardData, activities) {
     let complexity = 'medium';
-    
+
     const totalDuration = this.calculateTotalDuration(activities);
     const highPriorityActivities = activities.filter(a => a.priority === 'high').length;
     const teamSize = wizardData.teamSize || 1;
-    
+
     if (totalDuration > 120 || highPriorityActivities > 5 || teamSize < 3) {
       complexity = 'high';
     } else if (totalDuration < 30 && highPriorityActivities < 3 && teamSize >= 5) {
       complexity = 'low';
     }
-    
+
     return complexity;
   }
 
@@ -690,19 +691,19 @@ class SmartSchedulerService {
     return templates.sort((a, b) => {
       let scoreA = 0;
       let scoreB = 0;
-      
+
       // Puntuar por coincidencia de tipo de proyecto
       if (a.project_type === wizardData.projectType) scoreA += 3;
       if (b.project_type === wizardData.projectType) scoreB += 3;
-      
+
       // Puntuar por coincidencia de industria
       if (a.industry === wizardData.industry) scoreA += 2;
       if (b.industry === wizardData.industry) scoreB += 2;
-      
+
       // Puntuar por coincidencia de metodología
       if (a.methodology === wizardData.methodology) scoreA += 1;
       if (b.methodology === wizardData.methodology) scoreB += 1;
-      
+
       return scoreB - scoreA; // Orden descendente
     });
   }
@@ -712,7 +713,7 @@ class SmartSchedulerService {
    */
   getGenericTemplateData(wizardData) {
     const { projectType = 'general', teamSize = 5 } = wizardData;
-    
+
     // Template genérico basado en el tipo de proyecto
     const genericPhases = {
       'manufacturing': [
@@ -792,23 +793,23 @@ class SmartSchedulerService {
       let query = this.supabase
         .from('schedule_templates')
         .select('*');
-      
+
       if (this.organizationId) {
         query = query.or(`organization_id.eq.${this.organizationId},organization_id.is.null`);
       } else {
         query = query.is('organization_id', null);
       }
-      
+
       const { data: templates, error } = await query.order('name');
 
       if (error) {
-        console.error('Error obteniendo templates:', error);
+        scheduleLogger.error('Error obteniendo templates:', error);
         return [];
       }
 
       return templates || [];
     } catch (error) {
-      console.error('Error obteniendo templates:', error);
+      scheduleLogger.error('Error obteniendo templates:', error);
       return [];
     }
   }
@@ -831,13 +832,13 @@ class SmartSchedulerService {
       const { data: history, error } = await query;
 
       if (error) {
-        console.error('Error obteniendo historial:', error);
+        scheduleLogger.error('Error obteniendo historial:', error);
         return [];
       }
 
       return history || [];
     } catch (error) {
-      console.error('Error obteniendo historial:', error);
+      scheduleLogger.error('Error obteniendo historial:', error);
       return [];
     }
   }
@@ -858,14 +859,14 @@ class SmartSchedulerService {
         .eq('organization_id', this.organizationId);
 
       if (error) {
-        console.error('Error guardando feedback:', error);
+        scheduleLogger.error('Error guardando feedback:', error);
         return false;
       }
 
-      console.log('✅ Feedback guardado exitosamente');
+      scheduleLogger.debug('✅ Feedback guardado exitosamente');
       return true;
     } catch (error) {
-      console.error('Error guardando feedback:', error);
+      scheduleLogger.error('Error guardando feedback:', error);
       return false;
     }
   }
@@ -915,8 +916,8 @@ class SmartSchedulerService {
       }
     });
 
-    console.log(`📋 Actividades extraídas de fases: ${activities.length}`);
-    console.log(`🔗 Dependencias generadas automáticamente para ${activities.length} actividades`);
+    scheduleLogger.debug(`📋 Actividades extraídas de fases: ${activities.length}`);
+    scheduleLogger.debug(`🔗 Dependencias generadas automáticamente para ${activities.length} actividades`);
     return activities;
   }
 
@@ -925,13 +926,13 @@ class SmartSchedulerService {
    */
   async extractActivitiesFromTemplate(template, context = null) {
     let activities = [];
-    
+
     if (template.activities && template.activities.length > 0) {
       activities = template.activities;
     } else if (template.template_data && template.template_data.phases) {
       activities = this.extractActivitiesFromPhases(template.template_data.phases);
     } else {
-      console.warn('No se pudieron extraer actividades del template');
+      scheduleLogger.warn('No se pudieron extraer actividades del template');
       return [];
     }
 
@@ -939,7 +940,7 @@ class SmartSchedulerService {
     if (context && context.projectType === 'equipment_installation') {
       activities = this.addMachinerySpecificActivities(activities, context);
     }
-    
+
     return activities;
   }
 
@@ -972,7 +973,7 @@ class SmartSchedulerService {
       }
     });
 
-    console.log(`📋 Hitos extraídos de fases: ${milestones.length}`);
+    scheduleLogger.debug(`📋 Hitos extraídos de fases: ${milestones.length}`);
     return milestones;
   }
 
@@ -984,42 +985,42 @@ class SmartSchedulerService {
     let adjustedDuration = baseDuration;
 
     // Actividades relacionadas con fabricación/producción - usar tiempo de entrega
-    if (activityName.includes('fabricación') || activityName.includes('manufactura') || 
-        activityName.includes('producción') || activityName.includes('manufacturing')) {
-      
+    if (activityName.includes('fabricación') || activityName.includes('manufactura') ||
+      activityName.includes('producción') || activityName.includes('manufacturing')) {
+
       if (context.deliveryTime && context.deliveryTimeUnit) {
         const deliveryDays = this.convertToDays(context.deliveryTime, context.deliveryTimeUnit);
         adjustedDuration = deliveryDays;
-        console.log(`🔧 Ajustando "${activity.name}": ${baseDuration}d → ${adjustedDuration}d (tiempo de entrega: ${context.deliveryTime} ${context.deliveryTimeUnit})`);
+        scheduleLogger.debug(`🔧 Ajustando "${activity.name}": ${baseDuration}d → ${adjustedDuration}d (tiempo de entrega: ${context.deliveryTime} ${context.deliveryTimeUnit})`);
       } else {
-        console.log(`⚠️ No se pudo ajustar "${activity.name}": deliveryTime=${context.deliveryTime}, deliveryTimeUnit=${context.deliveryTimeUnit}`);
+        scheduleLogger.debug(`⚠️ No se pudo ajustar "${activity.name}": deliveryTime=${context.deliveryTime}, deliveryTimeUnit=${context.deliveryTimeUnit}`);
       }
     }
 
     // Actividades administrativas - duraciones cortas y fijas
-    if (activityName.includes('aprobación') || activityName.includes('aprobación de compras') || 
-        activityName.includes('autorización') || activityName.includes('firma de contratos')) {
-      
+    if (activityName.includes('aprobación') || activityName.includes('aprobación de compras') ||
+      activityName.includes('autorización') || activityName.includes('firma de contratos')) {
+
       adjustedDuration = Math.min(adjustedDuration, 5); // Máximo 5 días para aprobaciones
-      console.log(`📋 Ajustando "${activity.name}": ${baseDuration}d → ${adjustedDuration}d (actividad administrativa)`);
+      scheduleLogger.debug(`📋 Ajustando "${activity.name}": ${baseDuration}d → ${adjustedDuration}d (actividad administrativa)`);
     }
 
     // Actividades de importación - agregar tiempo adicional
-    if (context.isForeignEquipment && 
-        (activityName.includes('importación') || activityName.includes('aduana') || 
-         activityName.includes('embarque') || activityName.includes('transporte'))) {
-      
+    if (context.isForeignEquipment &&
+      (activityName.includes('importación') || activityName.includes('aduana') ||
+        activityName.includes('embarque') || activityName.includes('transporte'))) {
+
       adjustedDuration = Math.max(adjustedDuration, 15); // Mínimo 15 días para importación
-      console.log(`🌍 Ajustando "${activity.name}": ${baseDuration}d → ${adjustedDuration}d (importación)`);
+      scheduleLogger.debug(`🌍 Ajustando "${activity.name}": ${baseDuration}d → ${adjustedDuration}d (importación)`);
     }
 
     // Actividades de infraestructura - agregar tiempo adicional
-    if (context.requiresInfrastructure && 
-        (activityName.includes('instalación') || activityName.includes('infraestructura') || 
-         activityName.includes('preparación') || activityName.includes('cimentación'))) {
-      
+    if (context.requiresInfrastructure &&
+      (activityName.includes('instalación') || activityName.includes('infraestructura') ||
+        activityName.includes('preparación') || activityName.includes('cimentación'))) {
+
       adjustedDuration = Math.max(adjustedDuration, 10); // Mínimo 10 días para infraestructura
-      console.log(`🔧 Ajustando "${activity.name}": ${baseDuration}d → ${adjustedDuration}d (infraestructura)`);
+      scheduleLogger.debug(`🔧 Ajustando "${activity.name}": ${baseDuration}d → ${adjustedDuration}d (infraestructura)`);
     }
 
     return adjustedDuration;
@@ -1070,9 +1071,9 @@ class SmartSchedulerService {
           priority: 'high'
         }
       ];
-      
+
       newActivities.push(...importActivities);
-      console.log(`🌍 Agregadas ${importActivities.length} actividades de importación`);
+      scheduleLogger.debug(`🌍 Agregadas ${importActivities.length} actividades de importación`);
     }
 
     // Actividades de infraestructura si es requerida
@@ -1106,9 +1107,9 @@ class SmartSchedulerService {
           priority: 'high'
         }
       ];
-      
+
       newActivities.push(...infrastructureActivities);
-      console.log(`🔧 Agregadas ${infrastructureActivities.length} actividades de infraestructura`);
+      scheduleLogger.debug(`🔧 Agregadas ${infrastructureActivities.length} actividades de infraestructura`);
     }
 
     // Actividades de anticipos basadas en la configuración
@@ -1127,12 +1128,12 @@ class SmartSchedulerService {
           description: payment.description
         }
       }));
-      
+
       newActivities.push(...paymentActivities);
-      console.log(`💰 Agregadas ${paymentActivities.length} actividades de anticipos`);
+      scheduleLogger.debug(`💰 Agregadas ${paymentActivities.length} actividades de anticipos`);
     }
 
-    console.log(`📊 Total actividades después de agregar específicas de maquinaria: ${newActivities.length}`);
+    scheduleLogger.debug(`📊 Total actividades después de agregar específicas de maquinaria: ${newActivities.length}`);
     return newActivities;
   }
 
@@ -1184,17 +1185,17 @@ class SmartSchedulerService {
    * Ordenar actividades de maquinaria lógicamente
    */
   sortMachineryActivities(activities, context) {
-    console.log('🔄 Iniciando ordenamiento de actividades:', activities.length);
+    scheduleLogger.debug('🔄 Iniciando ordenamiento de actividades:', activities.length);
 
     // Función simple para obtener el orden de una actividad
     const getActivitySortOrder = (activity) => {
       const name = activity.name.toLowerCase();
-      
+
       // Actividades de planificación (primero)
       if (name.includes('análisis') || name.includes('necesidades') || name.includes('requerimientos')) {
         return 100;
       }
-      
+
       // Anticipos según timing
       if (activity.paymentInfo) {
         switch (activity.paymentInfo.timing) {
@@ -1214,52 +1215,52 @@ class SmartSchedulerService {
             return 200;
         }
       }
-      
+
       // Actividades de planificación y aprobación
       if (name.includes('aprobación') || name.includes('autorización') || name.includes('planificación')) {
         return 300;
       }
-      
+
       // Búsqueda y selección de proveedores
       if (name.includes('búsqueda') || name.includes('proveedor') || name.includes('cotización')) {
         return 400;
       }
-      
+
       // Actividades de compra y contratos
       if (name.includes('compra') || name.includes('contrato') || name.includes('firma')) {
         return 500;
       }
-      
+
       // Fabricación y producción
       if (name.includes('fabricación') || name.includes('producción') || name.includes('manufactura')) {
         return 600;
       }
-      
+
       // Actividades de importación
       if (name.includes('importación') || name.includes('aduana') || name.includes('embarque')) {
         return 700;
       }
-      
+
       // Actividades de infraestructura
       if (name.includes('infraestructura') || name.includes('preparación') || name.includes('sitio')) {
         return 1000;
       }
-      
+
       // Instalación
       if (name.includes('instalación') || name.includes('montaje') || name.includes('configuración')) {
         return 1100;
       }
-      
+
       // Actividades de cierre
       if (name.includes('capacitación') || name.includes('documentación') || name.includes('garantía') || name.includes('soporte')) {
         return 1500;
       }
-      
+
       // Actividades de entrega
       if (name.includes('entrega')) {
         return 1250;
       }
-      
+
       // Por defecto, usar el orden de fase
       return this.getPhaseOrder(activity.phase) * 100;
     };
@@ -1267,20 +1268,20 @@ class SmartSchedulerService {
     const sortedActivities = activities.sort((a, b) => {
       const orderA = getActivitySortOrder(a);
       const orderB = getActivitySortOrder(b);
-      
-      console.log(`📋 Ordenando: ${a.name} (${orderA}) vs ${b.name} (${orderB})`);
-      
+
+      scheduleLogger.debug(`📋 Ordenando: ${a.name} (${orderA}) vs ${b.name} (${orderB})`);
+
       if (orderA !== orderB) {
         return orderA - orderB;
       }
-      
+
       // Si tienen el mismo orden, ordenar alfabéticamente
       return a.name.localeCompare(b.name);
     });
 
-    console.log('📋 Actividades ordenadas:');
+    scheduleLogger.debug('📋 Actividades ordenadas:');
     sortedActivities.forEach((activity, index) => {
-      console.log(`${index + 1}. ${activity.name} (${getActivitySortOrder(activity)})`);
+      scheduleLogger.debug(`${index + 1}. ${activity.name} (${getActivitySortOrder(activity)})`);
     });
 
     return sortedActivities;
@@ -1295,11 +1296,11 @@ class SmartSchedulerService {
         'análisis', 'requerimientos', 'planificación', 'aprobación', 'orden', 'cotización'
       ],
       'Adquisición': [
-        'cotización', 'proveedor', 'compra', 'fabricación', 'producción', 'importación', 
+        'cotización', 'proveedor', 'compra', 'fabricación', 'producción', 'importación',
         'aduana', 'embarque', 'transporte'
       ],
       'Implementación': [
-        'infraestructura', 'preparación', 'sitio', 'cimentación', 'eléctrica', 
+        'infraestructura', 'preparación', 'sitio', 'cimentación', 'eléctrica',
         'instalación', 'configuración', 'prueba', 'entrega'
       ],
       'Cierre': [

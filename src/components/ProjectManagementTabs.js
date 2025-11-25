@@ -1,3 +1,5 @@
+import { logger } from '../utils/logger';
+
 import React, { useState, useMemo, useEffect } from 'react';
 import RiskManagement from './RiskManagement';
 import ScheduleManagement from './ScheduleManagement';
@@ -31,7 +33,7 @@ const OrphanedTasksManager = ({ orphanedTasks, availableMilestones, onReassign, 
         alert('❌ Error al reasignar tarea');
       }
     } catch (error) {
-      console.error('Error en reasignación:', error);
+      logger.error('Error en reasignación:', error);
       alert('❌ Error al reasignar tarea');
     } finally {
       setReassigning(prev => ({ ...prev, [taskId]: false }));
@@ -202,7 +204,7 @@ const ProjectManagementTabs = ({
       
       // Solo actualizar si es del proyecto actual
       if (projectId === currentProjectId) {
-        console.log('🔄 ProjectManagementTabs: Actualizando estado de minuta:', { tareaId, newStatus });
+        logger.debug('🔄 ProjectManagementTabs: Actualizando estado de minuta:', { tareaId, newStatus });
         setMinutaTasks(prev => prev.map(task => 
           task.id === tareaId ? { ...task, estatus: newStatus } : task
         ));
@@ -235,16 +237,16 @@ const ProjectManagementTabs = ({
       try {
         if (useSupabase) {
           // Cargar desde Supabase si está habilitado
-          console.log('🔍 DEBUG: Cargando minutas para proyecto:', currentProjectId);
+          logger.debug('🔍 DEBUG: Cargando minutas para proyecto:', currentProjectId);
           // Importar el servicio de Supabase dinámicamente
           const { default: supabaseService } = await import('../services/SupabaseService');
           const { success, minutas } = await supabaseService.loadMinutasByProject(currentProjectId);
           if (success) {
-            console.log(`🔍 DEBUG: Minutas recibidas de Supabase:`, minutas);
+            logger.debug(`🔍 DEBUG: Minutas recibidas de Supabase:`, minutas);
             setMinutaTasks(minutas);
-            console.log(`✅ Minutas cargadas desde Supabase: ${minutas.length}`);
+            logger.debug(`✅ Minutas cargadas desde Supabase: ${minutas.length}`);
           } else {
-            console.warn('⚠️ Error cargando minutas desde Supabase');
+            logger.warn('⚠️ Error cargando minutas desde Supabase');
             setMinutaTasks([]);
           }
         } else {
@@ -258,10 +260,10 @@ const ProjectManagementTabs = ({
             updateProjectMinutas(currentProjectId, minutasFromStorage);
           }
           
-          console.log(`✅ Minutas cargadas desde localStorage: ${minutasFromStorage.length}`);
+          logger.debug(`✅ Minutas cargadas desde localStorage: ${minutasFromStorage.length}`);
         }
       } catch (error) {
-        console.error('❌ Error cargando minutas:', error);
+        logger.error('❌ Error cargando minutas:', error);
         setMinutaTasks([]);
       } finally {
         setLoadingMinutas(false);
@@ -279,7 +281,7 @@ const ProjectManagementTabs = ({
     // El progreso del hito viene directamente del campo 'progress' de la tarea hito
     const milestoneProgress = milestone.progress || 0;
     
-    console.log('🎯 CÁLCULO PROGRESO HITO CORREGIDO:', {
+    logger.debug('🎯 CÁLCULO PROGRESO HITO CORREGIDO:', {
       milestoneName: milestone.name,
       milestoneId: milestone.id,
       milestoneProgress: milestoneProgress,
@@ -350,7 +352,7 @@ const ProjectManagementTabs = ({
       }
     });
     
-    console.log('🎯 TAREAS AGRUPADAS POR HITO (CORREGIDO):', {
+    logger.debug('🎯 TAREAS AGRUPADAS POR HITO (CORREGIDO):', {
       tasksNearDeadline: tasksNearDeadline.length,
       tasksByMilestone: Object.keys(tasksByMilestone).length,
       details: Object.values(tasksByMilestone).map(group => ({
@@ -469,7 +471,7 @@ const ProjectManagementTabs = ({
       
       return true;
     } catch (error) {
-      console.error('Error actualizando tarea de minuta:', error);
+      logger.error('Error actualizando tarea de minuta:', error);
       return false;
     }
   };
@@ -518,7 +520,7 @@ const ProjectManagementTabs = ({
       return dateA - dateB; // Orden ascendente (más antiguo primero)
     });
     
-    console.log('🎯 HITOS ORDENADOS POR FECHA:', {
+    logger.debug('🎯 HITOS ORDENADOS POR FECHA:', {
       totalGroups: sortedGroups.length,
       order: sortedGroups.map(group => ({
         milestoneName: group.milestone.name,
@@ -542,7 +544,7 @@ const ProjectManagementTabs = ({
   // 2. Tasks: Usar la función setTasks que ya filtra por proyecto
   // CORRECCIÓN: Usar useMemo para asegurar actualización en tiempo real
   const projectTasks = useMemo(() => {
-    console.log('🔄 ProjectManagementTabs - Recalculando projectTasks:', tasks?.length || 0);
+    logger.debug('🔄 ProjectManagementTabs - Recalculando projectTasks:', tasks?.length || 0);
     return Array.isArray(tasks) ? tasks : [];
   }, [tasks]);
 
@@ -631,7 +633,7 @@ const ProjectManagementTabs = ({
     );
     
     if (invalidTasks.length > 0) {
-      console.log('⚠️ Tareas con fechas de inicio inválidas:', invalidTasks.map(t => ({
+      logger.debug('⚠️ Tareas con fechas de inicio inválidas:', invalidTasks.map(t => ({
         id: t.id,
         name: t.name,
         startDate: t.startDate,
@@ -646,7 +648,7 @@ const ProjectManagementTabs = ({
       .filter(date => !isNaN(date.getTime())); // Filtrar fechas inválidas
     
     if (validStartDates.length === 0) {
-      console.log('⚠️ No se encontraron fechas de inicio válidas');
+      logger.debug('⚠️ No se encontraron fechas de inicio válidas');
       return null;
     }
     
@@ -654,11 +656,11 @@ const ProjectManagementTabs = ({
     
     // Verificar que la fecha mínima sea válida
     if (isNaN(minStartDate.getTime())) {
-      console.log('⚠️ Fecha mínima calculada es inválida');
+      logger.debug('⚠️ Fecha mínima calculada es inválida');
       return null;
     }
     
-    console.log('✅ Fecha de inicio calculada:', minStartDate.toISOString().split('T')[0]);
+    logger.debug('✅ Fecha de inicio calculada:', minStartDate.toISOString().split('T')[0]);
     return minStartDate.toISOString().split('T')[0];
   };
 
@@ -672,7 +674,7 @@ const ProjectManagementTabs = ({
     );
     
     if (invalidTasks.length > 0) {
-      console.log('⚠️ Tareas con fechas de fin inválidas:', invalidTasks.map(t => ({
+      logger.debug('⚠️ Tareas con fechas de fin inválidas:', invalidTasks.map(t => ({
         id: t.id,
         name: t.name,
         endDate: t.endDate,
@@ -687,7 +689,7 @@ const ProjectManagementTabs = ({
       .filter(date => !isNaN(date.getTime())); // Filtrar fechas inválidas
     
     if (validEndDates.length === 0) {
-      console.log('⚠️ No se encontraron fechas de fin válidas');
+      logger.debug('⚠️ No se encontraron fechas de fin válidas');
       return null;
     }
     
@@ -695,11 +697,11 @@ const ProjectManagementTabs = ({
     
     // Verificar que la fecha máxima sea válida
     if (isNaN(maxEndDate.getTime())) {
-      console.log('⚠️ Fecha máxima calculada es inválida');
+      logger.debug('⚠️ Fecha máxima calculada es inválida');
       return null;
     }
     
-    console.log('✅ Fecha de fin calculada:', maxEndDate.toISOString().split('T')[0]);
+    logger.debug('✅ Fecha de fin calculada:', maxEndDate.toISOString().split('T')[0]);
     return maxEndDate.toISOString().split('T')[0];
   };
 
@@ -1060,7 +1062,7 @@ const ProjectManagementTabs = ({
                 <div className="space-y-4 max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
                   {(() => {
                     const milestones = projectTasks?.filter(task => task.isMilestone) || [];
-                    console.log('🎯 Dashboard - Hitos actualizados:', milestones.map(m => ({ 
+                    logger.debug('🎯 Dashboard - Hitos actualizados:', milestones.map(m => ({ 
                       id: m.id, 
                       name: m.name, 
                       startDate: m.startDate, 
@@ -1101,7 +1103,7 @@ const ProjectManagementTabs = ({
                               value={milestone.status || 'in-progress'}
                               onChange={(e) => {
                                 const newStatus = e.target.value;
-                                console.log('🎯 CAMBIO DE ESTADO DE HITO:', {
+                                logger.debug('🎯 CAMBIO DE ESTADO DE HITO:', {
                                   milestoneId: milestone.id,
                                   milestoneName: milestone.name,
                                   oldStatus: milestone.status,
@@ -1115,7 +1117,7 @@ const ProjectManagementTabs = ({
                                     : task
                                 );
                                 
-                                console.log('🎯 TAREAS ACTUALIZADAS:', {
+                                logger.debug('🎯 TAREAS ACTUALIZADAS:', {
                                   totalTasks: updatedTasks.length,
                                   milestoneTasks: updatedTasks.filter(t => t.isMilestone).length,
                                   updatedMilestone: updatedTasks.find(t => t.id === milestone.id)
@@ -1357,7 +1359,7 @@ const ProjectManagementTabs = ({
               contracts={projectContracts}
               onUpdateProject={() => {
                 // Función para actualizar el proyecto cuando se apruebe un cambio
-                console.log('Proyecto actualizado por cambio aprobado');
+                logger.debug('Proyecto actualizado por cambio aprobado');
               }}
             />
           )}
