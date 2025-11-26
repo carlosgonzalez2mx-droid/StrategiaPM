@@ -27,17 +27,17 @@ const diffWorkingDaysExclusive = (a, b) => {
   const startDate = new Date(toISO(a));
   const endDate = new Date(toISO(b));
   let workingDays = 0;
-  
+
   let currentDate = new Date(startDate);
   currentDate.setDate(currentDate.getDate() + 1); // Empezar desde el día siguiente
-  
+
   while (currentDate < endDate) {
     if (isWorkingDay(currentDate)) {
       workingDays++;
     }
     currentDate.setDate(currentDate.getDate() + 1);
   }
-  
+
   return workingDays;
 };
 
@@ -46,7 +46,7 @@ const durationWorkingDaysInclusive = (start, end) => {
   const startDate = new Date(toISO(start));
   const endDate = new Date(toISO(end));
   let workingDays = 0;
-  
+
   let currentDate = new Date(startDate);
   while (currentDate <= endDate) {
     if (isWorkingDay(currentDate)) {
@@ -54,7 +54,7 @@ const durationWorkingDaysInclusive = (start, end) => {
     }
     currentDate.setDate(currentDate.getDate() + 1);
   }
-  
+
   return workingDays;
 };
 
@@ -86,8 +86,8 @@ const durationDaysInclusive = (start, end, includeWeekends = false) => {
   }
 };
 
-const FinancialManagement = ({ 
-  workPackages, 
+const FinancialManagement = ({
+  workPackages,
   setWorkPackages,
   currentProject,
   risks = [], // Agregar riesgos como prop
@@ -112,7 +112,7 @@ const FinancialManagement = ({
 
   // NOTA: Los estados purchaseOrders, advances, invoices, contracts ahora vienen como props
   // desde el componente padre para mantener la persistencia correcta
-  
+
   // Estados para gestión de contratos PMBOK (solo modales)
   const [showContractModal, setShowContractModal] = useState(false);
   const [editingContract, setEditingContract] = useState(null);
@@ -145,9 +145,9 @@ const FinancialManagement = ({
   // Función para sincronizar con cronograma
   const syncWithSchedule = (scheduleUpdates) => {
     if (!scheduleUpdates || !scheduleUpdates.tasks) return;
-    
+
     logger.debug('🔄 Sincronizando métricas financieras con cronograma...');
-    
+
     // Actualizar work packages basado en progreso del cronograma
     const updatedWorkPackages = workPackages.map(wp => {
       const scheduleTask = scheduleUpdates.tasks.find(task => task.workPackageId === wp.id);
@@ -156,11 +156,8 @@ const FinancialManagement = ({
           id: wp.id,
           name: wp.name,
           description: wp.description,
-          startDate: wp.startDate,
-          endDate: wp.endDate,
           budget: wp.budget,
           actualCost: wp.actualCost,
-          status: wp.status,
           priority: wp.priority,
           percentComplete: scheduleTask.progress || wp.percentComplete,
           plannedValue: wp.plannedValue,
@@ -173,7 +170,7 @@ const FinancialManagement = ({
       }
       return wp;
     });
-    
+
     setWorkPackages(updatedWorkPackages);
     logger.debug('✅ Work packages actualizados desde cronograma');
   };
@@ -188,47 +185,47 @@ const FinancialManagement = ({
   // Funciones para cálculo de reservas (deben estar antes del useMemo)
   const calculateContingencyReserve = () => {
     if (!risks || !Array.isArray(risks)) return (currentProject?.budget || 0) * 0.05;
-    
+
     const activeRisks = risks.filter(r => r.status === 'active');
     if (activeRisks.length === 0) return (currentProject?.budget || 0) * 0.05;
-    
+
     // Cálculo base (5% del presupuesto)
     const baseContingency = (currentProject?.budget || 0) * 0.05;
-    
+
     // Cálculo basado en riesgos (suma de impactos esperados)
     const riskBasedContingency = activeRisks.reduce((sum, risk) => {
       const expectedImpact = (risk.probability || 0) * (risk.costImpact || 0);
       const priorityFactor = risk.priority === 'high' ? 1.5 : risk.priority === 'medium' ? 1.2 : 1.0;
       return sum + (expectedImpact * priorityFactor);
     }, 0);
-    
+
     return baseContingency + riskBasedContingency;
   };
 
   const calculateManagementReserve = () => {
     if (!currentProject) return 0;
     const projectBudget = currentProject.budget || 0;
-    
+
     if (!risks || !Array.isArray(risks)) return projectBudget * 0.1;
-    
+
     const activeRisks = risks.filter(r => r.status === 'active');
-    
+
     // Base 10% del presupuesto
     let managementReserve = projectBudget * 0.1;
-    
+
     // Ajustar según complejidad de riesgos
     if (activeRisks.length > 10) {
       managementReserve *= 1.2;
     } else if (activeRisks.length > 5) {
       managementReserve *= 1.1;
     }
-    
+
     // Ajustar por riesgos de alta prioridad
     const highPriorityRisks = activeRisks.filter(r => r.priority === 'high').length;
     if (highPriorityRisks > 3) {
       managementReserve *= 1.15;
     }
-    
+
     return managementReserve;
   };
 
@@ -392,16 +389,16 @@ const FinancialManagement = ({
   // Handlers para órdenes de compra
   const handleSavePO = () => {
     logger.debug('💾 GUARDANDO OC - editingPO:', editingPO);
-    
+
     // Validación: Si está aprobada, debe tener fecha de aprobación
     if (editingPO.status === 'approved' && (!editingPO.approvalDate || editingPO.approvalDate.trim() === '')) {
       alert('⚠️ Error: Las órdenes de compra aprobadas deben tener una fecha de aprobación para el cálculo del flujo de caja.');
       return;
     }
-    
+
     // Asegurar que purchaseOrders sea un array válido
     const currentOrders = Array.isArray(purchaseOrders) ? purchaseOrders : [];
-    
+
     if (editingPO.id) {
       // Editar orden existente
       const updatedOrders = currentOrders.map(po => po.id === editingPO.id ? editingPO : po);
@@ -425,7 +422,7 @@ const FinancialManagement = ({
       const newOrders = [...currentOrders, newPO];
       logger.debug('➕ CREANDO NUEVA OC:', newPO.id, 'Total órdenes:', newOrders.length);
       setPurchaseOrders(newOrders);
-      
+
       // Registrar evento de auditoría
       if (logFinancialEvent && currentProject) {
         logFinancialEvent('purchase-order', newPO, currentProject);
@@ -440,10 +437,10 @@ const FinancialManagement = ({
       try {
         // Importar el servicio de Supabase dinámicamente
         const { default: supabaseService } = await import('../services/SupabaseService');
-        
+
         // Eliminar de Supabase primero
         const result = await supabaseService.deletePurchaseOrder(id);
-        
+
         if (result.success) {
           // Si se eliminó correctamente de Supabase, eliminar del estado local
           const currentOrders = Array.isArray(purchaseOrders) ? purchaseOrders : [];
@@ -465,7 +462,7 @@ const FinancialManagement = ({
   // Handlers para anticipos
   const handleSaveAdvance = () => {
     const currentAdvances = Array.isArray(advances) ? advances : [];
-    
+
     if (editingAdvance.id) {
       const updatedAdvances = currentAdvances.map(adv => adv.id === editingAdvance.id ? editingAdvance : adv);
       setAdvances(updatedAdvances);
@@ -481,7 +478,7 @@ const FinancialManagement = ({
       };
       const newAdvances = [...currentAdvances, newAdvance];
       setAdvances(newAdvances);
-      
+
       // Registrar evento de auditoría
       if (logFinancialEvent && currentProject) {
         logFinancialEvent('advance', newAdvance, currentProject);
@@ -496,10 +493,10 @@ const FinancialManagement = ({
       try {
         // Importar el servicio de Supabase dinámicamente
         const { default: supabaseService } = await import('../services/SupabaseService');
-        
+
         // Eliminar de Supabase primero
         const result = await supabaseService.deleteAdvance(id);
-        
+
         if (result.success) {
           // Si se eliminó correctamente de Supabase, eliminar del estado local
           const currentAdvances = Array.isArray(advances) ? advances : [];
@@ -520,7 +517,7 @@ const FinancialManagement = ({
   // Handlers para facturas
   const handleSaveInvoice = () => {
     const currentInvoices = Array.isArray(invoices) ? invoices : [];
-    
+
     if (editingInvoice.id) {
       const updatedInvoices = currentInvoices.map(inv => inv.id === editingInvoice.id ? editingInvoice : inv);
       setInvoices(updatedInvoices);
@@ -536,7 +533,7 @@ const FinancialManagement = ({
       };
       const newInvoices = [...currentInvoices, newInvoice];
       setInvoices(newInvoices);
-      
+
       // Registrar evento de auditoría
       if (logFinancialEvent && currentProject) {
         logFinancialEvent('invoice', newInvoice, currentProject);
@@ -551,10 +548,10 @@ const FinancialManagement = ({
       try {
         // Importar el servicio de Supabase dinámicamente
         const { default: supabaseService } = await import('../services/SupabaseService');
-        
+
         // Eliminar de Supabase primero
         const result = await supabaseService.deleteInvoice(id);
-        
+
         if (result.success) {
           // Si se eliminó correctamente de Supabase, eliminar del estado local
           const currentInvoices = Array.isArray(invoices) ? invoices : [];
@@ -594,7 +591,7 @@ const FinancialManagement = ({
         newContracts.push(newContract);
         return newContracts;
       });
-      
+
       // Registrar evento de auditoría
       if (logFinancialEvent && currentProject) {
         logFinancialEvent('contract', editingContract, currentProject);
@@ -609,7 +606,7 @@ const FinancialManagement = ({
   };
 
   const getStatusColor = (status) => {
-    switch(status) {
+    switch (status) {
       case 'paid': return 'bg-green-100 text-green-800';
       case 'pending': return 'bg-yellow-100 text-yellow-800';
       case 'overdue': return 'bg-red-100 text-red-800';
@@ -624,7 +621,7 @@ const FinancialManagement = ({
         {/* Elementos decorativos de fondo */}
         <div className="absolute top-0 right-0 w-32 h-32 bg-green-100/30 rounded-full -translate-y-16 translate-x-16"></div>
         <div className="absolute bottom-0 left-0 w-24 h-24 bg-emerald-100/30 rounded-full translate-y-12 -translate-x-12"></div>
-        
+
         <div className="relative z-10">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
@@ -636,16 +633,15 @@ const FinancialManagement = ({
                 <p className="text-gray-600 text-lg">Control de costos, órdenes de compra, anticipos y facturas</p>
               </div>
             </div>
-            
+
             {/* Indicador de configuración de días laborables */}
             <div className="bg-white/60 backdrop-blur rounded-2xl px-4 py-2 shadow-sm">
               <div className="flex items-center space-x-2 text-sm">
                 <span className="text-gray-600">📅 Días laborables:</span>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                  includeWeekends 
-                    ? 'bg-blue-100 text-blue-800' 
+                <span className={`px-2 py-1 rounded-full text-xs font-medium ${includeWeekends
+                    ? 'bg-blue-100 text-blue-800'
                     : 'bg-green-100 text-green-800'
-                }`}>
+                  }`}>
                   {includeWeekends ? 'Lunes a Domingo' : 'Lunes a Viernes'}
                 </span>
               </div>
@@ -841,7 +837,7 @@ const FinancialManagement = ({
           <h3 className="text-lg font-semibold text-gray-800">🛡️ Reservas y Contingencias</h3>
           <span className="text-sm text-gray-500">Basado en análisis de riesgos</span>
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="bg-gray-50 rounded-lg p-4">
             <div className="flex items-center justify-between">
@@ -1006,12 +1002,11 @@ const FinancialManagement = ({
                   VEI (Value Efficiency)
                   <span className="ml-1 text-purple-500 cursor-help" title="Value Efficiency Index: Valor Entregado ÷ Costo Real. VEI > 1 = Eficiente. Métrica PMBOK 7">❓</span>
                 </div>
-                <div className={`text-2xl font-bold ${
-                  valueMetrics.VEI >= 1.2 ? 'text-green-600' :
-                  valueMetrics.VEI >= 1.0 ? 'text-blue-600' :
-                  valueMetrics.VEI >= 0.8 ? 'text-yellow-600' :
-                  'text-red-600'
-                }`}>
+                <div className={`text-2xl font-bold ${valueMetrics.VEI >= 1.2 ? 'text-green-600' :
+                    valueMetrics.VEI >= 1.0 ? 'text-blue-600' :
+                      valueMetrics.VEI >= 0.8 ? 'text-yellow-600' :
+                        'text-red-600'
+                  }`}>
                   {valueMetrics.VEI.toFixed(2)}
                 </div>
                 <div className="text-xs text-gray-600 mt-1">
@@ -1029,11 +1024,10 @@ const FinancialManagement = ({
                   ROI Proyectado
                   <span className="ml-1 text-orange-500 cursor-help" title="Return on Investment proyectado: (Valor Planificado - EAC) ÷ EAC × 100">❓</span>
                 </div>
-                <div className={`text-2xl font-bold ${
-                  valueMetrics.projectedROI >= 20 ? 'text-green-800' :
-                  valueMetrics.projectedROI >= 0 ? 'text-blue-800' :
-                  'text-red-800'
-                }`}>
+                <div className={`text-2xl font-bold ${valueMetrics.projectedROI >= 20 ? 'text-green-800' :
+                    valueMetrics.projectedROI >= 0 ? 'text-blue-800' :
+                      'text-red-800'
+                  }`}>
                   {valueMetrics.projectedROI.toFixed(1)}%
                 </div>
                 <div className="text-xs text-gray-600 mt-1">
@@ -1096,7 +1090,7 @@ const FinancialManagement = ({
                 </div>
                 <div className="text-xs text-gray-600 mt-1">
                   {valueMetrics.costToValueRatio < 1 ? '✅ Excelente' :
-                   valueMetrics.costToValueRatio < 1.5 ? '✓ Bueno' : '⚠️ Alto'}
+                    valueMetrics.costToValueRatio < 1.5 ? '✓ Bueno' : '⚠️ Alto'}
                 </div>
               </div>
               <div className="text-cyan-500 text-xl">⚖️</div>
@@ -1147,17 +1141,16 @@ const FinancialManagement = ({
                 setShowPOModal(true);
               }}
               disabled={isReadOnlyMode}
-              className={`px-3 py-1 rounded text-sm ${
-                isReadOnlyMode
+              className={`px-3 py-1 rounded text-sm ${isReadOnlyMode
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-blue-600 text-white hover:bg-blue-700'
-              }`}
+                }`}
               title={isReadOnlyMode ? "No disponible (modo solo lectura)" : "Crear nueva orden de compra"}
             >
               + Nueva
             </button>
           </div>
-          
+
           <div className="space-y-3">
             {(!Array.isArray(purchaseOrders) || purchaseOrders.length === 0) ? (
               <p className="text-gray-500 text-sm">No hay órdenes de compra</p>
@@ -1170,22 +1163,20 @@ const FinancialManagement = ({
                       <div className="text-xs text-gray-600">{po.supplier}</div>
                       <div className="text-xs text-gray-600">${po.totalAmount?.toLocaleString()}</div>
                       <div className="flex items-center space-x-2 mt-1">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          po.status === 'approved' ? 'bg-green-100 text-green-800' : 
-                          po.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : 
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {po.status === 'approved' ? 'Aprobada' : 
-                           po.status === 'pending' ? 'Pendiente' : 'Rechazada'}
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${po.status === 'approved' ? 'bg-green-100 text-green-800' :
+                            po.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-red-100 text-red-800'
+                          }`}>
+                          {po.status === 'approved' ? 'Aprobada' :
+                            po.status === 'pending' ? 'Pendiente' : 'Rechazada'}
                         </span>
                         {po.status === 'approved' && (
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            po.approvalDate && po.approvalDate.trim() !== '' 
-                              ? 'bg-blue-100 text-blue-800' 
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${po.approvalDate && po.approvalDate.trim() !== ''
+                              ? 'bg-blue-100 text-blue-800'
                               : 'bg-red-100 text-red-800'
-                          }`}>
-                            {po.approvalDate && po.approvalDate.trim() !== '' 
-                              ? `✅ ${new Date(po.approvalDate + 'T00:00:00').toLocaleDateString('es-ES')}` 
+                            }`}>
+                            {po.approvalDate && po.approvalDate.trim() !== ''
+                              ? `✅ ${new Date(po.approvalDate + 'T00:00:00').toLocaleDateString('es-ES')}`
                               : '⚠️ Sin fecha de aprobación'}
                           </span>
                         )}
@@ -1225,17 +1216,16 @@ const FinancialManagement = ({
                 setShowAdvanceModal(true);
               }}
               disabled={isReadOnlyMode}
-              className={`px-3 py-1 rounded text-sm ${
-                isReadOnlyMode
+              className={`px-3 py-1 rounded text-sm ${isReadOnlyMode
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-green-600 text-white hover:bg-green-700'
-              }`}
+                }`}
               title={isReadOnlyMode ? "No disponible (modo solo lectura)" : "Crear nuevo anticipo"}
             >
               + Nuevo
             </button>
           </div>
-          
+
           <div className="space-y-3">
             {advances.length === 0 ? (
               <p className="text-gray-500 text-sm">No hay anticipos</p>
@@ -1282,17 +1272,16 @@ const FinancialManagement = ({
                 setShowInvoiceModal(true);
               }}
               disabled={isReadOnlyMode}
-              className={`px-3 py-1 rounded text-sm ${
-                isReadOnlyMode
+              className={`px-3 py-1 rounded text-sm ${isReadOnlyMode
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                   : 'bg-purple-600 text-white hover:bg-purple-700'
-              }`}
+                }`}
               title={isReadOnlyMode ? "No disponible (modo solo lectura)" : "Crear nueva factura"}
             >
               + Nueva
             </button>
           </div>
-          
+
           <div className="space-y-3">
             {invoices.length === 0 ? (
               <p className="text-gray-500 text-sm">No hay facturas</p>
@@ -1343,14 +1332,14 @@ const FinancialManagement = ({
                 <h2 className="text-xl font-bold">
                   {editingPO?.id ? 'Editar Orden de Compra' : 'Nueva Orden de Compra'}
                 </h2>
-                <button 
+                <button
                   onClick={() => setShowPOModal(false)}
                   className="text-gray-500 hover:text-gray-700 text-xl"
                 >
                   ✕
                 </button>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Número de OC *</label>
@@ -1365,7 +1354,7 @@ const FinancialManagement = ({
                     placeholder="PO-2025-XXX"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Proveedor *</label>
                   <input
@@ -1379,7 +1368,7 @@ const FinancialManagement = ({
                     placeholder="Nombre del proveedor"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Monto Total *</label>
                   <input
@@ -1394,7 +1383,7 @@ const FinancialManagement = ({
                     step="0.01"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
                   <select
@@ -1410,7 +1399,7 @@ const FinancialManagement = ({
                     <option value="rejected">Rechazada</option>
                   </select>
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Fecha de Aprobación *
@@ -1430,7 +1419,7 @@ const FinancialManagement = ({
                     Fecha cuando la orden fue aprobada (usada para flujo de caja)
                   </p>
                 </div>
-                
+
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
                   <textarea
@@ -1445,7 +1434,7 @@ const FinancialManagement = ({
                   />
                 </div>
               </div>
-              
+
               <div className="flex justify-end space-x-3 mt-6">
                 <button
                   onClick={() => setShowPOModal(false)}
@@ -1474,14 +1463,14 @@ const FinancialManagement = ({
                 <h2 className="text-xl font-bold">
                   {editingAdvance?.id ? 'Editar Anticipo' : 'Nuevo Anticipo'}
                 </h2>
-                <button 
+                <button
                   onClick={() => setShowAdvanceModal(false)}
                   className="text-gray-500 hover:text-gray-700 text-xl"
                 >
                   ✕
                 </button>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Número de Anticipo *</label>
@@ -1496,11 +1485,12 @@ const FinancialManagement = ({
                       amount: editingAdvance.amount,
                       paymentDate: editingAdvance.paymentDate,
                       description: editingAdvance.description,
-                      projectId: editingAdvance.projectId, number: e.target.value})}
+                      projectId: editingAdvance.projectId, number: e.target.value
+                    })}
                     placeholder="ADV-2025-XXX"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Proveedor *</label>
                   <input
@@ -1514,11 +1504,12 @@ const FinancialManagement = ({
                       amount: editingAdvance.amount,
                       paymentDate: editingAdvance.paymentDate,
                       description: editingAdvance.description,
-                      projectId: editingAdvance.projectId, supplier: e.target.value})}
+                      projectId: editingAdvance.projectId, supplier: e.target.value
+                    })}
                     placeholder="Nombre del proveedor"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Monto *</label>
                   <input
@@ -1532,12 +1523,13 @@ const FinancialManagement = ({
                       amount: editingAdvance.amount,
                       paymentDate: editingAdvance.paymentDate,
                       description: editingAdvance.description,
-                      projectId: editingAdvance.projectId, amount: Number(e.target.value)})}
+                      projectId: editingAdvance.projectId, amount: Number(e.target.value)
+                    })}
                     min="0"
                     step="0.01"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Pago</label>
                   <input
@@ -1551,10 +1543,11 @@ const FinancialManagement = ({
                       amount: editingAdvance.amount,
                       paymentDate: editingAdvance.paymentDate,
                       description: editingAdvance.description,
-                      projectId: editingAdvance.projectId, paymentDate: e.target.value})}
+                      projectId: editingAdvance.projectId, paymentDate: e.target.value
+                    })}
                   />
                 </div>
-                
+
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
                   <textarea
@@ -1568,12 +1561,13 @@ const FinancialManagement = ({
                       amount: editingAdvance.amount,
                       paymentDate: editingAdvance.paymentDate,
                       description: editingAdvance.description,
-                      projectId: editingAdvance.projectId, description: e.target.value})}
+                      projectId: editingAdvance.projectId, description: e.target.value
+                    })}
                     placeholder="Descripción del anticipo"
                   />
                 </div>
               </div>
-              
+
               <div className="flex justify-end space-x-3 mt-6">
                 <button
                   onClick={() => setShowAdvanceModal(false)}
@@ -1602,14 +1596,14 @@ const FinancialManagement = ({
                 <h2 className="text-xl font-bold">
                   {editingInvoice?.id ? 'Editar Factura' : 'Nueva Factura'}
                 </h2>
-                <button 
+                <button
                   onClick={() => setShowInvoiceModal(false)}
                   className="text-gray-500 hover:text-gray-700 text-xl"
                 >
                   ✕
                 </button>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Número de Factura *</label>
@@ -1626,11 +1620,12 @@ const FinancialManagement = ({
                       receivedDate: editingInvoice.receivedDate,
                       dueDate: editingInvoice.dueDate,
                       description: editingInvoice.description,
-                      projectId: editingInvoice.projectId, number: e.target.value})}
+                      projectId: editingInvoice.projectId, number: e.target.value
+                    })}
                     placeholder="INV-2025-XXX"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Proveedor *</label>
                   <input
@@ -1646,11 +1641,12 @@ const FinancialManagement = ({
                       receivedDate: editingInvoice.receivedDate,
                       dueDate: editingInvoice.dueDate,
                       description: editingInvoice.description,
-                      projectId: editingInvoice.projectId, supplier: e.target.value})}
+                      projectId: editingInvoice.projectId, supplier: e.target.value
+                    })}
                     placeholder="Nombre del proveedor"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Monto *</label>
                   <input
@@ -1666,12 +1662,13 @@ const FinancialManagement = ({
                       receivedDate: editingInvoice.receivedDate,
                       dueDate: editingInvoice.dueDate,
                       description: editingInvoice.description,
-                      projectId: editingInvoice.projectId, amount: Number(e.target.value)})}
+                      projectId: editingInvoice.projectId, amount: Number(e.target.value)
+                    })}
                     min="0"
                     step="0.01"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
                   <select
@@ -1685,14 +1682,15 @@ const FinancialManagement = ({
                       receivedDate: editingInvoice.receivedDate,
                       dueDate: editingInvoice.dueDate,
                       description: editingInvoice.description,
-                      status: e.target.value})}
+                      status: e.target.value
+                    })}
                   >
                     <option value="pending">Pendiente</option>
                     <option value="paid">Pagada</option>
                     <option value="overdue">Vencida</option>
                   </select>
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Recepción</label>
                   <input
@@ -1708,10 +1706,11 @@ const FinancialManagement = ({
                       receivedDate: editingInvoice.receivedDate,
                       dueDate: editingInvoice.dueDate,
                       description: editingInvoice.description,
-                      projectId: editingInvoice.projectId, receivedDate: e.target.value})}
+                      projectId: editingInvoice.projectId, receivedDate: e.target.value
+                    })}
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Vencimiento</label>
                   <input
@@ -1727,10 +1726,11 @@ const FinancialManagement = ({
                       receivedDate: editingInvoice.receivedDate,
                       dueDate: editingInvoice.dueDate,
                       description: editingInvoice.description,
-                      projectId: editingInvoice.projectId, dueDate: e.target.value})}
+                      projectId: editingInvoice.projectId, dueDate: e.target.value
+                    })}
                   />
                 </div>
-                
+
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
                   <textarea
@@ -1746,12 +1746,13 @@ const FinancialManagement = ({
                       receivedDate: editingInvoice.receivedDate,
                       dueDate: editingInvoice.dueDate,
                       description: editingInvoice.description,
-                      projectId: editingInvoice.projectId, description: e.target.value})}
+                      projectId: editingInvoice.projectId, description: e.target.value
+                    })}
                     placeholder="Descripción de la factura"
                   />
                 </div>
               </div>
-              
+
               <div className="flex justify-end space-x-3 mt-6">
                 <button
                   onClick={() => setShowInvoiceModal(false)}
