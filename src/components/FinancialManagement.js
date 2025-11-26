@@ -639,8 +639,8 @@ const FinancialManagement = ({
               <div className="flex items-center space-x-2 text-sm">
                 <span className="text-gray-600">📅 Días laborables:</span>
                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${includeWeekends
-                    ? 'bg-blue-100 text-blue-800'
-                    : 'bg-green-100 text-green-800'
+                  ? 'bg-blue-100 text-blue-800'
+                  : 'bg-green-100 text-green-800'
                   }`}>
                   {includeWeekends ? 'Lunes a Domingo' : 'Lunes a Viernes'}
                 </span>
@@ -1003,9 +1003,9 @@ const FinancialManagement = ({
                   <span className="ml-1 text-purple-500 cursor-help" title="Value Efficiency Index: Valor Entregado ÷ Costo Real. VEI > 1 = Eficiente. Métrica PMBOK 7">❓</span>
                 </div>
                 <div className={`text-2xl font-bold ${valueMetrics.VEI >= 1.2 ? 'text-green-600' :
-                    valueMetrics.VEI >= 1.0 ? 'text-blue-600' :
-                      valueMetrics.VEI >= 0.8 ? 'text-yellow-600' :
-                        'text-red-600'
+                  valueMetrics.VEI >= 1.0 ? 'text-blue-600' :
+                    valueMetrics.VEI >= 0.8 ? 'text-yellow-600' :
+                      'text-red-600'
                   }`}>
                   {valueMetrics.VEI.toFixed(2)}
                 </div>
@@ -1025,8 +1025,8 @@ const FinancialManagement = ({
                   <span className="ml-1 text-orange-500 cursor-help" title="Return on Investment proyectado: (Valor Planificado - EAC) ÷ EAC × 100">❓</span>
                 </div>
                 <div className={`text-2xl font-bold ${valueMetrics.projectedROI >= 20 ? 'text-green-800' :
-                    valueMetrics.projectedROI >= 0 ? 'text-blue-800' :
-                      'text-red-800'
+                  valueMetrics.projectedROI >= 0 ? 'text-blue-800' :
+                    'text-red-800'
                   }`}>
                   {valueMetrics.projectedROI.toFixed(1)}%
                 </div>
@@ -1142,8 +1142,8 @@ const FinancialManagement = ({
               }}
               disabled={isReadOnlyMode}
               className={`px-3 py-1 rounded text-sm ${isReadOnlyMode
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-blue-600 text-white hover:bg-blue-700'
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                : 'bg-blue-600 text-white hover:bg-blue-700'
                 }`}
               title={isReadOnlyMode ? "No disponible (modo solo lectura)" : "Crear nueva orden de compra"}
             >
@@ -1164,16 +1164,16 @@ const FinancialManagement = ({
                       <div className="text-xs text-gray-600">${po.totalAmount?.toLocaleString()}</div>
                       <div className="flex items-center space-x-2 mt-1">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${po.status === 'approved' ? 'bg-green-100 text-green-800' :
-                            po.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-red-100 text-red-800'
+                          po.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-red-100 text-red-800'
                           }`}>
                           {po.status === 'approved' ? 'Aprobada' :
                             po.status === 'pending' ? 'Pendiente' : 'Rechazada'}
                         </span>
                         {po.status === 'approved' && (
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${po.approvalDate && po.approvalDate.trim() !== ''
-                              ? 'bg-blue-100 text-blue-800'
-                              : 'bg-red-100 text-red-800'
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-red-100 text-red-800'
                             }`}>
                             {po.approvalDate && po.approvalDate.trim() !== ''
                               ? `✅ ${new Date(po.approvalDate + 'T00:00:00').toLocaleDateString('es-ES')}`
@@ -1217,8 +1217,8 @@ const FinancialManagement = ({
               }}
               disabled={isReadOnlyMode}
               className={`px-3 py-1 rounded text-sm ${isReadOnlyMode
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-green-600 text-white hover:bg-green-700'
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                : 'bg-green-600 text-white hover:bg-green-700'
                 }`}
               title={isReadOnlyMode ? "No disponible (modo solo lectura)" : "Crear nuevo anticipo"}
             >
@@ -1273,8 +1273,8 @@ const FinancialManagement = ({
               }}
               disabled={isReadOnlyMode}
               className={`px-3 py-1 rounded text-sm ${isReadOnlyMode
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-purple-600 text-white hover:bg-purple-700'
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                : 'bg-purple-600 text-white hover:bg-purple-700'
                 }`}
               title={isReadOnlyMode ? "No disponible (modo solo lectura)" : "Crear nueva factura"}
             >
@@ -1479,13 +1479,8 @@ const FinancialManagement = ({
                     className="w-full border rounded px-3 py-2"
                     value={editingAdvance?.number || ''}
                     onChange={(e) => setEditingAdvance({
-                      id: editingAdvance.id,
-                      number: editingAdvance.number,
-                      supplier: editingAdvance.supplier,
-                      amount: editingAdvance.amount,
-                      paymentDate: editingAdvance.paymentDate,
-                      description: editingAdvance.description,
-                      projectId: editingAdvance.projectId, number: e.target.value
+                      ...editingAdvance,
+                      number: e.target.value
                     })}
                     placeholder="ADV-2025-XXX"
                   />
@@ -1498,13 +1493,8 @@ const FinancialManagement = ({
                     className="w-full border rounded px-3 py-2"
                     value={editingAdvance?.supplier || ''}
                     onChange={(e) => setEditingAdvance({
-                      id: editingAdvance.id,
-                      number: editingAdvance.number,
-                      supplier: editingAdvance.supplier,
-                      amount: editingAdvance.amount,
-                      paymentDate: editingAdvance.paymentDate,
-                      description: editingAdvance.description,
-                      projectId: editingAdvance.projectId, supplier: e.target.value
+                      ...editingAdvance,
+                      supplier: e.target.value
                     })}
                     placeholder="Nombre del proveedor"
                   />
@@ -1517,13 +1507,8 @@ const FinancialManagement = ({
                     className="w-full border rounded px-3 py-2"
                     value={editingAdvance?.amount || ''}
                     onChange={(e) => setEditingAdvance({
-                      id: editingAdvance.id,
-                      number: editingAdvance.number,
-                      supplier: editingAdvance.supplier,
-                      amount: editingAdvance.amount,
-                      paymentDate: editingAdvance.paymentDate,
-                      description: editingAdvance.description,
-                      projectId: editingAdvance.projectId, amount: Number(e.target.value)
+                      ...editingAdvance,
+                      amount: Number(e.target.value)
                     })}
                     min="0"
                     step="0.01"
@@ -1541,9 +1526,9 @@ const FinancialManagement = ({
                       number: editingAdvance.number,
                       supplier: editingAdvance.supplier,
                       amount: editingAdvance.amount,
-                      paymentDate: editingAdvance.paymentDate,
                       description: editingAdvance.description,
-                      projectId: editingAdvance.projectId, paymentDate: e.target.value
+                      projectId: editingAdvance.projectId,
+                      paymentDate: e.target.value
                     })}
                   />
                 </div>
@@ -1560,8 +1545,8 @@ const FinancialManagement = ({
                       supplier: editingAdvance.supplier,
                       amount: editingAdvance.amount,
                       paymentDate: editingAdvance.paymentDate,
-                      description: editingAdvance.description,
-                      projectId: editingAdvance.projectId, description: e.target.value
+                      projectId: editingAdvance.projectId,
+                      description: e.target.value
                     })}
                     placeholder="Descripción del anticipo"
                   />
@@ -1633,15 +1618,8 @@ const FinancialManagement = ({
                     className="w-full border rounded px-3 py-2"
                     value={editingInvoice?.supplier || ''}
                     onChange={(e) => setEditingInvoice({
-                      id: editingInvoice.id,
-                      number: editingInvoice.number,
-                      supplier: editingInvoice.supplier,
-                      amount: editingInvoice.amount,
-                      status: editingInvoice.status,
-                      receivedDate: editingInvoice.receivedDate,
-                      dueDate: editingInvoice.dueDate,
-                      description: editingInvoice.description,
-                      projectId: editingInvoice.projectId, supplier: e.target.value
+                      ...editingInvoice,
+                      supplier: e.target.value
                     })}
                     placeholder="Nombre del proveedor"
                   />
@@ -1654,15 +1632,8 @@ const FinancialManagement = ({
                     className="w-full border rounded px-3 py-2"
                     value={editingInvoice?.amount || ''}
                     onChange={(e) => setEditingInvoice({
-                      id: editingInvoice.id,
-                      number: editingInvoice.number,
-                      supplier: editingInvoice.supplier,
-                      amount: editingInvoice.amount,
-                      status: editingInvoice.status,
-                      receivedDate: editingInvoice.receivedDate,
-                      dueDate: editingInvoice.dueDate,
-                      description: editingInvoice.description,
-                      projectId: editingInvoice.projectId, amount: Number(e.target.value)
+                      ...editingInvoice,
+                      amount: Number(e.target.value)
                     })}
                     min="0"
                     step="0.01"
@@ -1698,15 +1669,8 @@ const FinancialManagement = ({
                     className="w-full border rounded px-3 py-2"
                     value={editingInvoice?.receivedDate || ''}
                     onChange={(e) => setEditingInvoice({
-                      id: editingInvoice.id,
-                      number: editingInvoice.number,
-                      supplier: editingInvoice.supplier,
-                      amount: editingInvoice.amount,
-                      status: editingInvoice.status,
-                      receivedDate: editingInvoice.receivedDate,
-                      dueDate: editingInvoice.dueDate,
-                      description: editingInvoice.description,
-                      projectId: editingInvoice.projectId, receivedDate: e.target.value
+                      ...editingInvoice,
+                      receivedDate: e.target.value
                     })}
                   />
                 </div>
@@ -1718,15 +1682,8 @@ const FinancialManagement = ({
                     className="w-full border rounded px-3 py-2"
                     value={editingInvoice?.dueDate || ''}
                     onChange={(e) => setEditingInvoice({
-                      id: editingInvoice.id,
-                      number: editingInvoice.number,
-                      supplier: editingInvoice.supplier,
-                      amount: editingInvoice.amount,
-                      status: editingInvoice.status,
-                      receivedDate: editingInvoice.receivedDate,
-                      dueDate: editingInvoice.dueDate,
-                      description: editingInvoice.description,
-                      projectId: editingInvoice.projectId, dueDate: e.target.value
+                      ...editingInvoice,
+                      dueDate: e.target.value
                     })}
                   />
                 </div>
@@ -1738,15 +1695,8 @@ const FinancialManagement = ({
                     rows="3"
                     value={editingInvoice?.description || ''}
                     onChange={(e) => setEditingInvoice({
-                      id: editingInvoice.id,
-                      number: editingInvoice.number,
-                      supplier: editingInvoice.supplier,
-                      amount: editingInvoice.amount,
-                      status: editingInvoice.status,
-                      receivedDate: editingInvoice.receivedDate,
-                      dueDate: editingInvoice.dueDate,
-                      description: editingInvoice.description,
-                      projectId: editingInvoice.projectId, description: e.target.value
+                      ...editingInvoice,
+                      description: e.target.value
                     })}
                     placeholder="Descripción de la factura"
                   />
