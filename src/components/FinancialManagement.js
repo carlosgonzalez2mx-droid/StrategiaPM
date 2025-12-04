@@ -424,11 +424,20 @@ const FinancialManagement = ({
       // Editar orden existente
       const updatedOrders = currentOrders.map(po => po.id === editingPO.id ? editingPO : po);
       logger.debug('📝 EDITANDO OC EXISTENTE:', editingPO.id, 'Total órdenes:', updatedOrders.length);
+      logger.debug('🔍 DEBUG - editingPO completo:', {
+        id: editingPO.id,
+        number: editingPO.number,
+        supplier: editingPO.supplier,
+        totalAmount: editingPO.totalAmount,
+        approvalDate: editingPO.approvalDate,
+        description: editingPO.description
+      });
       setPurchaseOrders(updatedOrders);
+      logger.debug('✅ setPurchaseOrders llamado (EDIT) - Los cambios deberían guardarse automáticamente');
     } else {
       // Crear nueva orden
       const newPO = {
-        id: Date.now().toString(),
+        id: crypto.randomUUID(),
         number: editingPO.number,
         supplier: editingPO.supplier,
         description: editingPO.description,
@@ -443,6 +452,7 @@ const FinancialManagement = ({
       const newOrders = [...currentOrders, newPO];
       logger.debug('➕ CREANDO NUEVA OC:', newPO.id, 'Total órdenes:', newOrders.length);
       setPurchaseOrders(newOrders);
+      logger.debug('✅ setPurchaseOrders llamado - Los cambios deberían guardarse automáticamente');
 
       // Registrar evento de auditoría
       if (logFinancialEvent && currentProject) {
@@ -489,7 +499,7 @@ const FinancialManagement = ({
       setAdvances(updatedAdvances);
     } else {
       const newAdvance = {
-        id: Date.now().toString(),
+        id: crypto.randomUUID(),
         number: editingAdvance.number,
         supplier: editingAdvance.supplier,
         amount: editingAdvance.amount,
@@ -730,8 +740,8 @@ const FinancialManagement = ({
                   ${(financialMetrics.EAC / 1000).toFixed(0)}K
                 </div>
                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${financialMetrics.EAC <= financialMetrics.BAC ? 'bg-green-100 text-green-800' :
-                    financialMetrics.EAC <= financialMetrics.BAC * 1.1 ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-red-100 text-red-800'
+                  financialMetrics.EAC <= financialMetrics.BAC * 1.1 ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-red-100 text-red-800'
                   }`}>
                   {financialMetrics.EAC <= financialMetrics.BAC ? '✅ Dentro' :
                     financialMetrics.EAC <= financialMetrics.BAC * 1.1 ? '⚠️ Cercano' :
@@ -758,8 +768,8 @@ const FinancialManagement = ({
                   {financialMetrics.CPI.toFixed(2)}
                 </div>
                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${financialMetrics.CPI >= 1.0 ? 'bg-green-100 text-green-800' :
-                    financialMetrics.CPI >= 0.9 ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-red-100 text-red-800'
+                  financialMetrics.CPI >= 0.9 ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-red-100 text-red-800'
                   }`}>
                   {financialMetrics.CPI >= 1.0 ? '✅ Excelente' :
                     financialMetrics.CPI >= 0.9 ? '⚠️ Aceptable' :
@@ -784,8 +794,8 @@ const FinancialManagement = ({
                   {financialMetrics.SPI.toFixed(2)}
                 </div>
                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${financialMetrics.SPI >= 1.0 ? 'bg-green-100 text-green-800' :
-                    financialMetrics.SPI >= 0.9 ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-red-100 text-red-800'
+                  financialMetrics.SPI >= 0.9 ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-red-100 text-red-800'
                   }`}>
                   {financialMetrics.SPI >= 1.0 ? '✅ A tiempo' :
                     financialMetrics.SPI >= 0.9 ? '⚠️ Leve retraso' :
@@ -810,8 +820,8 @@ const FinancialManagement = ({
                   ${(financialMetrics.VAC / 1000).toFixed(0)}K
                 </div>
                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${financialMetrics.VAC > 0 ? 'bg-green-100 text-green-800' :
-                    financialMetrics.VAC === 0 ? 'bg-blue-100 text-blue-800' :
-                      'bg-red-100 text-red-800'
+                  financialMetrics.VAC === 0 ? 'bg-blue-100 text-blue-800' :
+                    'bg-red-100 text-red-800'
                   }`}>
                   {financialMetrics.VAC > 0 ? '✅ Bajo presupuesto' :
                     financialMetrics.VAC === 0 ? '✓ En presupuesto' :
@@ -833,14 +843,14 @@ const FinancialManagement = ({
               </div>
               <div className="flex items-center space-x-2 mb-1">
                 <div className={`text-2xl font-bold ${financialMetrics.TCPI <= 1.0 ? 'text-green-600' :
-                    financialMetrics.TCPI <= 1.1 ? 'text-yellow-600' :
-                      'text-red-600'
+                  financialMetrics.TCPI <= 1.1 ? 'text-yellow-600' :
+                    'text-red-600'
                   }`}>
                   {financialMetrics.TCPI.toFixed(2)}
                 </div>
                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${financialMetrics.TCPI <= 1.0 ? 'bg-green-100 text-green-800' :
-                    financialMetrics.TCPI <= 1.1 ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-red-100 text-red-800'
+                  financialMetrics.TCPI <= 1.1 ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-red-100 text-red-800'
                   }`}>
                   {financialMetrics.TCPI <= 1.0 ? '✅ Alcanzable' :
                     financialMetrics.TCPI <= 1.1 ? '⚠️ Desafiante' :

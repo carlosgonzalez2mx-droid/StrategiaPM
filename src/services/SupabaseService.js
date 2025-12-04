@@ -1026,31 +1026,109 @@ class SupabaseService {
         }
       });
 
-      // Agrupar órdenes de compra
+      // Agrupar órdenes de compra con conversión de campos
       (purchaseOrdersResult.data || []).forEach(po => {
+        // DEBUG: Mostrar qué viene de Supabase
+        supabaseLogger.data('📥 DEBUG - PO desde Supabase:', {
+          id: po.id,
+          po_number: po.po_number,
+          supplier: po.supplier,
+          total_amount: po.total_amount,
+          approval_date: po.approval_date
+        });
+
+        const convertedPO = {
+          ...po,
+          // Convertir snake_case a camelCase (campos correctos)
+          number: po.po_number || po.number, // po_number → number
+          supplier: po.supplier, // supplier se mantiene igual
+          totalAmount: po.total_amount || po.totalAmount, // total_amount → totalAmount
+          currency: po.currency || 'USD',
+          approvalDate: po.approval_date || po.approvalDate, // approval_date → approvalDate
+          requestDate: po.request_date || po.requestDate, // request_date → requestDate
+          expectedDate: po.expected_date || po.expectedDate, // expected_date → expectedDate
+          projectId: po.project_id || po.projectId,
+          // Mantener nombres originales para compatibilidad
+          po_number: po.po_number,
+          total_amount: po.total_amount,
+          approval_date: po.approval_date,
+          request_date: po.request_date,
+          expected_date: po.expected_date,
+          project_id: po.project_id
+        };
+
+        // DEBUG: Mostrar qué se convierte
+        supabaseLogger.data('🔄 DEBUG - PO convertido:', {
+          id: convertedPO.id,
+          number: convertedPO.number,
+          supplier: convertedPO.supplier,
+          totalAmount: convertedPO.totalAmount,
+          approvalDate: convertedPO.approvalDate
+        });
+
         if (purchaseOrdersByProject[po.project_id]) {
-          purchaseOrdersByProject[po.project_id].push(po);
+          purchaseOrdersByProject[po.project_id].push(convertedPO);
         }
       });
 
-      // Agrupar anticipos
+      // Agrupar anticipos con conversión de campos
       (advancesResult.data || []).forEach(adv => {
+        const convertedAdv = {
+          ...adv,
+          // Convertir snake_case a camelCase (campos correctos)
+          number: adv.advance_number || adv.number, // advance_number → number
+          supplier: adv.supplier,
+          amount: adv.amount,
+          paymentDate: adv.payment_date || adv.paymentDate, // payment_date → paymentDate
+          projectId: adv.project_id || adv.projectId,
+          // Mantener nombres originales para compatibilidad
+          advance_number: adv.advance_number,
+          payment_date: adv.payment_date,
+          project_id: adv.project_id
+        };
+
         if (advancesByProject[adv.project_id]) {
-          advancesByProject[adv.project_id].push(adv);
+          advancesByProject[adv.project_id].push(convertedAdv);
         }
       });
 
-      // Agrupar facturas
+      // Agrupar facturas con conversión de campos
       (invoicesResult.data || []).forEach(inv => {
+        const convertedInv = {
+          ...inv,
+          // Convertir snake_case a camelCase
+          issueDate: inv.issue_date || inv.issueDate,
+          dueDate: inv.due_date || inv.dueDate,
+          paymentDate: inv.payment_date || inv.paymentDate,
+          projectId: inv.project_id || inv.projectId,
+          // Mantener nombres originales para compatibilidad
+          issue_date: inv.issue_date,
+          due_date: inv.due_date,
+          payment_date: inv.payment_date,
+          project_id: inv.project_id
+        };
+
         if (invoicesByProject[inv.project_id]) {
-          invoicesByProject[inv.project_id].push(inv);
+          invoicesByProject[inv.project_id].push(convertedInv);
         }
       });
 
-      // Agrupar contratos
+      // Agrupar contratos con conversión de campos
       (contractsResult.data || []).forEach(cont => {
+        const convertedCont = {
+          ...cont,
+          // Convertir snake_case a camelCase
+          startDate: cont.start_date || cont.startDate,
+          endDate: cont.end_date || cont.endDate,
+          projectId: cont.project_id || cont.projectId,
+          // Mantener nombres originales para compatibilidad
+          start_date: cont.start_date,
+          end_date: cont.end_date,
+          project_id: cont.project_id
+        };
+
         if (contractsByProject[cont.project_id]) {
-          contractsByProject[cont.project_id].push(cont);
+          contractsByProject[cont.project_id].push(convertedCont);
         }
       });
 
@@ -1395,21 +1473,35 @@ class SupabaseService {
         const pos = data.purchaseOrdersByProject[projectId] || [];
 
         pos.forEach(po => {
-          allPOs.push({
+          const poToSave = {
             id: po.id || crypto.randomUUID(),
             project_id: projectId,
-            po_number: po.poNumber || po.po_number || null,
-            vendor: po.vendor || null,
-            amount: po.amount || 0,
+            // ✅ CORRECCIÓN: Usar los nombres de campos correctos de FinancialManagement.js
+            po_number: po.number || po.po_number || null, // 'number' es el campo correcto
+            supplier: po.supplier || null, // 'supplier' en lugar de 'vendor'
+            total_amount: po.totalAmount || po.total_amount || 0, // 'totalAmount' en lugar de 'amount'
+            currency: po.currency || 'USD',
             status: po.status || 'pending',
-            order_date: po.orderDate || po.order_date || null,
-            delivery_date: po.deliveryDate || po.delivery_date || null,
+            request_date: po.requestDate || po.request_date || null,
+            approval_date: po.approvalDate || po.approval_date || null,
+            expected_date: po.expectedDate || po.expected_date || null,
             description: po.description || '',
             owner_id: this.currentUser.id,
             organization_id: this.organizationId,
             created_at: po.createdAt || po.created_at || new Date().toISOString(),
             updated_at: new Date().toISOString()
+          };
+
+          // DEBUG: Mostrar qué se va a guardar
+          supabaseLogger.data('💾 DEBUG - Guardando PO:', {
+            id: poToSave.id,
+            po_number: poToSave.po_number,
+            supplier: poToSave.supplier,
+            total_amount: poToSave.total_amount,
+            approval_date: poToSave.approval_date
           });
+
+          allPOs.push(poToSave);
         });
       }
 
@@ -1427,11 +1519,11 @@ class SupabaseService {
           allAdvances.push({
             id: advance.id || crypto.randomUUID(),
             project_id: projectId,
-            advance_number: advance.advanceNumber || advance.advance_number || null,
+            // ✅ CORRECCIÓN: Usar 'number' en lugar de 'advanceNumber'
+            advance_number: advance.number || advance.advance_number || null,
+            supplier: advance.supplier || null,
             amount: advance.amount || 0,
-            status: advance.status || 'pending',
-            request_date: advance.requestDate || advance.request_date || null,
-            approval_date: advance.approvalDate || advance.approval_date || null,
+            payment_date: advance.paymentDate || advance.payment_date || null,
             description: advance.description || '',
             owner_id: this.currentUser.id,
             organization_id: this.organizationId,
