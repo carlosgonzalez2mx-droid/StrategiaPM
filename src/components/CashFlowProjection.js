@@ -3,7 +3,7 @@ import { logger } from '../utils/logger';
 import React, { useState, useMemo } from 'react';
 import useAuditLog from '../hooks/useAuditLog';
 
-const CashFlowProjection = ({ 
+const CashFlowProjection = ({
   currentProjectId,
   currentProject,
   projects,
@@ -16,13 +16,13 @@ const CashFlowProjection = ({
 }) => {
   // Generar ID único para esta instancia del componente
   const componentId = useMemo(() => Math.random().toString(36).substr(2, 9), []);
-  
+
   logger.debug(`🔍 CASHFLOW COMPONENT - INSTANCIA ${componentId} INICIANDO:`, {
     currentProject: currentProject?.name,
     tasksCount: tasks?.length || 0,
     timestamp: new Date().toISOString()
   });
-  
+
   // DEBUG: Logging detallado de las tareas recibidas
   logger.debug(`🔍 CASHFLOW COMPONENT [${componentId}] - TAREAS RECIBIDAS:`, {
     totalTasks: tasks?.length || 0,
@@ -36,16 +36,30 @@ const CashFlowProjection = ({
       isMilestone: t.isMilestone
     })) || []
   });
-  
+
+  // Calcular la fecha de inicio más temprana de las tareas
+  const earliestTaskDate = useMemo(() => {
+    if (!tasks || tasks.length === 0) return new Date().toISOString().split('T')[0];
+
+    const taskDates = tasks
+      .filter(task => task.startDate)
+      .map(task => new Date(task.startDate));
+
+    if (taskDates.length === 0) return new Date().toISOString().split('T')[0];
+
+    const earliestDate = new Date(Math.min(...taskDates.map(d => d.getTime())));
+    return earliestDate.toISOString().split('T')[0];
+  }, [tasks]);
+
   const [projectionPeriod, setProjectionPeriod] = useState('12'); // meses
-  const [projectionStartDate, setProjectionStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [projectionStartDate, setProjectionStartDate] = useState(earliestTaskDate);
   const [showProjectionSettings, setShowProjectionSettings] = useState(false);
   const [projectionSettings, setProjectionSettings] = useState({
     // Configuración simplificada para tu flujo de negocio
     paymentTerms: 'milestone', // Cambiado a milestone para que use la fecha de aprobación directamente
     revenueRecognition: 'percentage_completion' // 'uniform' o 'percentage_completion'
   });
-  
+
   const { addAuditEvent } = useAuditLog(currentProjectId);
 
   // Usar el proyecto actual que se pasa como prop (ya procesado por ProjectManagementTabs)
@@ -55,16 +69,16 @@ const CashFlowProjection = ({
   // Calcular progreso del proyecto
   const calculateProjectProgress = (date) => {
     if (!currentProject) return 0;
-    
+
     const startDate = new Date(currentProject.startDate);
     const endDate = new Date(currentProject.endDate);
     const totalDuration = endDate - startDate;
     const elapsed = date - startDate;
-    
+
     if (totalDuration <= 0) return 0;
     if (elapsed <= 0) return 0;
     if (elapsed >= totalDuration) return 100;
-    
+
     return Math.min(100, Math.max(0, (elapsed / totalDuration) * 100));
   };
 
@@ -78,17 +92,17 @@ const CashFlowProjection = ({
     // Normalizar fechas del rango mensual
     const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
     monthStart.setHours(0, 0, 0, 0);
-    
+
     const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
     monthEnd.setHours(23, 59, 59, 999);
-    
+
     logger.debug('🔍 CashFlow: Calculando gasto planificado para mes:', {
       month: monthDate.toLocaleDateString('es-ES', { year: 'numeric', month: 'long' }),
       monthStart: monthStart.toISOString().split('T')[0],
       monthEnd: monthEnd.toISOString().split('T')[0],
       totalTasks: tasks.length
     });
-    
+
     // DEBUG: Mostrar todas las tareas con costos para julio 2026
     if (monthDate.getMonth() === 6 && monthDate.getFullYear() === 2026) {
       logger.debug('🔍 DEBUG JULIO 2026 - ANÁLISIS COMPLETO DE TAREAS:');
@@ -108,16 +122,16 @@ const CashFlowProjection = ({
           // Verificar si la tarea está en julio 2026
           const taskStart = new Date(task.startDate);
           const normalizedTaskStart = new Date(
-            taskStart.getFullYear(), 
-            taskStart.getMonth(), 
+            taskStart.getFullYear(),
+            taskStart.getMonth(),
             taskStart.getDate(),
             0, 0, 0, 0
           );
-          
+
           const taskEnd = new Date(task.endDate);
           const normalizedTaskEnd = new Date(
-            taskEnd.getFullYear(), 
-            taskEnd.getMonth(), 
+            taskEnd.getFullYear(),
+            taskEnd.getMonth(),
             taskEnd.getDate(),
             23, 59, 59, 999
           );
@@ -167,11 +181,11 @@ const CashFlowProjection = ({
 
       logger.debug('🔍 JULIO 2026 - Tareas EXCLUIDAS (posibles causas del error):', tareasExcluidasJulio);
     }
-    
+
     let plannedExpense = 0;
     let tasksWithCosts = 0;
     let tasksInMonth = 0;
-    
+
     // Calcular gasto planificado basado en tareas del cronograma que se ejecutan en este mes
     tasks.forEach((task, index) => {
       logger.debug(`🔍 CashFlow: Tarea ${index + 1}:`, {
@@ -184,7 +198,7 @@ const CashFlowProjection = ({
         isMilestone: task.isMilestone,
         duration: task.duration
       });
-      
+
       // DEBUG ESPECÍFICO: Para la tarea 45 (hito problemático)
       if (index === 44) { // Tarea 45 (índice 44)
         const monthName = monthDate.toLocaleDateString('es-ES', { year: 'numeric', month: 'long' });
@@ -199,7 +213,7 @@ const CashFlowProjection = ({
           monthEnd: monthEnd.toISOString().split('T')[0],
           monthName: monthName
         });
-        
+
         // DEBUG: Logging específico para agosto 2026
         if (monthName === 'agosto de 2026' && task.cost > 0) {
           logger.debug(`🔍 CASHFLOW [${componentId}] - TAREA CON COSTO EN AGOSTO 2026:`, {
@@ -217,25 +231,25 @@ const CashFlowProjection = ({
           });
         }
       }
-      
+
       if (task.cost && task.startDate && task.endDate) {
         tasksWithCosts++;
         const taskStart = new Date(task.startDate);
         const normalizedTaskStart = new Date(
-          taskStart.getFullYear(), 
-          taskStart.getMonth(), 
+          taskStart.getFullYear(),
+          taskStart.getMonth(),
           taskStart.getDate(),
           0, 0, 0, 0
         );
-        
+
         const taskEnd = new Date(task.endDate);
         const normalizedTaskEnd = new Date(
-          taskEnd.getFullYear(), 
-          taskEnd.getMonth(), 
+          taskEnd.getFullYear(),
+          taskEnd.getMonth(),
           taskEnd.getDate(),
           23, 59, 59, 999
         );
-        
+
         // DEBUG: Logging específico para julio y agosto 2026
         const monthName = monthDate.toLocaleDateString('es-ES', { year: 'numeric', month: 'long' });
         if ((monthName === 'julio de 2026' || monthName === 'agosto de 2026') && task.cost > 0) {
@@ -253,48 +267,48 @@ const CashFlowProjection = ({
             monthEnd: monthEnd.toISOString().split('T')[0]
           });
         }
-        
+
         // Verificar si la tarea se ejecuta en este mes
         // CORRECCIÓN: Para hitos, verificar que la fecha esté exactamente en el mes
         let isInMonth = false;
-        
+
         if (task.isMilestone || task.duration === 0) {
           // Para hitos: verificar que la fecha esté dentro del mes
           isInMonth = normalizedTaskStart >= monthStart && normalizedTaskStart <= monthEnd;
-          
-  // DEBUG: Logging detallado solo para tareas con costos altos y meses específicos
-  if (task.cost > 0 && (monthName === 'julio de 2026' || monthName === 'agosto de 2026')) {
-    logger.debug(`🎯 DEBUG HITO [${componentId}] - Verificación de mes:`, {
-      taskName: task.name || task.title,
-      taskStartDate: task.startDate,
-      taskStart: taskStart.toISOString().split('T')[0],
-      monthStart: monthStart.toISOString().split('T')[0],
-      monthEnd: monthEnd.toISOString().split('T')[0],
-      isInMonth: isInMonth,
-      monthName: monthName,
-      comparison: {
-        taskStartGreaterEqualMonthStart: normalizedTaskStart >= monthStart,
-        taskStartLessEqualMonthEnd: normalizedTaskStart <= monthEnd,
-        taskStartTime: normalizedTaskStart.getTime(),
-        monthStartTime: monthStart.getTime(),
-        monthEndTime: monthEnd.getTime()
-      }
-    });
-  }
+
+          // DEBUG: Logging detallado solo para tareas con costos altos y meses específicos
+          if (task.cost > 0 && (monthName === 'julio de 2026' || monthName === 'agosto de 2026')) {
+            logger.debug(`🎯 DEBUG HITO [${componentId}] - Verificación de mes:`, {
+              taskName: task.name || task.title,
+              taskStartDate: task.startDate,
+              taskStart: taskStart.toISOString().split('T')[0],
+              monthStart: monthStart.toISOString().split('T')[0],
+              monthEnd: monthEnd.toISOString().split('T')[0],
+              isInMonth: isInMonth,
+              monthName: monthName,
+              comparison: {
+                taskStartGreaterEqualMonthStart: normalizedTaskStart >= monthStart,
+                taskStartLessEqualMonthEnd: normalizedTaskStart <= monthEnd,
+                taskStartTime: normalizedTaskStart.getTime(),
+                monthStartTime: monthStart.getTime(),
+                monthEndTime: monthEnd.getTime()
+              }
+            });
+          }
         } else {
           // Para tareas normales: verificar intersección de fechas
           isInMonth = normalizedTaskStart <= monthEnd && normalizedTaskEnd >= monthStart;
         }
-        
+
         if (isInMonth) {
           tasksInMonth++;
-          
+
           // CORRECCIÓN: Manejo especial para hitos (duración 0)
           if (task.isMilestone || task.duration === 0) {
             // Para hitos: el costo completo se asigna al mes donde ocurre
             const taskCostInMonth = task.cost || 0;
             plannedExpense += taskCostInMonth;
-            
+
             logger.debug(`💰 CashFlow: HITO "${task.name || task.title}" en mes:`, {
               taskCost: task.cost,
               isMilestone: true,
@@ -302,7 +316,7 @@ const CashFlowProjection = ({
               endDate: task.endDate,
               costInMonth: taskCostInMonth.toFixed(2)
             });
-            
+
             // DEBUG ESPECÍFICO: Para el hito problemático
             if (task.cost && task.cost > 300000) {
               logger.debug('🚨 DEBUG HITO PROBLEMÁTICO:', {
@@ -321,17 +335,17 @@ const CashFlowProjection = ({
             // Para tareas normales: calcular porcentaje basado en duración
             const monthDuration = monthEnd - monthStart + 1; // Duración del mes en ms
             const taskDuration = normalizedTaskEnd - normalizedTaskStart + 1; // Duración de la tarea en ms
-            
+
             // Calcular intersección de fechas
             const intersectionStart = new Date(Math.max(normalizedTaskStart.getTime(), monthStart.getTime()));
             const intersectionEnd = new Date(Math.min(normalizedTaskEnd.getTime(), monthEnd.getTime()));
             const intersectionDuration = intersectionEnd - intersectionStart + 1;
-            
+
             if (intersectionDuration > 0) {
               const percentageInMonth = intersectionDuration / taskDuration;
               const taskCostInMonth = (task.cost || 0) * percentageInMonth;
               plannedExpense += taskCostInMonth;
-              
+
               logger.debug(`💰 CashFlow: Tarea "${task.name || task.title}" en mes:`, {
                 taskCost: task.cost,
                 percentageInMonth: (percentageInMonth * 100).toFixed(1) + '%',
@@ -342,7 +356,7 @@ const CashFlowProjection = ({
         }
       }
     });
-    
+
     logger.debug('🔍 CashFlow: Resumen del mes:', {
       totalTasks: tasks.length,
       tasksWithCosts,
@@ -391,7 +405,7 @@ const CashFlowProjection = ({
     // Normalizar fechas del rango mensual
     const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
     monthStart.setHours(0, 0, 0, 0);
-    
+
     const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
     monthEnd.setHours(23, 59, 59, 999);
 
@@ -403,7 +417,7 @@ const CashFlowProjection = ({
     // GASTO COMPROMETIDO: Solo órdenes de compra aprobadas con fecha de aprobación
     const monthPOs = purchaseOrders?.filter(po => {
       if (po.status !== 'approved') return false;
-      
+
       // SOLO usar approvalDate - si no existe, no incluir la orden
       if (!po.approvalDate || po.approvalDate.trim() === '') {
         logger.debug('⚠️ CASHFLOW PROJECTION - OC sin fecha de aprobación:', {
@@ -415,7 +429,7 @@ const CashFlowProjection = ({
         });
         return false;
       }
-      
+
       // CORREGIDO: Usar fecha local para evitar problemas de zona horaria
       const approvalDate = new Date(po.approvalDate + 'T00:00:00');
       const normalizedApprovalDate = new Date(
@@ -424,13 +438,13 @@ const CashFlowProjection = ({
         approvalDate.getDate(),
         0, 0, 0, 0
       );
-      
+
       const adjustedDate = new Date(normalizedApprovalDate);
       adjustedDate.setDate(normalizedApprovalDate.getDate() + daysToPayment);
       adjustedDate.setHours(0, 0, 0, 0);
-      
+
       const isInMonth = adjustedDate >= monthStart && adjustedDate <= monthEnd;
-      
+
       logger.debug('🔍 CASHFLOW PROJECTION - Evaluando OC:', {
         id: po.id,
         number: po.number,
@@ -445,7 +459,7 @@ const CashFlowProjection = ({
         isInMonth,
         willInclude: isInMonth
       });
-      
+
       return isInMonth;
     }) || [];
 
@@ -471,14 +485,14 @@ const CashFlowProjection = ({
     // Normalizar fechas del rango mensual
     const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
     monthStart.setHours(0, 0, 0, 0);
-    
+
     const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
     monthEnd.setHours(23, 59, 59, 999);
 
     // ANTICIPOS PAGADOS
     const monthAdvances = advances?.filter(advance => {
       if (advance.status !== 'paid') return false;
-      
+
       const paymentDate = new Date(advance.paymentDate || advance.date);
       const normalizedPaymentDate = new Date(
         paymentDate.getFullYear(),
@@ -494,7 +508,7 @@ const CashFlowProjection = ({
     // FACTURAS PAGADAS
     const monthInvoices = invoices?.filter(invoice => {
       if (invoice.status !== 'paid') return false;
-      
+
       const paymentDate = new Date(invoice.paymentDate || invoice.date);
       const normalizedPaymentDate = new Date(
         paymentDate.getFullYear(),
@@ -574,18 +588,18 @@ const CashFlowProjection = ({
       // Calcular gasto planificado del mes
       const monthPlannedExpense = calculateMonthPlannedExpense(currentDate);
       logger.debug(`🔍 CASHFLOW PROJECTION [${componentId}] - RESULTADO calculateMonthPlannedExpense para ${monthKey}: $${monthPlannedExpense}`);
-      
+
       // Calcular gasto comprometido del mes (OCs)
       logger.debug(`🔍 CASHFLOW PROJECTION - LLAMANDO calculateMonthCommittedExpense para mes ${monthKey}`);
       const monthCommittedExpense = calculateMonthCommittedExpense(currentDate, daysToPayment);
       logger.debug(`🔍 CASHFLOW PROJECTION - RESULTADO calculateMonthCommittedExpense: $${monthCommittedExpense}`);
-      
+
       // Calcular gasto real del mes (anticipos pagados + facturas pagadas)
       const monthRealExpense = calculateMonthRealExpense(currentDate);
-      
+
       // Calcular diferencia (gasto planificado - gasto real)
       const netCashFlow = monthPlannedExpense - monthRealExpense;
-      
+
       // Calcular saldo acumulado
       const previousBalance = i > 0 ? projection[i - 1].cumulativeBalance : 0;
       const cumulativeBalance = previousBalance + monthPlannedExpense;
@@ -603,7 +617,7 @@ const CashFlowProjection = ({
         cashIn: monthPlannedExpense,
         cashOut: monthRealExpense
       };
-      
+
       // DEBUG: Logging específico para julio y agosto 2026
       if (monthKey === '2026-07' || monthKey === '2026-08') {
         logger.debug(`🔍 CASHFLOW PROJECTION [${componentId}] - ASIGNANDO VALORES para ${monthKey}:`, {
@@ -613,7 +627,7 @@ const CashFlowProjection = ({
           monthKey: monthProjection.monthKey
         });
       }
-      
+
       projection.push(monthProjection);
     }
 
@@ -634,21 +648,21 @@ const CashFlowProjection = ({
 
     // Calcular gasto planificado total
     const totalPlannedExpense = cashFlowProjection.reduce((sum, month) => sum + month.revenue, 0);
-    
+
     const totalCommittedExpenses = cashFlowProjection.reduce((sum, month) => sum + month.expenses, 0);
     const totalRealExpenses = cashFlowProjection.reduce((sum, month) => sum + month.realExpenses, 0);
     const totalNetCashFlow = totalPlannedExpense - totalRealExpenses;
-    
+
     const maxCashOutflow = Math.min(...cashFlowProjection.map(m => m.cumulativeBalance));
     const maxCashInflow = Math.max(...cashFlowProjection.map(m => m.cumulativeBalance));
-    
+
     const positiveMonths = cashFlowProjection.filter(m => m.netCashFlow > 0).length;
     const negativeMonths = cashFlowProjection.filter(m => m.netCashFlow < 0).length;
-    
+
     const averageMonthlyPlannedExpense = totalPlannedExpense / cashFlowProjection.length;
     const averageMonthlyCommittedExpenses = totalCommittedExpenses / cashFlowProjection.length;
     const averageMonthlyRealExpenses = totalRealExpenses / cashFlowProjection.length;
-    
+
     return {
       totalRevenue: totalPlannedExpense, // Mantener 'totalRevenue' para compatibilidad
       totalPlannedExpense,
@@ -701,14 +715,14 @@ const CashFlowProjection = ({
   // Función para formatear números con formato mexicano: $1.234.567,89
   const formatCurrency = (value) => {
     if (value === null || value === undefined || isNaN(value)) return '$0,00';
-    
+
     // Formatear con separadores de miles (punto) y decimales (coma)
     // CORRECCIÓN: Permitir hasta 3 decimales para preservar precisión de costos
     const formatted = new Intl.NumberFormat('es-MX', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 3
     }).format(value);
-    
+
     return `$${formatted}`;
   };
 
@@ -752,7 +766,7 @@ const CashFlowProjection = ({
           {/* Elementos decorativos de fondo */}
           <div className="absolute top-0 right-0 w-32 h-32 bg-green-100/30 rounded-full -translate-y-16 translate-x-16"></div>
           <div className="absolute bottom-0 left-0 w-24 h-24 bg-emerald-100/30 rounded-full translate-y-12 -translate-x-12"></div>
-          
+
           <div className="relative z-10">
             <div className="flex items-center justify-between">
               <div className="flex items-center">
@@ -784,7 +798,7 @@ const CashFlowProjection = ({
                   </div>
                 </div>
               </div>
-              
+
               <div className="flex items-center space-x-4">
                 <button
                   onClick={exportProjection}
@@ -811,7 +825,7 @@ const CashFlowProjection = ({
                 </div>
               </div>
             </div>
-            
+
             <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-red-500">
               <div className="flex items-center justify-between">
                 <div>
@@ -823,7 +837,7 @@ const CashFlowProjection = ({
                 </div>
               </div>
             </div>
-            
+
             <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-blue-500">
               <div className="flex items-center justify-between">
                 <div>
@@ -837,7 +851,7 @@ const CashFlowProjection = ({
                 </div>
               </div>
             </div>
-            
+
             <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-purple-500">
               <div className="flex items-center justify-between">
                 <div>
@@ -856,7 +870,7 @@ const CashFlowProjection = ({
 
         {/* Configuración de proyección */}
         <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 📅 Período de Proyección (meses)
@@ -873,7 +887,7 @@ const CashFlowProjection = ({
                 <option value="36">36 meses</option>
               </select>
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 🚀 Fecha de Inicio
@@ -884,15 +898,6 @@ const CashFlowProjection = ({
                 onChange={(e) => setProjectionStartDate(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-colors"
               />
-            </div>
-            
-            <div className="flex items-end">
-              <button
-                onClick={() => setShowProjectionSettings(true)}
-                className="w-full px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 transition-all duration-200 shadow-sm hover:shadow-md"
-              >
-                ⚙️ Configuración Avanzada
-              </button>
             </div>
           </div>
         </div>
@@ -905,7 +910,7 @@ const CashFlowProjection = ({
                 📊 Proyección Mensual de Flujo de Caja
               </h3>
             </div>
-            
+
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
@@ -929,39 +934,38 @@ const CashFlowProjection = ({
                         monthObject: month
                       });
                     }
-                    
+
                     return (
-                    <tr key={month.month} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4">
-                        <div className="font-medium text-gray-900">{month.monthLabel}</div>
-                        <div className="text-sm text-gray-500">Mes {month.month}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-blue-600 font-medium">{formatCurrency(month.expenses)}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-orange-600 font-medium">{formatCurrency(month.revenue)}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-red-600 font-medium">{formatCurrency(month.realExpenses)}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className={`font-medium ${getBalanceColor(month.cumulativeBalance)}`}>
-                          {formatCurrency(month.cumulativeBalance)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          month.cumulativeBalance > 0
-                            ? 'bg-green-100 text-green-800'
-                            : month.cumulativeBalance < 0
-                            ? 'bg-red-100 text-red-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}>
-                          {month.cumulativeBalance > 0 ? '✅ Positivo' : month.cumulativeBalance < 0 ? '⚠️ Déficit' : '⚖️ Equilibrio'}
-                        </span>
-                      </td>
-                    </tr>
+                      <tr key={month.month} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="font-medium text-gray-900">{month.monthLabel}</div>
+                          <div className="text-sm text-gray-500">Mes {month.month}</div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-blue-600 font-medium">{formatCurrency(month.expenses)}</div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-orange-600 font-medium">{formatCurrency(month.revenue)}</div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-red-600 font-medium">{formatCurrency(month.realExpenses)}</div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className={`font-medium ${getBalanceColor(month.cumulativeBalance)}`}>
+                            {formatCurrency(month.cumulativeBalance)}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${month.cumulativeBalance > 0
+                              ? 'bg-green-100 text-green-800'
+                              : month.cumulativeBalance < 0
+                                ? 'bg-red-100 text-red-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}>
+                            {month.cumulativeBalance > 0 ? '✅ Positivo' : month.cumulativeBalance < 0 ? '⚠️ Déficit' : '⚖️ Equilibrio'}
+                          </span>
+                        </td>
+                      </tr>
                     );
                   })}
                 </tbody>
@@ -974,7 +978,7 @@ const CashFlowProjection = ({
         {cashFlowProjection && (
           <div className="bg-white rounded-xl shadow-sm p-6 mt-8">
             <h3 className="text-lg font-semibold text-gray-800 mb-6">📈 Gráfico de Flujo de Caja</h3>
-            
+
             {/* Gráfico de barras - Flujo Neto Mensual */}
             <div className="mb-8">
               <h4 className="text-md font-medium text-gray-700 mb-4">💰 Flujo Neto Mensual</h4>
@@ -984,33 +988,32 @@ const CashFlowProjection = ({
                   const maxNetFlow = Math.max(
                     ...cashFlowProjection.map(m => Math.abs(m.netCashFlow))
                   );
-                  
+
                   // Altura proporcional en píxeles: valor actual / valor más alto * altura del contenedor
                   const containerHeight = 192; // h-48 = 192px
                   let height = 0;
                   if (maxNetFlow > 0) {
                     height = (Math.abs(month.netCashFlow) / maxNetFlow) * containerHeight;
                   }
-                  
+
                   // Altura mínima solo para valores exactamente cero
                   if (month.netCashFlow === 0) {
                     height = 2; // Altura mínima para valores exactamente cero
                   }
-                  
+
                   return (
                     <div key={`net-${month.month}`} className="flex-1 flex flex-col items-center">
                       <div className="text-xs text-gray-500 mb-2 text-center">
                         {month.monthLabel.slice(0, 3)}
                       </div>
-                      <div 
-                        className={`w-full rounded-t transition-all duration-300 ${
-                          month.netCashFlow > 0 
-                            ? 'bg-green-500' 
-                            : month.netCashFlow < 0 
-                            ? 'bg-red-500'
-                            : 'bg-gray-400'
-                        }`}
-                        style={{ 
+                      <div
+                        className={`w-full rounded-t transition-all duration-300 ${month.netCashFlow > 0
+                            ? 'bg-green-500'
+                            : month.netCashFlow < 0
+                              ? 'bg-red-500'
+                              : 'bg-gray-400'
+                          }`}
+                        style={{
                           height: `${height}px`
                         }}
                       ></div>
@@ -1022,28 +1025,28 @@ const CashFlowProjection = ({
                 })}
               </div>
             </div>
-            
+
             {/* Gráfico de líneas - Saldo Acumulado */}
             <div className="mb-8">
               <h4 className="text-md font-medium text-gray-700 mb-4">📊 Saldo Acumulado (Línea de Tiempo)</h4>
               <div className="h-48 relative">
                 <svg className="w-full h-full" viewBox={`0 0 ${cashFlowProjection.length * 100} 200`}>
                   {/* Líneas de referencia */}
-                  <line x1="0" y1="100" x2={cashFlowProjection.length * 100} y2="100" 
-                         stroke="#e5e7eb" strokeWidth="1" strokeDasharray="5,5" />
-                  
+                  <line x1="0" y1="100" x2={cashFlowProjection.length * 100} y2="100"
+                    stroke="#e5e7eb" strokeWidth="1" strokeDasharray="5,5" />
+
                   {/* Línea del saldo acumulado */}
                   {(() => {
                     const minBalance = Math.min(...cashFlowProjection.map(m => m.cumulativeBalance));
                     const maxBalance = Math.max(...cashFlowProjection.map(m => m.cumulativeBalance));
                     const range = maxBalance - minBalance;
-                    
+
                     const points = cashFlowProjection.map((month, index) => {
                       const normalizedY = range > 0 ? (month.cumulativeBalance - minBalance) / range : 0.5;
                       const y = 200 - (normalizedY * 180);
                       return `${index * 100 + 50},${y}`;
                     }).join(' ');
-                    
+
                     return (
                       <polyline
                         points={points}
@@ -1055,17 +1058,17 @@ const CashFlowProjection = ({
                       />
                     );
                   })()}
-                  
+
                   {/* Puntos de datos */}
                   {(() => {
                     const minBalance = Math.min(...cashFlowProjection.map(m => m.cumulativeBalance));
                     const maxBalance = Math.max(...cashFlowProjection.map(m => m.cumulativeBalance));
                     const range = maxBalance - minBalance;
-                    
+
                     return cashFlowProjection.map((month, index) => {
                       const normalizedY = range > 0 ? (month.cumulativeBalance - minBalance) / range : 0.5;
                       const y = 200 - (normalizedY * 180);
-                      
+
                       return (
                         <circle
                           key={`point-${month.month}`}
@@ -1080,7 +1083,7 @@ const CashFlowProjection = ({
                     });
                   })()}
                 </svg>
-                
+
                 {/* Etiquetas de meses en el eje X */}
                 <div className="absolute bottom-0 left-0 right-0 flex justify-between px-4">
                   {cashFlowProjection.map((month) => (
@@ -1091,8 +1094,8 @@ const CashFlowProjection = ({
                 </div>
               </div>
             </div>
-            
-            
+
+
           </div>
         )}
       </div>
@@ -1111,7 +1114,7 @@ const CashFlowProjection = ({
                   ✕
                 </button>
               </div>
-              
+
               <div className="space-y-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1145,7 +1148,7 @@ const CashFlowProjection = ({
                     <div>• <strong>Anticipado:</strong> Fecha de aprobación - 15 días</div>
                   </div>
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     📈 Reconocimiento de Ingresos
@@ -1171,7 +1174,7 @@ const CashFlowProjection = ({
                   </p>
                 </div>
               </div>
-              
+
               <div className="flex justify-end space-x-4 pt-6 border-t mt-8">
                 <button
                   onClick={() => setShowProjectionSettings(false)}

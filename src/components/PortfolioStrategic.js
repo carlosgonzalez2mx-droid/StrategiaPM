@@ -24,12 +24,13 @@ import WeeklyPlanningTab from './WeeklyPlanningTab';
 import NotificationBadge from './notifications/NotificationBadge';
 import UsageIndicator from './subscription/UsageIndicator';
 import { calculatePlannedValueFromIRR } from '../utils/businessValueCalculator';
+import FloatingSaveButton from './FloatingSaveButton';
 
 
-const PortfolioStrategic = ({ 
-  projects, 
+const PortfolioStrategic = ({
+  projects,
   setProjects,
-  currentProjectId, 
+  currentProjectId,
   setCurrentProjectId,
   portfolioMetrics,
   workPackages,
@@ -51,7 +52,9 @@ const PortfolioStrategic = ({
   includeWeekendsByProject,
   setIncludeWeekendsByProject,
   getCurrentProjectIncludeWeekends,
-  useSupabase
+  useSupabase,
+  hasUnsavedChanges = false,
+  onSave
 }) => {
   const [activeTab, setActiveTab] = useState('overview');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -100,7 +103,7 @@ const PortfolioStrategic = ({
     const handleMinutaStatusChanged = (event) => {
       const { tareaId, newStatus, projectId, timestamp } = event.detail;
       logger.debug('🔄 PortfolioStrategic: Evento minutaStatusChanged recibido:', { tareaId, newStatus, projectId, timestamp });
-      
+
       // Forzar re-render del componente para actualizar el Dashboard resumen
       logger.debug('🔄 PortfolioStrategic: Forzando re-render del Dashboard resumen...');
       // El componente se re-renderizará automáticamente cuando cambien los datos
@@ -120,76 +123,76 @@ const PortfolioStrategic = ({
   // Función para validar si un proyecto puede ser archivado
   const canArchiveProject = (project) => {
     const validations = [];
-    
+
     logger.debug('🔍 VALIDANDO ARCHIVADO para proyecto:', project.name);
     logger.debug('📊 Progreso del proyecto:', project.progress);
     logger.debug('📋 Total de tareas disponibles:', tasks.length);
-    
+
     // 1. Verificar que el proyecto esté completado (100% de progreso)
     if (project.progress < 100) {
       validations.push(`El proyecto debe estar 100% completado (actual: ${project.progress}%)`);
     }
-    
+
     // 2. Verificar que todas las tareas estén finalizadas
     // Filtrar tareas del proyecto actual
-    const projectTasks = tasks.filter(task => 
+    const projectTasks = tasks.filter(task =>
       task.workPackageId === project.id || task.projectId === project.id
     );
-    
+
     logger.debug('📋 Tareas del proyecto:', projectTasks.length);
-    
-    const incompleteTasks = projectTasks.filter(task => 
+
+    const incompleteTasks = projectTasks.filter(task =>
       task.progress < 100 && task.status !== 'completed'
     );
-    
+
     logger.debug('❌ Tareas incompletas:', incompleteTasks.length);
-    
+
     if (incompleteTasks.length > 0) {
       validations.push(`Todas las tareas deben estar completadas (${incompleteTasks.length} tareas pendientes)`);
     }
-    
+
     // 3. Verificar que no haya dependencias activas
     // Verificar si hay tareas con dependencias no completadas
-    const tasksWithDependencies = projectTasks.filter(task => 
+    const tasksWithDependencies = projectTasks.filter(task =>
       task.predecessors && task.predecessors.length > 0
     );
-    
+
     const tasksWithIncompleteDependencies = tasksWithDependencies.filter(task => {
-      const predecessorTasks = task.predecessors.map(predId => 
+      const predecessorTasks = task.predecessors.map(predId =>
         projectTasks.find(t => t.id === predId)
       ).filter(Boolean);
-      
+
       return predecessorTasks.some(pred => pred.progress < 100);
     });
-    
+
     if (tasksWithIncompleteDependencies.length > 0) {
       validations.push('No debe haber dependencias activas con tareas incompletas');
     }
-    
+
     // 4. Verificar que la documentación esté completa
     // Verificar si hay archivos pendientes o documentación incompleta
     const projectFiles = []; // Placeholder - en implementación real se conectaría con FileManager
     const requiredDocuments = ['Acta de Inicio', 'Cronograma', 'Presupuesto', 'Acta de Cierre'];
-    const missingDocuments = requiredDocuments.filter(doc => 
+    const missingDocuments = requiredDocuments.filter(doc =>
       !projectFiles.some(file => file.name.includes(doc))
     );
-    
+
     if (missingDocuments.length > 0) {
       validations.push(`Documentación incompleta: ${missingDocuments.join(', ')}`);
     }
-    
+
     // 5. Verificar que tenga las aprobaciones necesarias
     // Verificar si hay órdenes de compra, facturas o contratos pendientes
-    const projectPurchaseOrders = purchaseOrders.filter(po => 
+    const projectPurchaseOrders = purchaseOrders.filter(po =>
       po.projectId === project.id || po.workPackageId === project.id
     );
-    const projectInvoices = invoices.filter(inv => 
+    const projectInvoices = invoices.filter(inv =>
       inv.projectId === project.id || inv.workPackageId === project.id
     );
-    const projectContracts = contracts.filter(contract => 
+    const projectContracts = contracts.filter(contract =>
       contract.projectId === project.id || contract.workPackageId === project.id
     );
-    
+
     const pendingApprovals = [];
     if (projectPurchaseOrders.some(po => po.status === 'pending')) {
       pendingApprovals.push('Órdenes de compra pendientes');
@@ -200,14 +203,14 @@ const PortfolioStrategic = ({
     if (projectContracts.some(contract => contract.status === 'pending')) {
       pendingApprovals.push('Contratos pendientes');
     }
-    
+
     if (pendingApprovals.length > 0) {
       validations.push(`Aprobaciones pendientes: ${pendingApprovals.join(', ')}`);
     }
-    
+
     logger.debug('✅ Validaciones encontradas:', validations);
     logger.debug('🎯 Puede archivar:', validations.length === 0);
-    
+
     return {
       canArchive: validations.length === 0,
       validations: validations
@@ -221,7 +224,7 @@ const PortfolioStrategic = ({
 
     // Validar si el proyecto puede ser archivado
     const validation = canArchiveProject(projectToArchive);
-    
+
     if (!validation.canArchive) {
       // Mostrar modal de validación
       const validationMessage = validation.validations.join('\n• ');
@@ -254,38 +257,38 @@ const PortfolioStrategic = ({
       archivedAt: new Date().toISOString(),
       archivedBy: 'Usuario Actual' // En un sistema real, esto vendría del contexto de usuario
     };
-    
+
     setArchivedProjects(prev => {
       const newArchived = prev.slice();
       newArchived.push(archivedProject);
       return newArchived;
     });
-    
+
     // Cambiar el estado del proyecto a 'archived'
-    const updatedProjects = projects.map(p => 
-      p.id === projectId 
-        ? { 
-            id: p.id,
-            name: p.name,
-            description: p.description,
-            startDate: p.startDate,
-            endDate: p.endDate,
-            budget: p.budget,
-            status: 'archived',
-            priority: p.priority,
-            manager: p.manager,
-            team: p.team,
-            createdAt: p.createdAt,
-            updatedAt: p.updatedAt,
-            version: p.version,
-            progress: p.progress,
-            archivedAt: new Date().toISOString()
-          }
+    const updatedProjects = projects.map(p =>
+      p.id === projectId
+        ? {
+          id: p.id,
+          name: p.name,
+          description: p.description,
+          startDate: p.startDate,
+          endDate: p.endDate,
+          budget: p.budget,
+          status: 'archived',
+          priority: p.priority,
+          manager: p.manager,
+          team: p.team,
+          createdAt: p.createdAt,
+          updatedAt: p.updatedAt,
+          version: p.version,
+          progress: p.progress,
+          archivedAt: new Date().toISOString()
+        }
         : p
     );
-    
+
     setProjects(updatedProjects);
-    
+
     // Si el proyecto archivado era el actual, cambiar a otro proyecto activo
     if (currentProjectId === projectId) {
       const activeProjects = updatedProjects.filter(p => p.status === 'active');
@@ -311,7 +314,7 @@ const PortfolioStrategic = ({
   };
 
   const getStatusColor = (status) => {
-    switch(status) {
+    switch (status) {
       case 'active': return 'bg-green-100 text-green-800 border-green-200';
       case 'inactive': return 'bg-gray-100 text-gray-600 border-gray-300';
       case 'completed': return 'bg-blue-100 text-blue-800 border-blue-200';
@@ -323,7 +326,7 @@ const PortfolioStrategic = ({
   };
 
   const getPriorityColor = (priority) => {
-    switch(priority) {
+    switch (priority) {
       case 'high': return 'bg-red-100 text-red-800 border-red-200';
       case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'low': return 'bg-green-100 text-green-800 border-green-200';
@@ -332,7 +335,7 @@ const PortfolioStrategic = ({
   };
 
   const getStatusIcon = (status) => {
-    switch(status) {
+    switch (status) {
       case 'active': return '🟢';
       case 'inactive': return '⚫';
       case 'completed': return '✅';
@@ -383,7 +386,7 @@ const PortfolioStrategic = ({
         {/* Elementos decorativos de fondo */}
         <div className="absolute top-0 right-0 w-32 h-32 bg-blue-100/30 rounded-full -translate-y-16 translate-x-16"></div>
         <div className="absolute bottom-0 left-0 w-24 h-24 bg-indigo-100/30 rounded-full translate-y-12 -translate-x-12"></div>
-        
+
         <div className="relative z-10">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
@@ -423,11 +426,10 @@ const PortfolioStrategic = ({
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 ${
-                  activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 ${activeTab === tab.id
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
               >
                 <span>{tab.icon}</span>
                 <span>{tab.name}</span>
@@ -461,44 +463,44 @@ const PortfolioStrategic = ({
 
               {/* Métricas - solo mostrar si hay proyectos */}
               {projects.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-blue-50 p-6 rounded-lg border border-blue-200">
-                  <div className="flex items-center space-x-3 mb-3">
-                    <span className="text-2xl">📊</span>
-                    <h3 className="text-lg font-semibold text-blue-800">Total Proyectos</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="bg-blue-50 p-6 rounded-lg border border-blue-200">
+                    <div className="flex items-center space-x-3 mb-3">
+                      <span className="text-2xl">📊</span>
+                      <h3 className="text-lg font-semibold text-blue-800">Total Proyectos</h3>
+                    </div>
+                    <div className="text-3xl font-bold text-blue-600 mb-2">{projects.length}</div>
+                    <div className="text-sm text-blue-600">
+                      {projects.filter(p => p.status === 'active').length} activos
+                    </div>
                   </div>
-                  <div className="text-3xl font-bold text-blue-600 mb-2">{projects.length}</div>
-                  <div className="text-sm text-blue-600">
-                    {projects.filter(p => p.status === 'active').length} activos
-                  </div>
-                </div>
 
-                <div className="bg-green-50 p-6 rounded-lg border border-green-200">
-                  <div className="flex items-center space-x-3 mb-3">
-                    <span className="text-2xl">💰</span>
-                    <h3 className="text-lg font-semibold text-green-800">Presupuesto Total</h3>
+                  <div className="bg-green-50 p-6 rounded-lg border border-green-200">
+                    <div className="flex items-center space-x-3 mb-3">
+                      <span className="text-2xl">💰</span>
+                      <h3 className="text-lg font-semibold text-green-800">Presupuesto Total</h3>
+                    </div>
+                    <div className="text-3xl font-bold text-green-600 mb-2">
+                      ${(projects.filter(p => p.status === 'active').reduce((sum, p) => sum + p.budget, 0) / 1000).toFixed(0)}K USD
+                    </div>
+                    <div className="text-sm text-green-600">
+                      Solo proyectos activos
+                    </div>
                   </div>
-                  <div className="text-3xl font-bold text-green-600 mb-2">
-                    ${(projects.filter(p => p.status === 'active').reduce((sum, p) => sum + p.budget, 0) / 1000).toFixed(0)}K USD
-                  </div>
-                  <div className="text-sm text-green-600">
-                    Solo proyectos activos
-                  </div>
-                </div>
 
-                <div className="bg-purple-50 p-6 rounded-lg border border-purple-200">
-                  <div className="flex items-center space-x-3 mb-3">
-                    <span className="text-2xl">🎯</span>
-                    <h3 className="text-lg font-semibold text-purple-800">Proyectos Prioritarios</h3>
-                  </div>
-                  <div className="text-3xl font-bold text-purple-600 mb-2">
-                    {projects.filter(p => p.priority === 'high' && p.status === 'active').length}
-                  </div>
-                  <div className="text-sm text-purple-600">
-                    Prioridad alta (activos)
+                  <div className="bg-purple-50 p-6 rounded-lg border border-purple-200">
+                    <div className="flex items-center space-x-3 mb-3">
+                      <span className="text-2xl">🎯</span>
+                      <h3 className="text-lg font-semibold text-purple-800">Proyectos Prioritarios</h3>
+                    </div>
+                    <div className="text-3xl font-bold text-purple-600 mb-2">
+                      {projects.filter(p => p.priority === 'high' && p.status === 'active').length}
+                    </div>
+                    <div className="text-sm text-purple-600">
+                      Prioridad alta (activos)
+                    </div>
                   </div>
                 </div>
-              </div>
               )}
 
               {/* Proyecto Destacado */}
@@ -512,7 +514,7 @@ const PortfolioStrategic = ({
                         <div><span className="font-medium">Nombre:</span> {currentProject.name}</div>
                         <div><span className="font-medium">Manager:</span> {currentProject.manager}</div>
                         <div><span className="font-medium">Sponsor:</span> {currentProject.sponsor}</div>
-                        <div><span className="font-medium">Estado:</span> 
+                        <div><span className="font-medium">Estado:</span>
                           <span className={`ml-2 px-2 py-1 rounded-full text-xs ${getStatusColor(currentProject.status)}`}>
                             {getStatusIcon(currentProject.status)} {currentProject.status}
                           </span>
@@ -563,7 +565,7 @@ const PortfolioStrategic = ({
 
           {/* Tab: Lista de Recursos */}
           {activeTab === 'resources' && (
-            <ResourceList 
+            <ResourceList
               globalResources={globalResources}
               setGlobalResources={setGlobalResources}
             />
@@ -586,7 +588,7 @@ const PortfolioStrategic = ({
                 }
                 return null;
               })()}
-              <WeeklyPlanningTab 
+              <WeeklyPlanningTab
                 projects={projects}
                 tasksByProject={tasksByProject}
                 minutasByProject={minutasByProject}
@@ -631,13 +633,12 @@ const PortfolioStrategic = ({
                         {projects.filter(p => p.status === 'active').map(project => {
                           const validation = canArchiveProject(project);
                           const canArchive = validation.canArchive;
-                          
+
                           return (
-                            <div key={project.id} className={`flex items-center justify-between p-4 rounded-lg border ${
-                              canArchive 
-                                ? 'bg-gray-50 border-gray-200' 
-                                : 'bg-red-50 border-red-200'
-                            }`}>
+                            <div key={project.id} className={`flex items-center justify-between p-4 rounded-lg border ${canArchive
+                              ? 'bg-gray-50 border-gray-200'
+                              : 'bg-red-50 border-red-200'
+                              }`}>
                               <div className="flex-1">
                                 <h5 className="font-medium text-gray-800">{project.name}</h5>
                                 <p className="text-sm text-gray-600">{project.description}</p>
@@ -652,7 +653,7 @@ const PortfolioStrategic = ({
                                     Creado: {new Date(project.createdAt).toLocaleDateString()}
                                   </span>
                                 </div>
-                                
+
                                 {/* Mostrar validaciones si no puede ser archivado */}
                                 {!canArchive && (
                                   <div className="mt-2 p-2 bg-red-100 rounded border border-red-200">
@@ -668,22 +669,21 @@ const PortfolioStrategic = ({
                                   </div>
                                 )}
                               </div>
-                              
+
                               <div className="ml-4 flex flex-col space-y-2">
                                 <button
                                   onClick={() => handleArchiveProject(project.id)}
                                   disabled={!canArchive}
-                                  className={`px-4 py-2 rounded-lg transition-colors flex items-center space-x-2 ${
-                                    canArchive
-                                      ? 'bg-purple-600 text-white hover:bg-purple-700'
-                                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                  }`}
+                                  className={`px-4 py-2 rounded-lg transition-colors flex items-center space-x-2 ${canArchive
+                                    ? 'bg-purple-600 text-white hover:bg-purple-700'
+                                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                    }`}
                                   title={canArchive ? 'Archivar proyecto' : 'No cumple requisitos para archivado'}
                                 >
                                   <span>📁</span>
                                   <span>Archivar</span>
                                 </button>
-                                
+
                                 {!canArchive && (
                                   <span className="text-xs text-red-600 text-center">
                                     No disponible
@@ -758,18 +758,18 @@ const PortfolioStrategic = ({
           {activeTab === 'metrics' && (
             <div className="space-y-6">
               <h3 className="text-lg font-semibold text-gray-800">Métricas del Portfolio</h3>
-              
+
               {/* Alerta Informativa */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <div className="flex items-center">
                   <div className="text-blue-600 text-xl mr-3">ℹ️</div>
                   <div className="text-blue-800 text-sm">
-                    <strong>Importante:</strong> Las métricas financieras solo consideran proyectos con estado "Activo". 
+                    <strong>Importante:</strong> Las métricas financieras solo consideran proyectos con estado "Activo".
                     Los proyectos "Inactivos" no suman al presupuesto total ni a las reservas del portfolio.
                   </div>
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="bg-white border border-gray-200 rounded-lg p-6">
                   <h4 className="font-semibold text-gray-800 mb-4">Distribución por Estado</h4>
@@ -853,7 +853,7 @@ const PortfolioStrategic = ({
                 </div>
                 <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                   <div className="text-sm text-blue-800">
-                    <strong>Nota:</strong> Las métricas financieras solo consideran proyectos con estado "Activo". 
+                    <strong>Nota:</strong> Las métricas financieras solo consideran proyectos con estado "Activo".
                     Los proyectos "Inactivos" o "Completados" no influyen en los indicadores financieros.
                   </div>
                 </div>
@@ -936,11 +936,11 @@ const PortfolioStrategic = ({
                   </h4>
                   <div className="space-y-2">
                     {(() => {
-                      const projectTasks = tasks.filter(task => 
-                        task.workPackageId === selectedArchivedProject.id || 
+                      const projectTasks = tasks.filter(task =>
+                        task.workPackageId === selectedArchivedProject.id ||
                         task.projectId === selectedArchivedProject.id
                       );
-                      
+
                       if (projectTasks.length === 0) {
                         return (
                           <p className="text-sm text-gray-500 italic">
@@ -948,7 +948,7 @@ const PortfolioStrategic = ({
                           </p>
                         );
                       }
-                      
+
                       return (
                         <div className="space-y-1">
                           <p className="text-sm text-gray-600">
@@ -974,11 +974,11 @@ const PortfolioStrategic = ({
                   </h4>
                   <div className="space-y-2">
                     {(() => {
-                      const projectAuditLogs = auditLogs.filter(log => 
-                        log.projectId === selectedArchivedProject.id || 
+                      const projectAuditLogs = auditLogs.filter(log =>
+                        log.projectId === selectedArchivedProject.id ||
                         log.workPackageId === selectedArchivedProject.id
                       );
-                      
+
                       if (projectAuditLogs.length === 0) {
                         return (
                           <p className="text-sm text-gray-500 italic">
@@ -986,7 +986,7 @@ const PortfolioStrategic = ({
                           </p>
                         );
                       }
-                      
+
                       // Agrupar por tipo de documento
                       const documentTypes = projectAuditLogs.reduce((acc, log) => {
                         const type = log.documentType || 'Otros';
@@ -994,7 +994,7 @@ const PortfolioStrategic = ({
                         acc[type].push(log);
                         return acc;
                       }, {});
-                      
+
                       return (
                         <div className="space-y-2">
                           <p className="text-sm text-gray-600 font-medium">
@@ -1031,8 +1031,8 @@ const PortfolioStrategic = ({
                   <div className="text-center">
                     <div className="text-2xl font-bold text-green-600">
                       {(() => {
-                        const projectTasks = tasks.filter(task => 
-                          task.workPackageId === selectedArchivedProject.id || 
+                        const projectTasks = tasks.filter(task =>
+                          task.workPackageId === selectedArchivedProject.id ||
                           task.projectId === selectedArchivedProject.id
                         );
                         return projectTasks.length;
@@ -1063,11 +1063,11 @@ const PortfolioStrategic = ({
                 </h4>
                 <div className="space-y-3">
                   {(() => {
-                    const projectAuditLogs = auditLogs.filter(log => 
-                      log.projectId === selectedArchivedProject.id || 
+                    const projectAuditLogs = auditLogs.filter(log =>
+                      log.projectId === selectedArchivedProject.id ||
                       log.workPackageId === selectedArchivedProject.id
                     );
-                    
+
                     if (projectAuditLogs.length === 0) {
                       return (
                         <p className="text-sm text-gray-500 italic text-center py-4">
@@ -1075,12 +1075,12 @@ const PortfolioStrategic = ({
                         </p>
                       );
                     }
-                    
+
                     // Ordenar por fecha (más reciente primero)
-                    const sortedLogs = projectAuditLogs.sort((a, b) => 
+                    const sortedLogs = projectAuditLogs.sort((a, b) =>
                       new Date(b.timestamp) - new Date(a.timestamp)
                     );
-                    
+
                     return (
                       <div className="space-y-2 max-h-64 overflow-y-auto">
                         {sortedLogs.map((log, index) => (
@@ -1091,15 +1091,14 @@ const PortfolioStrategic = ({
                                   <span className="text-sm font-medium text-gray-800">
                                     {log.documentType || 'Documento'}
                                   </span>
-                                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                    log.action === 'create' ? 'bg-green-100 text-green-800' :
+                                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${log.action === 'create' ? 'bg-green-100 text-green-800' :
                                     log.action === 'update' ? 'bg-blue-100 text-blue-800' :
-                                    log.action === 'delete' ? 'bg-red-100 text-red-800' :
-                                    'bg-gray-100 text-gray-800'
-                                  }`}>
+                                      log.action === 'delete' ? 'bg-red-100 text-red-800' :
+                                        'bg-gray-100 text-gray-800'
+                                    }`}>
                                     {log.action === 'create' ? 'Creado' :
-                                     log.action === 'update' ? 'Modificado' :
-                                     log.action === 'delete' ? 'Eliminado' : 'Acción'}
+                                      log.action === 'update' ? 'Modificado' :
+                                        log.action === 'delete' ? 'Eliminado' : 'Acción'}
                                   </span>
                                 </div>
                                 <p className="text-xs text-gray-600 mb-1">
@@ -1127,7 +1126,7 @@ const PortfolioStrategic = ({
                   <div>
                     <h5 className="font-medium text-gray-800">Proyecto Archivado</h5>
                     <p className="text-sm text-gray-600 mt-1">
-                      Este proyecto está archivado y es de solo lectura. Los datos se mantienen 
+                      Este proyecto está archivado y es de solo lectura. Los datos se mantienen
                       para consulta histórica y auditoría, pero no se puede modificar.
                     </p>
                   </div>
@@ -1146,6 +1145,12 @@ const PortfolioStrategic = ({
           </div>
         </div>
       )}
+
+      {/* Botón flotante de guardado */}
+      <FloatingSaveButton
+        onSave={onSave}
+        hasUnsavedChanges={hasUnsavedChanges}
+      />
     </div>
   );
 };

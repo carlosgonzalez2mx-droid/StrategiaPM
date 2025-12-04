@@ -128,7 +128,8 @@ const useFileStorage = (projectId) => {
               return {
                 ...file,
                 fileName: timestampMatch[1],
-                originalName: timestampMatch[1]
+                originalName: timestampMatch[1],
+                description: file.description || '' // ✅ PRESERVAR DESCRIPCIÓN
               };
             }
           }
@@ -211,9 +212,9 @@ const useFileStorage = (projectId) => {
               ...file,
               fileName: displayName,
               originalName: displayName,
-              mimeType: file.metadata?.mimeType || 'application/octet-stream',
-              description: file.metadata?.description || '',
-              relatedItemId: file.metadata?.relatedItemId || null,
+              mimeType: file.metadata?.mimeType || file.mimeType || 'application/octet-stream',
+              description: file.description || file.metadata?.description || '', // ✅ CORRECCIÓN: description está en nivel superior
+              relatedItemId: file.relatedItemId || file.metadata?.relatedItemId || null,
               content: file.publicUrl,
               fileExtension: displayName.split('.').pop()?.toLowerCase() || ''
             };
@@ -314,6 +315,12 @@ const useFileStorage = (projectId) => {
             storageProvider: 'local'
           }
         };
+
+        console.log('📝 DEBUG - Archivo creado con descripción:', {
+          fileName: newFile.fileName,
+          description: newFile.description,
+          hasDescription: !!newFile.description
+        });
 
         const updatedFiles = [...files, newFile];
         setFiles(updatedFiles);

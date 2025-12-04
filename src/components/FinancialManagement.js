@@ -235,6 +235,7 @@ const FinancialManagement = ({
     const safePurchaseOrders = Array.isArray(purchaseOrders) ? purchaseOrders : [];
     const safeAdvances = Array.isArray(advances) ? advances : [];
     const safeInvoices = Array.isArray(invoices) ? invoices : [];
+    const safeTasks = Array.isArray(scheduleData?.tasks) ? scheduleData.tasks : [];
 
     logger.debug('🔍 FINANCIAL METRICS DEBUG:', {
       purchaseOrdersType: typeof purchaseOrders,
@@ -245,7 +246,8 @@ const FinancialManagement = ({
       advancesLength: safeAdvances.length,
       invoicesType: typeof invoices,
       invoicesIsArray: Array.isArray(invoices),
-      invoicesLength: safeInvoices.length
+      invoicesLength: safeInvoices.length,
+      tasksLength: safeTasks.length
     });
 
     const totalPO = safePurchaseOrders.reduce((sum, po) => sum + (po.totalAmount || 0), 0);
@@ -254,11 +256,30 @@ const FinancialManagement = ({
     const paidInvoices = safeInvoices.filter(inv => inv.status === 'paid').reduce((sum, inv) => sum + (inv.amount || 0), 0);
     const pendingInvoices = totalInvoices - paidInvoices;
 
-    // Métricas EVM completas
+    // ✅ CORRECCIÓN: Calcular EV y PV desde las tareas del cronograma (PMBOK correcto)
     const BAC = currentProject?.budget || 0;
-    const AC = totalInvoices; // Costo real incurrido
-    const EV = paidInvoices; // Valor ganado (facturas pagadas)
-    const PV = totalPO + totalAdvances; // Valor planificado (órdenes de compra + anticipos)
+
+    // PV (Planned Value): Valor planificado basado en el costo de las tareas
+    const PV = safeTasks.reduce((sum, task) => sum + (task.cost || 0), 0);
+
+    // EV (Earned Value): Valor ganado basado en el progreso de las tareas
+    const EV = safeTasks.reduce((sum, task) => {
+      const taskCost = task.cost || 0;
+      const taskProgress = task.progress || 0;
+      return sum + (taskCost * (taskProgress / 100));
+    }, 0);
+
+    // AC (Actual Cost): Costo real incurrido (facturas pagadas)
+    const AC = paidInvoices;
+
+    logger.debug('📊 PMBOK METRICS CALCULATION:', {
+      BAC,
+      PV_fromTasks: PV,
+      EV_fromTasks: EV,
+      AC_fromInvoices: AC,
+      tasksWithCost: safeTasks.filter(t => t.cost > 0).length,
+      totalTaskCost: PV
+    });
 
     // Incluir contratos en las métricas
     const totalContracts = contracts.reduce((sum, contract) => sum + (contract.value || 0), 0);
@@ -287,7 +308,7 @@ const FinancialManagement = ({
       committedBudget: totalPO + totalAdvances + activeContracts,
       availableBudget: BAC - (totalPO + totalAdvances + activeContracts),
 
-      // Métricas EVM completas
+      // Métricas EVM completas (ahora calculadas desde tareas del cronograma)
       BAC,
       AC,
       EV,
@@ -311,7 +332,7 @@ const FinancialManagement = ({
       totalReserves: calculateContingencyReserve() + calculateManagementReserve(),
       totalProjectBudget: (currentProject?.budget || 0) + calculateContingencyReserve() + calculateManagementReserve()
     };
-  }, [purchaseOrders, advances, invoices, contracts, currentProject, risks]);
+  }, [purchaseOrders, advances, invoices, contracts, currentProject, risks, scheduleData]);
 
   // ===== MÉTRICAS DE VALOR ENTREGADO (PMBOK 7 - Value Principle) =====
   const valueMetrics = useMemo(() => {
@@ -704,8 +725,18 @@ const FinancialManagement = ({
                 EAC (Estimación Final)
                 <span className="ml-1 text-purple-500 cursor-help" title="Estimate at Completion: Estimación del costo total al terminar">❓</span>
               </div>
-              <div className="text-2xl font-bold text-purple-600">
-                ${(financialMetrics.EAC / 1000).toFixed(0)}K
+              <div className="flex items-center space-x-2 mb-1">
+                <div className="text-2xl font-bold text-purple-600">
+                  ${(financialMetrics.EAC / 1000).toFixed(0)}K
+                </div>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${financialMetrics.EAC <= financialMetrics.BAC ? 'bg-green-100 text-green-800' :
+                    financialMetrics.EAC <= financialMetrics.BAC * 1.1 ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-red-100 text-red-800'
+                  }`}>
+                  {financialMetrics.EAC <= financialMetrics.BAC ? '✅ Dentro' :
+                    financialMetrics.EAC <= financialMetrics.BAC * 1.1 ? '⚠️ Cercano' :
+                      '❌ Excedido'}
+                </span>
               </div>
             </div>
             <div className="text-purple-500 text-2xl">🎯</div>
@@ -722,8 +753,18 @@ const FinancialManagement = ({
                 CPI
                 <span className="ml-1 text-blue-500 cursor-help" title="Cost Performance Index: EV/AC">❓</span>
               </div>
-              <div className={`text-2xl font-bold ${financialMetrics.CPI >= 1 ? 'text-green-600' : 'text-red-600'}`}>
-                {financialMetrics.CPI.toFixed(2)}
+              <div className="flex items-center space-x-2 mb-1">
+                <div className={`text-2xl font-bold ${financialMetrics.CPI >= 1 ? 'text-green-600' : 'text-red-600'}`}>
+                  {financialMetrics.CPI.toFixed(2)}
+                </div>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${financialMetrics.CPI >= 1.0 ? 'bg-green-100 text-green-800' :
+                    financialMetrics.CPI >= 0.9 ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-red-100 text-red-800'
+                  }`}>
+                  {financialMetrics.CPI >= 1.0 ? '✅ Excelente' :
+                    financialMetrics.CPI >= 0.9 ? '⚠️ Aceptable' :
+                      '❌ Deficiente'}
+                </span>
               </div>
               <div className="text-xs text-gray-600">Cost Performance</div>
             </div>
@@ -738,8 +779,18 @@ const FinancialManagement = ({
                 SPI
                 <span className="ml-1 text-orange-500 cursor-help" title="Schedule Performance Index: EV/PV">❓</span>
               </div>
-              <div className={`text-2xl font-bold ${financialMetrics.SPI >= 1 ? 'text-green-600' : 'text-red-600'}`}>
-                {financialMetrics.SPI.toFixed(2)}
+              <div className="flex items-center space-x-2 mb-1">
+                <div className={`text-2xl font-bold ${financialMetrics.SPI >= 1 ? 'text-green-600' : 'text-red-600'}`}>
+                  {financialMetrics.SPI.toFixed(2)}
+                </div>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${financialMetrics.SPI >= 1.0 ? 'bg-green-100 text-green-800' :
+                    financialMetrics.SPI >= 0.9 ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-red-100 text-red-800'
+                  }`}>
+                  {financialMetrics.SPI >= 1.0 ? '✅ A tiempo' :
+                    financialMetrics.SPI >= 0.9 ? '⚠️ Leve retraso' :
+                      '❌ Retrasado'}
+                </span>
               </div>
               <div className="text-xs text-gray-600">Schedule Performance</div>
             </div>
@@ -754,8 +805,18 @@ const FinancialManagement = ({
                 VAC
                 <span className="ml-1 text-red-500 cursor-help" title="Variance at Completion: BAC-EAC">❓</span>
               </div>
-              <div className={`text-2xl font-bold ${financialMetrics.VAC >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                ${(financialMetrics.VAC / 1000).toFixed(0)}K
+              <div className="flex items-center space-x-2 mb-1">
+                <div className={`text-2xl font-bold ${financialMetrics.VAC >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  ${(financialMetrics.VAC / 1000).toFixed(0)}K
+                </div>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${financialMetrics.VAC > 0 ? 'bg-green-100 text-green-800' :
+                    financialMetrics.VAC === 0 ? 'bg-blue-100 text-blue-800' :
+                      'bg-red-100 text-red-800'
+                  }`}>
+                  {financialMetrics.VAC > 0 ? '✅ Bajo presupuesto' :
+                    financialMetrics.VAC === 0 ? '✓ En presupuesto' :
+                      '❌ Sobre presupuesto'}
+                </span>
               </div>
               <div className="text-xs text-gray-600">Variance at Completion</div>
             </div>
@@ -770,8 +831,21 @@ const FinancialManagement = ({
                 TCPI
                 <span className="ml-1 text-teal-500 cursor-help" title="To Complete Performance Index">❓</span>
               </div>
-              <div className="text-2xl font-bold text-gray-800">
-                {financialMetrics.TCPI.toFixed(2)}
+              <div className="flex items-center space-x-2 mb-1">
+                <div className={`text-2xl font-bold ${financialMetrics.TCPI <= 1.0 ? 'text-green-600' :
+                    financialMetrics.TCPI <= 1.1 ? 'text-yellow-600' :
+                      'text-red-600'
+                  }`}>
+                  {financialMetrics.TCPI.toFixed(2)}
+                </div>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${financialMetrics.TCPI <= 1.0 ? 'bg-green-100 text-green-800' :
+                    financialMetrics.TCPI <= 1.1 ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-red-100 text-red-800'
+                  }`}>
+                  {financialMetrics.TCPI <= 1.0 ? '✅ Alcanzable' :
+                    financialMetrics.TCPI <= 1.1 ? '⚠️ Desafiante' :
+                      '❌ Difícil'}
+                </span>
               </div>
               <div className="text-xs text-gray-600">To Complete Performance</div>
             </div>

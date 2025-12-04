@@ -1201,6 +1201,281 @@ class SupabaseService {
     }
   }
 
+  /**
+   * Preparar datos de tablas limpias para guardado atómico
+   * Solo para: projects, tasks, contracts, resources, resource_assignments
+   */
+  prepareCleanTablesForAtomic(data) {
+    const cleanData = {};
+
+    // 1. PROJECTS (31 campos)
+    if (data.projects && data.projects.length > 0) {
+      cleanData.projects = data.projects.map(project => ({
+        id: project.id,
+        name: project.name || '',
+        description: project.description || '',
+        status: project.status || 'active',
+        budget: project.budget || 0,
+        start_date: project.startDate || project.start_date || null,
+        end_date: project.endDate || project.end_date || null,
+        manager: project.manager || '',
+        sponsor: project.sponsor || '',
+        priority: project.priority || 'medium',
+        progress: project.progress || 0,
+        organization_id: this.organizationId,
+        created_at: project.createdAt || project.created_at || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        business_case: project.businessCase || project.business_case || '',
+        objective: project.objective || '',
+        irr: project.irr || 0,
+        roi: project.roi || 0,
+        kickoff_date: project.kickoffDate || project.kickoff_date || null,
+        stakeholders: project.stakeholders || [],
+        contingency_reserve: project.contingencyReserve || project.contingency_reserve || 0,
+        management_reserve: project.managementReserve || project.management_reserve || 0,
+        health: project.health || null,
+        category: project.category || null,
+        is_archived: project.isArchived || project.is_archived || false,
+        is_template: project.isTemplate || project.is_template || false,
+        owner_id: project.ownerId || project.owner_id || this.currentUser.id,
+        team: project.team || [],
+        version: project.version || '1.0.0',
+        planned_value: project.plannedValue || project.planned_value || 0,
+        period: project.period || 3
+      }));
+    }
+
+    // 2. TASKS (24 campos) - Flatten from tasksByProject
+    if (data.tasksByProject) {
+      const allTasks = [];
+
+      for (const projectId in data.tasksByProject) {
+        const tasks = data.tasksByProject[projectId] || [];
+
+        tasks.forEach(task => {
+          // Generar UUID válido si el ID no es un UUID
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+          const taskId = uuidRegex.test(task.id)
+            ? task.id
+            : this.generateDeterministicId(projectId, task.wbsCode || task.id);
+
+          allTasks.push({
+            id: taskId,
+            project_id: projectId,
+            name: task.name || '',
+            description: task.description || '',
+            start_date: task.startDate || task.start_date || null,
+            end_date: task.endDate || task.end_date || null,
+            duration: task.duration || 0,
+            progress: task.progress || 0,
+            priority: task.priority || 'medium',
+            assigned_to: task.assignedTo || task.assigned_to || null,
+            cost: task.cost || 0,
+            is_milestone: task.isMilestone || task.is_milestone || false,
+            created_at: task.createdAt || task.created_at || new Date().toISOString(),
+            wbs_code: task.wbsCode || task.wbs_code || null,
+            predecessors: task.predecessors || [],
+            successors: task.successors || [],
+            is_critical: task.isCritical || task.is_critical || false,
+            original_duration: task.originalDuration || task.original_duration || null,
+            resources: task.resources || [],
+            status: task.status || 'pending',
+            owner_id: this.currentUser.id,
+            organization_id: this.organizationId,
+            business_value: task.businessValue || task.business_value || 0,
+            updated_at: new Date().toISOString()
+          });
+        });
+      }
+
+      cleanData.tasks = allTasks;
+    }
+
+    // 3. CONTRACTS (13 campos) - Flatten from contractsByProject
+    if (data.contractsByProject) {
+      const allContracts = [];
+
+      for (const projectId in data.contractsByProject) {
+        const contracts = data.contractsByProject[projectId] || [];
+
+        contracts.forEach(contract => {
+          allContracts.push({
+            id: contract.id,
+            project_id: projectId,
+            contract_number: contract.contractNumber || contract.contract_number || '',
+            vendor: contract.vendor || '',
+            amount: contract.amount || 0,
+            status: contract.status || 'active',
+            start_date: contract.startDate || contract.start_date || null,
+            end_date: contract.endDate || contract.end_date || null,
+            description: contract.description || '',
+            owner_id: this.currentUser.id,
+            created_at: contract.createdAt || contract.created_at || new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+        });
+      }
+
+      cleanData.contracts = allContracts;
+    }
+
+    // 4. RESOURCES (10 campos)
+    if (data.resources && data.resources.length > 0) {
+      cleanData.resources = data.resources.map(resource => ({
+        id: resource.id,
+        name: resource.name || '',
+        email: resource.email || null,
+        role: resource.role || null,
+        skills: resource.skills || [],
+        availability: resource.availability || 100,
+        hourly_rate: resource.hourlyRate || resource.hourly_rate || 0,
+        created_at: resource.createdAt || resource.created_at || new Date().toISOString()
+      }));
+    }
+
+    // 5. RESOURCE_ASSIGNMENTS (11 campos) - Flatten from resourceAssignmentsByProject
+    if (data.resourceAssignmentsByProject) {
+      const allAssignments = [];
+
+      for (const projectId in data.resourceAssignmentsByProject) {
+        const assignments = data.resourceAssignmentsByProject[projectId] || [];
+
+        assignments.forEach(assignment => {
+          allAssignments.push({
+            id: assignment.id,
+            project_id: projectId,
+            resource_id: assignment.resourceId || assignment.resource_id,
+            role: assignment.role || null,
+            start_date: assignment.startDate || assignment.start_date || null,
+            end_date: assignment.endDate || assignment.end_date || null,
+            hours_per_week: assignment.hoursPerWeek || assignment.hours_per_week || 40,
+            hourly_rate: assignment.hourlyRate || assignment.hourly_rate || 0,
+            created_at: assignment.createdAt || assignment.created_at || new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+        });
+      }
+
+      cleanData.resource_assignments = allAssignments;
+    }
+
+    // 6. RISKS (12 campos limpios)
+    if (data.risksByProject) {
+      const allRisks = [];
+
+      for (const projectId in data.risksByProject) {
+        const risks = data.risksByProject[projectId] || [];
+
+        risks.forEach(risk => {
+          allRisks.push({
+            id: risk.id || crypto.randomUUID(),
+            project_id: projectId,
+            name: risk.name || '',
+            description: risk.description || '',
+            probability: risk.probability || 'medium',
+            impact: risk.impact || 'medium',
+            status: risk.status || 'active',
+            mitigation_plan: risk.mitigationPlan || risk.mitigation_plan || '',
+            owner_id: this.currentUser.id,
+            organization_id: this.organizationId,
+            created_at: risk.createdAt || risk.created_at || new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+        });
+      }
+
+      cleanData.risks = allRisks;
+    }
+
+    // 7. PURCHASE_ORDERS (13 campos limpios)
+    if (data.purchaseOrdersByProject) {
+      const allPOs = [];
+
+      for (const projectId in data.purchaseOrdersByProject) {
+        const pos = data.purchaseOrdersByProject[projectId] || [];
+
+        pos.forEach(po => {
+          allPOs.push({
+            id: po.id || crypto.randomUUID(),
+            project_id: projectId,
+            po_number: po.poNumber || po.po_number || null,
+            vendor: po.vendor || null,
+            amount: po.amount || 0,
+            status: po.status || 'pending',
+            order_date: po.orderDate || po.order_date || null,
+            delivery_date: po.deliveryDate || po.delivery_date || null,
+            description: po.description || '',
+            owner_id: this.currentUser.id,
+            organization_id: this.organizationId,
+            created_at: po.createdAt || po.created_at || new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+        });
+      }
+
+      cleanData.purchase_orders = allPOs;
+    }
+
+    // 8. ADVANCES (12 campos limpios)
+    if (data.advancesByProject) {
+      const allAdvances = [];
+
+      for (const projectId in data.advancesByProject) {
+        const advances = data.advancesByProject[projectId] || [];
+
+        advances.forEach(advance => {
+          allAdvances.push({
+            id: advance.id || crypto.randomUUID(),
+            project_id: projectId,
+            advance_number: advance.advanceNumber || advance.advance_number || null,
+            amount: advance.amount || 0,
+            status: advance.status || 'pending',
+            request_date: advance.requestDate || advance.request_date || null,
+            approval_date: advance.approvalDate || advance.approval_date || null,
+            description: advance.description || '',
+            owner_id: this.currentUser.id,
+            organization_id: this.organizationId,
+            created_at: advance.createdAt || advance.created_at || new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+        });
+      }
+
+      cleanData.advances = allAdvances;
+    }
+
+    // 9. INVOICES (13 campos limpios)
+    if (data.invoicesByProject) {
+      const allInvoices = [];
+
+      for (const projectId in data.invoicesByProject) {
+        const invoices = data.invoicesByProject[projectId] || [];
+
+        invoices.forEach(invoice => {
+          allInvoices.push({
+            id: invoice.id || crypto.randomUUID(),
+            project_id: projectId,
+            invoice_number: invoice.invoiceNumber || invoice.invoice_number || null,
+            vendor: invoice.vendor || null,
+            amount: invoice.amount || 0,
+            status: invoice.status || 'pending',
+            invoice_date: invoice.invoiceDate || invoice.invoice_date || null,
+            due_date: invoice.dueDate || invoice.due_date || null,
+            description: invoice.description || '',
+            owner_id: this.currentUser.id,
+            organization_id: this.organizationId,
+            created_at: invoice.createdAt || invoice.created_at || new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+        });
+      }
+
+      cleanData.invoices = allInvoices;
+    }
+
+    return cleanData;
+  }
+
   // Guardar datos del portafolio
   async savePortfolioData(data) {
     if (!this.currentUser || !this.organizationId) {
@@ -1227,347 +1502,55 @@ class SupabaseService {
     window.dispatchEvent(syncStartEvent);
 
     try {
+      // ========================================
+      // GUARDADO HÍBRIDO: Atómico para tablas limpias
+      // ========================================
 
-      // Guardar/actualizar proyectos
-      if (data.projects && data.projects.length > 0) {
-        const projectsToUpsert = data.projects.map(project => {
-          // Función para validar y corregir fechas
-          const validateDate = (dateString) => {
-            if (!dateString) return null;
+      supabaseLogger.save('💾 Usando guardado atómico híbrido...');
 
-            try {
-              // Intentar parsear la fecha
-              const date = new Date(dateString);
+      // 1. Preparar datos de tablas limpias
+      const cleanData = this.prepareCleanTablesForAtomic(data);
 
-              // Verificar si la fecha es válida
-              if (isNaN(date.getTime())) {
-                supabaseLogger.warning(`⚠️ Fecha inválida detectada: ${dateString}`);
-                return null;
-              }
+      supabaseLogger.data('📦 Datos preparados para guardado atómico:', {
+        projects: cleanData.projects?.length || 0,
+        tasks: cleanData.tasks?.length || 0,
+        contracts: cleanData.contracts?.length || 0,
+        resources: cleanData.resources?.length || 0,
+        resource_assignments: cleanData.resource_assignments?.length || 0,
+        risks: cleanData.risks?.length || 0,
+        purchase_orders: cleanData.purchase_orders?.length || 0,
+        advances: cleanData.advances?.length || 0,
+        invoices: cleanData.invoices?.length || 0
+      });
 
-              // Verificar si la fecha está en un rango razonable (1900-2100)
-              const year = date.getFullYear();
-              if (year < 1900 || year > 2100) {
-                supabaseLogger.warning(`⚠️ Año fuera de rango: ${year} en fecha ${dateString}`);
-                return null;
-              }
-
-              // Retornar en formato ISO
-              return date.toISOString().split('T')[0];
-            } catch (error) {
-              supabaseLogger.warning(`⚠️ Error procesando fecha ${dateString}:`, error);
-              return null;
-            }
-          };
-
-          return {
-            id: project.id,
-            name: project.name,
-            description: project.description,
-            status: project.status,
-            priority: project.priority,
-            budget: project.budget,
-            manager: project.manager,
-            sponsor: project.sponsor || '',
-            objective: project.objective || '',
-            business_case: project.businessCase || project.business_case || '',
-            irr: project.irr || 0,
-            roi: project.roi || 0,
-            period: project.period || 3,
-            planned_value: project.plannedValue || project.planned_value || 0,
-            contingency_reserve: project.contingencyReserve || project.contingency_reserve || 0,
-            management_reserve: project.managementReserve || project.management_reserve || 0,
-            kickoff_date: validateDate(project.kickoffDate || project.kickoff_date),
-            stakeholders: project.stakeholders || [],
-            team: project.team || [],
-            progress: project.progress || 0,
-            version: project.version || '1.0.0',
-            organization_id: this.organizationId,
-            owner_id: this.currentUser.id,
-            updated_at: new Date().toISOString(),
-            // Validar fechas antes de enviar - CORREGIDO: usar ambos nombres para compatibilidad
-            start_date: validateDate(project.startDate || project.start_date),
-            end_date: validateDate(project.endDate || project.end_date),
-            created_at: validateDate(project.createdAt || project.created_at) || new Date().toISOString()
-          };
+      // 2. Llamar función atómica COMPLETA (9 tablas)
+      const { data: atomicResult, error: atomicError } = await this.supabase
+        .rpc('save_portfolio_atomic_full', {
+          p_user_id: this.currentUser.id,
+          p_organization_id: this.organizationId,
+          p_data: cleanData
         });
 
-        const { error: projectsError } = await this.supabase
-          .from('projects')
-          .upsert(projectsToUpsert, { onConflict: 'id' });
-
-        if (projectsError) throw projectsError;
-        supabaseLogger.success(' Proyectos guardados');
+      if (atomicError) {
+        supabaseLogger.error('❌ Error en guardado atómico:', atomicError);
+        throw atomicError;
       }
 
-      // Guardar/actualizar tareas
-      for (const projectId in data.tasksByProject) {
-        const tasks = data.tasksByProject[projectId];
-        if (tasks && tasks.length > 0) {
-          // Validar que no haya tareas duplicadas por ID
-          const taskIds = new Set();
-          const uniqueTasks = [];
-          let duplicatesFound = 0;
-
-          for (const task of tasks) {
-            if (taskIds.has(task.id)) {
-              supabaseLogger.warning(`⚠️ Tarea duplicada detectada en Supabase: ${task.id} - ${task.name}`);
-              duplicatesFound++;
-            } else {
-              taskIds.add(task.id);
-              uniqueTasks.push(task);
-            }
-          }
-
-          if (duplicatesFound > 0) {
-            supabaseLogger.warning(`⚠️ Se encontraron ${duplicatesFound} tareas duplicadas en Supabase, eliminando duplicados...`);
-          }
-
-          const tasksToProcess = uniqueTasks;
-          const tasksToUpsert = tasksToProcess.map(task => {
-            // Generar UUID válido si el ID no es un UUID
-            const generateUUID = () => {
-              return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-                const r = Math.random() * 16 | 0;
-                const v = c === 'x' ? r : (r & 0x3 | 0x8);
-                return v.toString(16);
-              });
-            };
-
-            // Verificar si el ID es un UUID válido
-            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-            const taskId = uuidRegex.test(task.id)
-              ? task.id
-              : this.generateDeterministicId(projectId, task.wbsCode || task.id || generateUUID());
-
-            // Log si se generó un nuevo UUID
-            if (taskId !== task.id) {
-              supabaseLogger.data(`🔄 Generando nuevo UUID para tarea "${task.name}": ${task.id} → ${taskId}`);
-            }
-
-            // Función para validar fechas de tareas
-            const validateTaskDate = (dateString) => {
-              if (!dateString) return null;
-
-              try {
-                const date = new Date(dateString);
-                if (isNaN(date.getTime())) {
-                  supabaseLogger.warning(`⚠️ Fecha inválida en tarea: ${dateString}`);
-                  return null;
-                }
-                return date.toISOString().split('T')[0];
-              } catch (error) {
-                supabaseLogger.warning(`⚠️ Error procesando fecha de tarea ${dateString}:`, error);
-                return null;
-              }
-            };
-
-            // Crear objeto limpio solo con campos válidos para Supabase
-            const cleanTask = {
-              id: taskId,
-              name: task.name,
-              description: task.description,
-              duration: task.duration,
-              progress: task.progress || 0,
-              priority: task.priority,
-              cost: task.cost || 0,
-              predecessors: task.predecessors || [],
-              successors: task.successors || [],
-              resources: task.resources || [],
-              status: task.status || 'pending',
-              project_id: projectId,
-              owner_id: this.currentUser.id,
-              // Convertir nombres de columnas de camelCase a snake_case
-              wbs_code: task.wbsCode || task.wbs_code,
-              start_date: validateTaskDate(task.startDate || task.start_date),
-              end_date: validateTaskDate(task.endDate || task.end_date),
-              assigned_to: task.assignedTo || task.assigned_to,
-              is_milestone: task.isMilestone || task.is_milestone || false,
-              original_duration: task.originalDuration || task.original_duration
-            };
-
-            // Remover campos undefined o null
-            Object.keys(cleanTask).forEach(key => {
-              if (cleanTask[key] === undefined || cleanTask[key] === null) {
-                delete cleanTask[key];
-              }
-            });
-
-            return cleanTask;
-          });
-
-          supabaseLogger.data(`📋 Enviando ${tasksToUpsert.length} tareas a Supabase para proyecto ${projectId}`);
-          supabaseLogger.data(`📋 Primera tarea de ejemplo:`, tasksToUpsert[0]);
-
-          // VERIFICAR DUPLICADOS ANTES DE ENVIAR
-          const taskIdsToVerify = new Set();
-          const duplicateIds = [];
-          tasksToUpsert.forEach(task => {
-            if (taskIdsToVerify.has(task.id)) {
-              duplicateIds.push(task.id);
-            } else {
-              taskIdsToVerify.add(task.id);
-            }
-          });
-
-          if (duplicateIds.length > 0) {
-            supabaseLogger.error(`🚨 DUPLICADOS DETECTADOS ANTES DE ENVIAR A SUPABASE:`, duplicateIds);
-            supabaseLogger.error(`🚨 Total duplicados: ${duplicateIds.length} de ${tasksToUpsert.length} tareas`);
-          }
-
-          // UPSERT: Actualiza si existe, inserta si es nuevo
-          supabaseLogger.data(`📝 Guardando ${tasksToUpsert.length} tareas con UPSERT para proyecto ${projectId}...`);
-
-          // Primero, obtener las tareas existentes para preservar datos no modificados
-          const { data: existingTasks, error: fetchError } = await this.supabase
-            .from('tasks')
-            .select('id')
-            .eq('project_id', projectId);
-
-          if (fetchError) {
-            supabaseLogger.warning('⚠️ No se pudieron verificar tareas existentes:', fetchError);
-          }
-
-          // Marcar tareas para eliminación (las que ya no están en el array nuevo)
-          const newTaskIds = new Set(tasksToUpsert.map(t => t.id));
-          const existingTaskIds = new Set((existingTasks || []).map(t => t.id));
-          const tasksToDelete = Array.from(existingTaskIds).filter(id => !newTaskIds.has(id));
-
-          // Eliminar tareas que ya no existen
-          if (tasksToDelete.length > 0) {
-            supabaseLogger.data(`🗑️ Eliminando ${tasksToDelete.length} tareas que ya no están en el cronograma`);
-            const { error: deleteError } = await this.supabase
-              .from('tasks')
-              .delete()
-              .in('id', tasksToDelete);
-
-            if (deleteError) {
-              supabaseLogger.error(' Error eliminando tareas obsoletas:', deleteError);
-            }
-          }
-
-          // UPSERT las tareas actuales
-          const { data: upsertedTasks, error: tasksError } = await this.supabase
-            .from('tasks')
-            .upsert(tasksToUpsert, {
-              onConflict: 'id',
-              ignoreDuplicates: false
-            })
-            .select('id, name');
-
-          if (tasksError) {
-            supabaseLogger.error(`❌ Error en UPSERT de tareas para proyecto ${projectId}:`, tasksError);
-            supabaseLogger.error(`❌ Detalles del error:`, {
-              code: tasksError.code,
-              message: tasksError.message,
-              details: tasksError.details,
-              hint: tasksError.hint
-            });
-          } else {
-            supabaseLogger.data(`✅ UPSERT exitoso: ${upsertedTasks?.length || 0} tareas actualizadas/creadas`);
-
-            // VERIFICAR SI SUPABASE DUPLICÓ LAS TAREAS
-            try {
-              // Esperar un momento para que se complete la transacción
-              await new Promise(resolve => setTimeout(resolve, 500));
-
-              const { data: savedTasks, error: verifyError } = await this.supabase
-                .from('tasks')
-                .select('id, name, created_at')
-                .eq('project_id', projectId)
-                .order('created_at', { ascending: false });
-
-              if (!verifyError && savedTasks) {
-                const savedCount = savedTasks.length;
-                const expectedCount = tasksToUpsert.length;
-
-                if (savedCount !== expectedCount) {
-                  supabaseLogger.error(`🚨 DUPLICACIÓN DETECTADA EN SUPABASE!`);
-                  supabaseLogger.error(`🚨 Esperadas: ${expectedCount}, Guardadas: ${savedCount}`);
-                  supabaseLogger.error(`🚨 Diferencia: ${savedCount - expectedCount} tareas duplicadas`);
-
-                  // Detectar duplicados por ID
-                  const taskIds = new Set();
-                  const duplicates = [];
-                  savedTasks.forEach(task => {
-                    if (taskIds.has(task.id)) {
-                      duplicates.push(task);
-                    } else {
-                      taskIds.add(task.id);
-                    }
-                  });
-
-                  if (duplicates.length > 0) {
-                    supabaseLogger.error(`🚨 TAREAS DUPLICADAS POR ID:`, duplicates.slice(0, 5));
-                  }
-
-                  // Detectar duplicados por nombre
-                  const nameCounts = {};
-                  savedTasks.forEach(task => {
-                    nameCounts[task.name] = (nameCounts[task.name] || 0) + 1;
-                  });
-
-                  const duplicateNames = Object.entries(nameCounts)
-                    .filter(([name, count]) => count > 1)
-                    .slice(0, 5);
-
-                  if (duplicateNames.length > 0) {
-                    supabaseLogger.error(`🚨 TAREAS DUPLICADAS POR NOMBRE:`, duplicateNames);
-                  }
-
-                } else {
-                  supabaseLogger.data(`✅ Verificación exitosa: ${savedCount} tareas en Supabase`);
-                }
-              } else {
-                supabaseLogger.warning(`⚠️ Error verificando tareas guardadas:`, verifyError);
-              }
-            } catch (verifyError) {
-              supabaseLogger.warning(`⚠️ Error verificando tareas guardadas:`, verifyError);
-            }
-          }
-        }
+      if (!atomicResult?.success) {
+        supabaseLogger.error('❌ Guardado atómico falló:', atomicResult);
+        throw new Error(atomicResult?.error || 'Error desconocido en guardado atómico');
       }
 
-      // Guardar/actualizar riesgos
-      for (const projectId in data.risksByProject) {
-        const risks = data.risksByProject[projectId];
-        if (risks && risks.length > 0) {
-          const risksToUpsert = risks.map(risk => ({
-            ...risk,
-            project_id: projectId,
-            owner_id: this.currentUser.id,
-            updated_at: new Date().toISOString()
-          }));
+      supabaseLogger.success('✅ Guardado atómico completo exitoso (9 tablas)');
+      supabaseLogger.data('📊 Registros guardados:', atomicResult.counts);
 
-          const { error: risksError } = await this.supabase
-            .from('risks')
-            .upsert(risksToUpsert, { onConflict: 'id' });
+      // ========================================
+      // GUARDADO ADICIONAL: Alertas corporativas
+      // ========================================
 
-          if (risksError) {
-            supabaseLogger.warning(`⚠️ Error guardando riesgos para proyecto ${projectId}:`, risksError);
-          }
-        }
-      }
+      supabaseLogger.save('💾 Guardando alertas corporativas...');
 
-      // Guardar/actualizar recursos globales
-      if (data.globalResources && data.globalResources.length > 0) {
-        const resourcesToUpsert = data.globalResources.map(resource => ({
-          ...resource,
-          organization_id: this.organizationId,
-          owner_id: this.currentUser.id,
-          updated_at: new Date().toISOString()
-        }));
-
-        const { error: resourcesError } = await this.supabase
-          .from('resources')
-          .upsert(resourcesToUpsert, { onConflict: 'id' });
-
-        if (resourcesError) {
-          supabaseLogger.warning('⚠️ Error guardando recursos:', resourcesError);
-        }
-      }
-
-      // Guardar/actualizar alertas corporativas
+      // Guardar/actualizar alertas corporativas (no incluidas en atomic)
       if (data.corporateAlerts && data.corporateAlerts.length > 0) {
         const alertsToUpsert = data.corporateAlerts.map(alert => ({
           ...alert,
@@ -1582,124 +1565,6 @@ class SupabaseService {
 
         if (alertsError) {
           supabaseLogger.warning('⚠️ Error guardando alertas:', alertsError);
-        }
-      }
-
-      // Guardar/actualizar órdenes de compra
-      for (const projectId in data.purchaseOrdersByProject) {
-        const purchaseOrders = data.purchaseOrdersByProject[projectId];
-        if (purchaseOrders && purchaseOrders.length > 0) {
-          const poToUpsert = purchaseOrders.map(po => {
-            // Limpiar strings vacíos para columnas de fecha
-            const cleanedPo = { ...po };
-
-            // Convertir strings vacíos a null para columnas de fecha
-            const dateFields = ['requestDate', 'approvalDate', 'expectedDate'];
-            dateFields.forEach(field => {
-              if (cleanedPo[field] === '' || cleanedPo[field] === null || cleanedPo[field] === undefined) {
-                cleanedPo[field] = null;
-              }
-            });
-
-            return {
-              ...cleanedPo,
-              project_id: projectId,
-              owner_id: this.currentUser.id,
-              updated_at: new Date().toISOString()
-            };
-          });
-
-          const { error: poError } = await this.supabase
-            .from('purchase_orders')
-            .upsert(poToUpsert, { onConflict: 'id' });
-
-          if (poError) {
-            supabaseLogger.warning(`⚠️ Error guardando órdenes de compra para proyecto ${projectId}:`, poError);
-          }
-        }
-      }
-
-      // Guardar/actualizar anticipos
-      for (const projectId in data.advancesByProject) {
-        const advances = data.advancesByProject[projectId];
-        if (advances && advances.length > 0) {
-          const advancesToUpsert = advances.map(advance => ({
-            ...advance,
-            project_id: projectId,
-            owner_id: this.currentUser.id,
-            updated_at: new Date().toISOString()
-          }));
-
-          const { error: advancesError } = await this.supabase
-            .from('advances')
-            .upsert(advancesToUpsert, { onConflict: 'id' });
-
-          if (advancesError) {
-            supabaseLogger.warning(`⚠️ Error guardando anticipos para proyecto ${projectId}:`, advancesError);
-          }
-        }
-      }
-
-      // Guardar/actualizar facturas
-      for (const projectId in data.invoicesByProject) {
-        const invoices = data.invoicesByProject[projectId];
-        if (invoices && invoices.length > 0) {
-          const invoicesToUpsert = invoices.map(invoice => ({
-            ...invoice,
-            project_id: projectId,
-            owner_id: this.currentUser.id,
-            updated_at: new Date().toISOString()
-          }));
-
-          const { error: invoicesError } = await this.supabase
-            .from('invoices')
-            .upsert(invoicesToUpsert, { onConflict: 'id' });
-
-          if (invoicesError) {
-            supabaseLogger.warning(`⚠️ Error guardando facturas para proyecto ${projectId}:`, invoicesError);
-          }
-        }
-      }
-
-      // Guardar/actualizar contratos
-      for (const projectId in data.contractsByProject) {
-        const contracts = data.contractsByProject[projectId];
-        if (contracts && contracts.length > 0) {
-          const contractsToUpsert = contracts.map(contract => ({
-            ...contract,
-            project_id: projectId,
-            owner_id: this.currentUser.id,
-            updated_at: new Date().toISOString()
-          }));
-
-          const { error: contractsError } = await this.supabase
-            .from('contracts')
-            .upsert(contractsToUpsert, { onConflict: 'id' });
-
-          if (contractsError) {
-            supabaseLogger.warning(`⚠️ Error guardando contratos para proyecto ${projectId}:`, contractsError);
-          }
-        }
-      }
-
-      // Guardar/actualizar asignaciones de recursos
-      for (const projectId in data.resourceAssignmentsByProject) {
-        const assignments = data.resourceAssignmentsByProject[projectId];
-        if (assignments && assignments.length > 0) {
-          const assignmentsToUpsert = assignments.map(assignment => ({
-            ...assignment,
-            project_id: projectId,
-            owner_id: this.currentUser.id,
-            updated_at: new Date().toISOString()
-          }));
-
-          const { error: assignmentsError } = await this.supabase
-            .from('resource_assignments')
-            .upsert(assignmentsToUpsert, { onConflict: 'id' });
-
-          if (assignmentsError) {
-            supabaseLogger.warning(`⚠️ Error guardando asignaciones para proyecto ${projectId}:`, assignmentsError);
-          }
         }
       }
 
@@ -2311,6 +2176,7 @@ class SupabaseService {
         storagePath: filePath,
         publicUrl: publicData.publicUrl,
         description: metadata.description || '', // Agregar descripción al nivel superior
+        relatedItemId: metadata.relatedItemId || null,
         metadata: {
           ...metadata,
           storageProvider: 'supabase',
@@ -2318,7 +2184,50 @@ class SupabaseService {
         }
       };
 
-      supabaseLogger.success(' Archivo subido exitosamente a Storage:', fileRecord.fileName);
+      // ✅ CORRECCIÓN: Guardar metadata en tabla de base de datos
+      // Supabase Storage list() no devuelve metadatos personalizados,
+      // así que guardamos la información en una tabla
+      try {
+        supabaseLogger.data('📝 DEBUG - Guardando metadata en DB:', {
+          file_id: fileRecord.id,
+          storage_path: filePath,
+          file_name: file.name,
+          description: metadata.description || ''
+        });
+
+        const { error: dbError } = await this.supabase
+          .from('file_metadata')
+          .upsert({
+            file_id: fileRecord.id,
+            project_id: projectId,
+            organization_id: this.organizationId,
+            storage_path: filePath,
+            file_name: file.name,
+            file_size: file.size,
+            mime_type: file.type,
+            category: category,
+            description: metadata.description || '',
+            related_item_id: metadata.relatedItemId || null,
+            uploaded_by: this.currentUser.id,
+            uploaded_by_email: this.currentUser.email,
+            upload_date: new Date().toISOString(),
+            public_url: publicData.publicUrl
+          }, {
+            onConflict: 'file_id'
+          });
+
+        if (dbError) {
+          supabaseLogger.warning('⚠️ Error guardando metadata en DB (no crítico):', dbError);
+          // No lanzar error, el archivo ya está en Storage
+        } else {
+          supabaseLogger.success('✅ Metadata guardada en DB');
+        }
+      } catch (dbError) {
+        supabaseLogger.warning('⚠️ Error guardando metadata en DB (no crítico):', dbError);
+        // No lanzar error, el archivo ya está en Storage
+      }
+
+      supabaseLogger.success('✅ Archivo subido exitosamente a Storage:', fileRecord.fileName);
       return { success: true, file: fileRecord };
 
     } catch (error) {
@@ -2498,15 +2407,15 @@ class SupabaseService {
       const data = allFiles;
 
       if (error) {
-        supabaseLogger.error(' Error listando archivos:', error);
+        supabaseLogger.error('❌ Error listando archivos:', error);
         return { success: false, error, files: [] };
       }
 
       // DEBUG: Mostrar datos raw de Supabase
-      supabaseLogger.loading(' DEBUG - Datos raw de Supabase:', data);
+      supabaseLogger.loading('🔍 DEBUG - Datos raw de Supabase:', data);
 
       // DEBUG: Verificar si realmente hay archivos en el bucket
-      supabaseLogger.loading(' DEBUG - Verificando bucket completo...');
+      supabaseLogger.loading('🔍 DEBUG - Verificando bucket completo...');
       const { data: bucketContents, error: allError } = await this.supabase.storage
         .from('project-files')
         .list('', {
@@ -2515,9 +2424,40 @@ class SupabaseService {
         });
 
       if (allError) {
-        supabaseLogger.error(' Error listando bucket completo:', allError);
+        supabaseLogger.error('❌ Error listando bucket completo:', allError);
       } else {
-        supabaseLogger.loading(' DEBUG - Todos los archivos en el bucket:', bucketContents);
+        supabaseLogger.loading('🔍 DEBUG - Todos los archivos en el bucket:', bucketContents);
+      }
+
+      // ✅ CORRECCIÓN: Consultar tabla file_metadata para obtener descripciones
+      let fileMetadataMap = {};
+      try {
+        const { data: metadataRecords, error: metadataError } = await this.supabase
+          .from('file_metadata')
+          .select('*')
+          .eq('project_id', projectId);
+
+        if (!metadataError && metadataRecords) {
+          // Crear mapa de metadata por storage_path para búsqueda rápida
+          fileMetadataMap = metadataRecords.reduce((map, record) => {
+            map[record.storage_path] = record;
+            return map;
+          }, {});
+          supabaseLogger.success(`✅ ${metadataRecords.length} registros de metadata cargados desde DB`);
+
+          // DEBUG: Mostrar descripciones encontradas
+          const descriptionsFound = metadataRecords.filter(r => r.description).length;
+          supabaseLogger.data(`📝 DEBUG - ${descriptionsFound} archivos con descripción en DB`);
+          metadataRecords.forEach(record => {
+            if (record.description) {
+              supabaseLogger.data(`  - ${record.file_name}: "${record.description}"`);
+            }
+          });
+        } else if (metadataError) {
+          supabaseLogger.warning('⚠️ Error cargando metadata desde DB (no crítico):', metadataError);
+        }
+      } catch (metadataError) {
+        supabaseLogger.warning('⚠️ Error cargando metadata desde DB (no crítico):', metadataError);
       }
 
       // Convertir archivos de Storage a formato esperado
@@ -2531,14 +2471,27 @@ class SupabaseService {
           .from('project-files')
           .getPublicUrl(filePath);
 
+        // ✅ CORRECCIÓN: Obtener metadata desde la tabla de base de datos
+        const dbMetadata = fileMetadataMap[filePath] || {};
+
+        // DEBUG: Mostrar si se encontró metadata para este archivo
+        supabaseLogger.data(`🔍 DEBUG - Buscando metadata para archivo:`, {
+          fileName: file.name,
+          filePath: filePath,
+          foundInDB: !!dbMetadata.file_id,
+          description: dbMetadata.description || 'NO ENCONTRADA'
+        });
+
         // CORRECCIÓN: Obtener tamaño del archivo desde metadata.size (que es donde Supabase lo guarda)
-        const fileSize = file.metadata?.size ||
+        const fileSize = dbMetadata.file_size ||
+          file.metadata?.size ||
           file.metadata?.file_size ||
           file.size ||
           0;
 
         // CORRECCIÓN: Usar created_at directamente (que es la fecha real de Supabase)
-        const uploadDate = file.created_at ||
+        const uploadDate = dbMetadata.upload_date ||
+          file.created_at ||
           file.updated_at ||
           file.metadata?.created_at ||
           new Date().toISOString();
@@ -2546,6 +2499,7 @@ class SupabaseService {
         // DEBUG: Mostrar qué valores estamos obteniendo
         supabaseLogger.data(`🔍 DEBUG - Procesando archivo ${file.name}:`, {
           'filePath': filePath,
+          'dbMetadata.description': dbMetadata.description,
           'file.metadata?.size': file.metadata?.size,
           'file.metadata?.file_size': file.metadata?.file_size,
           'file.size': file.size,
@@ -2557,29 +2511,31 @@ class SupabaseService {
         });
 
         // CORRECCIÓN: Usar el nombre original del archivo si está disponible en metadata
-        const originalFileName = file.metadata?.originalName ||
+        const originalFileName = dbMetadata.file_name ||
+          file.metadata?.originalName ||
           file.metadata?.name ||
           file.name;
 
         return {
-          id: `file-${file.name.split('.')[0]}`,
+          id: dbMetadata.file_id || `file-${file.name.split('.')[0]}`,
           projectId,
           fileName: originalFileName, // Usar nombre original en lugar del nombre técnico
           originalName: originalFileName, // Agregar originalName también
           fileSize: fileSize,
-          mimeType: file.metadata?.mimeType || 'application/octet-stream',
+          mimeType: dbMetadata.mime_type || file.metadata?.mimeType || 'application/octet-stream',
           uploadDate: uploadDate,
           storagePath: filePath,
           publicUrl: publicData.publicUrl,
-          description: file.metadata?.description || '', // ✅ AGREGAR DESCRIPCIÓN
-          relatedItemId: file.metadata?.relatedItemId || null,
-          category: file.metadata?.category || 'general',
-          uploadedBy: file.metadata?.uploadedBy || 'Usuario',
+          description: dbMetadata.description || file.metadata?.description || '', // ✅ DESCRIPCIÓN DESDE DB
+          relatedItemId: dbMetadata.related_item_id || file.metadata?.relatedItemId || null,
+          category: dbMetadata.category || file.metadata?.category || 'general',
+          uploadedBy: dbMetadata.uploaded_by_email || file.metadata?.uploadedBy || 'Usuario',
           metadata: {
             storageProvider: 'supabase',
             bucket: 'project-files',
             originalFile: file, // Incluir objeto original para debugging
             technicalName: file.name, // Guardar el nombre técnico para referencia
+            dbMetadata: dbMetadata, // Incluir metadata de DB para debugging
             ...file.metadata
           }
         };
@@ -2588,11 +2544,13 @@ class SupabaseService {
       supabaseLogger.data(`✅ ${files.length} archivos encontrados en Storage`);
 
       // DEBUG: Mostrar detalles de los archivos para diagnosticar
-      supabaseLogger.loading(' DEBUG - Archivos encontrados:', files.map(f => ({
+      supabaseLogger.loading('🔍 DEBUG - Archivos encontrados:', files.map(f => ({
         fileName: f.fileName,
         fileSize: f.fileSize,
         uploadDate: f.uploadDate,
         storagePath: f.storagePath,
+        description: f.description, // ✅ VERIFICAR DESCRIPCIÓN FINAL
+        hasDescription: !!f.description,
         publicUrl: f.publicUrl,
         originalFile: f.metadata?.originalFile
       })));

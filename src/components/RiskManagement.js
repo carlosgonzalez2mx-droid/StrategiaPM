@@ -41,9 +41,9 @@ import {
   Search
 } from 'lucide-react';
 
-const RiskManagement = ({ 
-  projects, 
-  currentProjectId, 
+const RiskManagement = ({
+  projects,
+  currentProjectId,
   setCurrentProjectId,
   risks,
   setRisks,
@@ -63,7 +63,7 @@ const RiskManagement = ({
   const [filterPriority, setFilterPriority] = useState('all');
   const [showOpportunities, setShowOpportunities] = useState(false);
   const [monteCarloResults, setMonteCarloResults] = useState(null);
-  
+
   // Estados para formularios
   const [showRiskForm, setShowRiskForm] = useState(false);
   const [editingRisk, setEditingRisk] = useState(null);
@@ -136,14 +136,14 @@ const RiskManagement = ({
         occurredRisks: 0
       };
     }
-    
+
     const activeRisks = risks.filter(r => r.status === 'active');
     const highPriority = activeRisks.filter(r => r.priority === 'high').length;
     const totalExposure = activeRisks.reduce((sum, r) => sum + (r.costImpact * r.probability), 0);
     const avgRiskScore = activeRisks.reduce((sum, r) => sum + r.riskScore, 0) / activeRisks.length;
     const mitigatedRisks = risks.filter(r => r.status === 'mitigated').length;
     const occurredRisks = risks.filter(r => r.actualOccurred).length;
-    
+
     return {
       totalRisks: risks.length,
       activeRisks: activeRisks.length,
@@ -178,13 +178,13 @@ const RiskManagement = ({
   const calculateContingencyReserve = () => {
     // Validación de seguridad para risks
     if (!risks || !Array.isArray(risks)) return currentProject?.budget * 0.05 || 0;
-    
+
     const activeRisks = risks.filter(r => r.status === 'active');
     if (activeRisks.length === 0) return currentProject?.budget * 0.05 || 0; // 5% base si no hay riesgos
-    
+
     // Cálculo base (5% del presupuesto)
     const baseContingency = (currentProject?.budget || 0) * 0.05;
-    
+
     // Cálculo basado en riesgos (suma de impactos esperados)
     const riskBasedContingency = activeRisks.reduce((sum, risk) => {
       const expectedImpact = risk.probability * risk.costImpact;
@@ -192,7 +192,7 @@ const RiskManagement = ({
       const priorityFactor = risk.priority === 'high' ? 1.5 : risk.priority === 'medium' ? 1.2 : 1.0;
       return sum + (expectedImpact * priorityFactor);
     }, 0);
-    
+
     return baseContingency + riskBasedContingency;
   };
 
@@ -200,28 +200,28 @@ const RiskManagement = ({
   const calculateManagementReserve = () => {
     if (!currentProject) return 0;
     const projectBudget = currentProject.budget || 0;
-    
+
     // Validación de seguridad para risks
     if (!risks || !Array.isArray(risks)) return projectBudget * 0.1;
-    
+
     const activeRisks = risks.filter(r => r.status === 'active');
-    
+
     // Base 10% del presupuesto
     let managementReserve = projectBudget * 0.1;
-    
+
     // Ajustar según complejidad de riesgos
     if (activeRisks.length > 10) {
       managementReserve *= 1.2; // 20% adicional
     } else if (activeRisks.length > 5) {
       managementReserve *= 1.1; // 10% adicional
     }
-    
+
     // Ajustar por riesgos de alta prioridad
     const highPriorityRisks = activeRisks.filter(r => r.priority === 'high').length;
     if (highPriorityRisks > 3) {
       managementReserve *= 1.15; // 15% adicional
     }
-    
+
     return managementReserve;
   };
 
@@ -229,10 +229,10 @@ const RiskManagement = ({
   const calculateTotalProjectBudget = () => {
     if (!currentProject) return 0;
     const baseBudget = currentProject.budget || 0;
-    
+
     // Validación de seguridad para risks
     if (!risks || !Array.isArray(risks)) return baseBudget * 1.15; // Base + 15% estándar
-    
+
     const contingencyReserve = calculateContingencyReserve();
     const managementReserve = calculateManagementReserve();
     return baseBudget + contingencyReserve + managementReserve;
@@ -284,10 +284,10 @@ const RiskManagement = ({
       try {
         // Importar el servicio de Supabase dinámicamente
         const { default: supabaseService } = await import('../services/SupabaseService');
-        
+
         // Eliminar de Supabase primero
         const result = await supabaseService.deleteRisk(riskId);
-        
+
         if (result.success) {
           // Si se eliminó correctamente de Supabase, eliminar del estado local
           if (risks && Array.isArray(risks)) {
@@ -310,7 +310,7 @@ const RiskManagement = ({
       // Calcular risk score
       const riskScore = editingRisk.probability * editingRisk.impact;
       const updatedRisk = Object.assign({}, editingRisk, { riskScore });
-      
+
       // Validación de seguridad para risks
       if (!risks || !Array.isArray(risks)) {
         setRisks([updatedRisk]);
@@ -322,13 +322,13 @@ const RiskManagement = ({
         const newRisks = risks.slice();
         newRisks.push(updatedRisk);
         setRisks(newRisks);
-        
+
         // Registrar evento de auditoría
         if (logRiskCreated && currentProject) {
           logRiskCreated(updatedRisk, currentProject);
         }
       }
-      
+
       setShowRiskForm(false);
       setEditingRisk(null);
     }
@@ -343,15 +343,15 @@ const RiskManagement = ({
   const filteredRisks = useMemo(() => {
     // Validación de seguridad para risks
     if (!risks || !Array.isArray(risks)) return [];
-    
+
     return risks.filter(risk => {
       const matchesCategory = filterCategory === 'all' || risk.category === filterCategory;
       const matchesStatus = filterStatus === 'all' || risk.status === filterStatus;
       const matchesPriority = filterPriority === 'all' || risk.priority === filterPriority;
       const matchesSearch = risk.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           risk.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           risk.code.toLowerCase().includes(searchTerm.toLowerCase());
-      
+        risk.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        risk.code.toLowerCase().includes(searchTerm.toLowerCase());
+
       return matchesCategory && matchesStatus && matchesPriority && matchesSearch;
     });
   }, [risks, filterCategory, filterStatus, filterPriority, searchTerm]);
@@ -359,11 +359,11 @@ const RiskManagement = ({
   // Análisis Monte Carlo mejorado con integración de reservas
   const runMonteCarloAnalysis = () => {
     if (!currentProject || !risks || !Array.isArray(risks)) return;
-    
+
     const iterations = 10000;
     const projectBudget = currentProject.budget || 0;
     const activeRisks = risks.filter(risk => risk.status === 'active');
-    
+
     if (activeRisks.length === 0) {
       setMonteCarloResults({
         averageCost: projectBudget,
@@ -378,10 +378,10 @@ const RiskManagement = ({
 
     let totalCost = 0;
     let costSamples = [];
-    
+
     for (let i = 0; i < iterations; i++) {
       let iterationCost = projectBudget;
-      
+
       // Simular ocurrencia de riesgos
       activeRisks.forEach(risk => {
         if (Math.random() < risk.probability) {
@@ -390,18 +390,18 @@ const RiskManagement = ({
           iterationCost += risk.costImpact * variation;
         }
       });
-      
+
       totalCost += iterationCost;
       costSamples.push(iterationCost);
     }
-    
+
     // Calcular estadísticas
     costSamples.sort((a, b) => a - b);
     const averageCost = totalCost / iterations;
     const p50 = costSamples[Math.floor(iterations * 0.5)];
     const p80 = costSamples[Math.floor(iterations * 0.8)];
     const p95 = costSamples[Math.floor(iterations * 0.95)];
-    
+
     const results = {
       averageCost,
       p50,
@@ -412,9 +412,9 @@ const RiskManagement = ({
       baseBudget: projectBudget,
       riskImpact: averageCost - projectBudget
     };
-    
+
     setMonteCarloResults(results);
-    
+
     // 🔄 INTEGRACIÓN: Actualizar reservas basándose en Monte Carlo
     updateReservesFromMonteCarlo(results);
   };
@@ -422,17 +422,17 @@ const RiskManagement = ({
   // Nueva función: Actualizar reservas basándose en Monte Carlo
   const updateReservesFromMonteCarlo = (monteCarloResults) => {
     if (!monteCarloResults || !currentProject || !setProjects) return;
-    
+
     // Calcular reserva de contingencia basada en P80 de Monte Carlo
     const p80Contingency = Math.max(0, monteCarloResults.p80 - monteCarloResults.baseBudget);
-    
+
     // Calcular reserva de gestión basada en P95 de Monte Carlo
     const p95Management = Math.max(0, monteCarloResults.p95 - monteCarloResults.p80);
-    
+
     logger.debug('🔄 Actualizando reservas basándose en Monte Carlo:');
     logger.debug('📊 P80 Contingency:', p80Contingency);
     logger.debug('📊 P95 Management:', p95Management);
-    
+
     // 🔄 ACTUALIZAR EL PROYECTO CON NUEVAS RESERVAS
     if (currentProject && setProjects) {
       // Crear proyecto actualizado con nuevas reservas
@@ -447,14 +447,14 @@ const RiskManagement = ({
           recommendedBudget: monteCarloResults.p95
         }
       };
-      
+
       // Actualizar la lista de proyectos
-      setProjects(prevProjects => 
-        prevProjects.map(p => 
+      setProjects(prevProjects =>
+        prevProjects.map(p =>
           p.id === currentProject.id ? updatedProject : p
         )
       );
-      
+
       // Notificar al usuario sobre la actualización
       alert(`✅ Reservas actualizadas basándose en análisis Monte Carlo:
       
@@ -463,7 +463,7 @@ const RiskManagement = ({
 📊 Presupuesto Total Recomendado: $${(monteCarloResults.p95 / 1000).toFixed(1)}K
 
 Las reservas se han actualizado en el proyecto y se reflejarán en todos los módulos.`);
-      
+
       logger.debug('✅ Proyecto actualizado con nuevas reservas de Monte Carlo');
     }
   };
@@ -476,7 +476,7 @@ Las reservas se han actualizado en el proyecto y se reflejarán en todos los mó
           {/* Elementos decorativos de fondo */}
           <div className="absolute top-0 right-0 w-32 h-32 bg-red-100/30 rounded-full -translate-y-16 translate-x-16"></div>
           <div className="absolute bottom-0 left-0 w-24 h-24 bg-orange-100/30 rounded-full translate-y-12 -translate-x-12"></div>
-          
+
           <div className="relative z-10">
             <div className="flex items-center justify-between">
               <div className="flex items-center">
@@ -517,7 +517,7 @@ Las reservas se han actualizado en el proyecto y se reflejarán en todos los mó
               <AlertTriangle className="text-red-500" size={32} />
             </div>
           </div>
-          
+
           <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-orange-500">
             <div className="flex items-center justify-between">
               <div>
@@ -527,7 +527,7 @@ Las reservas se han actualizado en el proyecto y se reflejarán en todos los mó
               <Zap className="text-orange-500" size={32} />
             </div>
           </div>
-          
+
           <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-yellow-500">
             <div className="flex items-center justify-between">
               <div>
@@ -537,7 +537,7 @@ Las reservas se han actualizado en el proyecto y se reflejarán en todos los mó
               <DollarSign className="text-yellow-500" size={32} />
             </div>
           </div>
-          
+
           <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-green-500">
             <div className="flex items-center justify-between">
               <div>
@@ -547,7 +547,7 @@ Las reservas se han actualizado en el proyecto y se reflejarán en todos los mó
               <Shield className="text-green-500" size={32} />
             </div>
           </div>
-          
+
           <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-purple-500">
             <div className="flex items-center justify-between">
               <div>
@@ -612,7 +612,7 @@ Las reservas se han actualizado en el proyecto y se reflejarán en todos los mó
               <span>Ejecutar Simulación</span>
             </button>
           </div>
-          
+
           {monteCarloResults ? (
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="bg-blue-50 rounded-lg p-4">
@@ -655,11 +655,10 @@ Las reservas se han actualizado en el proyecto y se reflejarán en todos los mó
             <button
               onClick={handleAddRisk}
               disabled={isReadOnlyMode}
-              className={`px-4 py-2 rounded-lg flex items-center space-x-2 ${
-                isReadOnlyMode
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-green-600 text-white hover:bg-green-700'
-              }`}
+              className={`px-4 py-2 rounded-lg flex items-center space-x-2 ${isReadOnlyMode
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                : 'bg-green-600 text-white hover:bg-green-700'
+                }`}
               title={isReadOnlyMode ? "No disponible (modo solo lectura)" : "Crear nuevo riesgo"}
             >
               <Plus size={16} />
@@ -679,7 +678,7 @@ Las reservas se han actualizado en el proyecto y se reflejarán en todos los mó
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
-            
+
             <select
               value={filterCategory}
               onChange={(e) => setFilterCategory(e.target.value)}
@@ -690,7 +689,7 @@ Las reservas se han actualizado en el proyecto y se reflejarán en todos los mó
                 <option key={key} value={key}>{cat.label}</option>
               ))}
             </select>
-            
+
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
@@ -701,7 +700,7 @@ Las reservas se han actualizado en el proyecto y se reflejarán en todos los mó
               <option value="mitigated">Mitigado</option>
               <option value="closed">Cerrado</option>
             </select>
-            
+
             <select
               value={filterPriority}
               onChange={(e) => setFilterPriority(e.target.value)}
@@ -712,7 +711,7 @@ Las reservas se han actualizado en el proyecto y se reflejarán en todos los mó
               <option value="medium">Media</option>
               <option value="low">Baja</option>
             </select>
-            
+
             <select
               value={viewMode}
               onChange={(e) => setViewMode(e.target.value)}
@@ -732,54 +731,52 @@ Las reservas se han actualizado en el proyecto y se reflejarán en todos los mó
                     <div className="flex items-center space-x-3 mb-2">
                       <span className="font-medium text-gray-900">{risk.code}</span>
                       <span className="font-medium text-gray-900">{risk.name}</span>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        risk.priority === 'high' ? 'bg-red-100 text-red-700' :
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${risk.priority === 'high' ? 'bg-red-100 text-red-700' :
                         risk.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                        'bg-green-100 text-green-700'
-                      }`}>
-                        {risk.priority.toUpperCase()}
+                          'bg-green-100 text-green-700'
+                        }`}>
+                        {(risk.priority || 'medium').toUpperCase()}
                       </span>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        risk.status === 'active' ? 'bg-red-100 text-red-700' :
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${risk.status === 'active' ? 'bg-red-100 text-red-700' :
                         risk.status === 'mitigated' ? 'bg-green-100 text-green-700' :
-                        'bg-gray-100 text-gray-700'
-                      }`}>
-                        {risk.status.toUpperCase()}
+                          'bg-gray-100 text-gray-700'
+                        }`}>
+                        {(risk.status || 'active').toUpperCase()}
                       </span>
                     </div>
-                    
+
                     <div className="text-sm text-gray-600 mb-2">{risk.description}</div>
-                    
+
                     <div className="grid grid-cols-2 md:grid-cols-6 gap-4 text-xs text-gray-500">
                       <div>
-                        <span className="font-medium">Probabilidad:</span> {(risk.probability * 100).toFixed(0)}%
+                        <span className="font-medium">Probabilidad:</span> {((risk.probability || 0.5) * 100).toFixed(0)}%
                       </div>
                       <div>
-                        <span className="font-medium">Impacto:</span> {(risk.impact * 100).toFixed(0)}%
+                        <span className="font-medium">Impacto:</span> {((risk.impact || 0.5) * 100).toFixed(0)}%
                       </div>
                       <div>
-                        <span className="font-medium">Costo:</span> ${(risk.costImpact / 1000).toFixed(0)}K
+                        <span className="font-medium">Costo:</span> ${((risk.costImpact || 0) / 1000).toFixed(0)}K
                       </div>
                       <div>
-                        <span className="font-medium">Cronograma:</span> {risk.scheduleImpact} días
+                        <span className="font-medium">Cronograma:</span> {risk.scheduleImpact || 0} días
                       </div>
                       <div>
-                        <span className="font-medium">Responsable:</span> {risk.owner}
+                        <span className="font-medium">Responsable:</span> {risk.owner || 'Sin asignar'}
                       </div>
                       <div>
-                        <span className="font-medium">Fase:</span> {phases[risk.phase]}
+                        <span className="font-medium">Fase:</span> {phases[risk.phase] || phases['planning']}
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center space-x-2 ml-4">
                     <div className="text-right">
                       <div className="text-lg font-bold text-gray-900">
-                        {risk.riskScore.toFixed(2)}
+                        {(risk.riskScore || (risk.probability || 0.5) * (risk.impact || 0.5)).toFixed(2)}
                       </div>
                       <div className="text-xs text-gray-500">Risk Score</div>
                     </div>
-                    
+
                     <div className="flex flex-col space-y-1">
                       <button
                         onClick={() => handleEditRisk(risk)}
@@ -800,7 +797,7 @@ Las reservas se han actualizado en el proyecto y se reflejarán en todos los mó
                 </div>
               </div>
             ))}
-            
+
             {filteredRisks.length === 0 && (
               <div className="text-center py-8 text-gray-500">
                 <AlertTriangle size={48} className="mx-auto mb-4 text-gray-300" />
@@ -833,7 +830,7 @@ Las reservas se han actualizado en el proyecto y se reflejarán en todos los mó
                   {/* Información básica */}
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Información Básica</h3>
-                    
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Código del Riesgo</label>
                       <input
@@ -845,7 +842,7 @@ Las reservas se han actualizado en el proyecto y se reflejarán en todos los mó
                         required
                       />
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del Riesgo</label>
                       <input
@@ -857,7 +854,7 @@ Las reservas se han actualizado en el proyecto y se reflejarán en todos los mó
                         required
                       />
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
                       <textarea
@@ -869,7 +866,7 @@ Las reservas se han actualizado en el proyecto y se reflejarán en todos los mó
                         required
                       />
                     </div>
-                    
+
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
@@ -883,7 +880,7 @@ Las reservas se han actualizado en el proyecto y se reflejarán en todos los mó
                           ))}
                         </select>
                       </div>
-                      
+
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Fase del Proyecto</label>
                         <select
@@ -902,7 +899,7 @@ Las reservas se han actualizado en el proyecto y se reflejarán en todos los mó
                   {/* Análisis cualitativo */}
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Análisis Cualitativo</h3>
-                    
+
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Probabilidad (0-1)</label>
@@ -917,7 +914,7 @@ Las reservas se han actualizado en el proyecto y se reflejarán en todos los mó
                           required
                         />
                       </div>
-                      
+
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Impacto (0-1)</label>
                         <input
@@ -932,7 +929,7 @@ Las reservas se han actualizado en el proyecto y se reflejarán en todos los mó
                         />
                       </div>
                     </div>
-                    
+
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Prioridad</label>
@@ -946,7 +943,7 @@ Las reservas se han actualizado en el proyecto y se reflejarán en todos los mó
                           <option value="low">Baja</option>
                         </select>
                       </div>
-                      
+
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
                         <select
@@ -960,7 +957,7 @@ Las reservas se han actualizado en el proyecto y se reflejarán en todos los mó
                         </select>
                       </div>
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Responsable</label>
                       <input
@@ -978,7 +975,7 @@ Las reservas se han actualizado en el proyecto y se reflejarán en todos los mó
                 {/* Análisis cuantitativo */}
                 <div className="mt-6 space-y-4">
                   <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Análisis Cuantitativo</h3>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Impacto en Costos (USD)</label>
@@ -990,7 +987,7 @@ Las reservas se han actualizado en el proyecto y se reflejarán en todos los mó
                         placeholder="0"
                       />
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Impacto en Cronograma (días)</label>
                       <input
@@ -1001,7 +998,7 @@ Las reservas se han actualizado en el proyecto y se reflejarán en todos los mó
                         placeholder="0"
                       />
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Frecuencia de Monitoreo</label>
                       <select
@@ -1020,7 +1017,7 @@ Las reservas se han actualizado en el proyecto y se reflejarán en todos los mó
                 {/* Plan de respuesta */}
                 <div className="mt-6 space-y-4">
                   <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Plan de Respuesta</h3>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Estrategia de Respuesta</label>
@@ -1037,7 +1034,7 @@ Las reservas se han actualizado en el proyecto y se reflejarán en todos los mó
                         {responseStrategies[editingRisk?.response || 'mitigate']?.description}
                       </p>
                     </div>
-                    
+
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Revisión</label>
                       <input
@@ -1048,7 +1045,7 @@ Las reservas se han actualizado en el proyecto y se reflejarán en todos los mó
                       />
                     </div>
                   </div>
-                  
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Plan de Respuesta</label>
                     <textarea
@@ -1059,7 +1056,7 @@ Las reservas se han actualizado en el proyecto y se reflejarán en todos los mó
                       placeholder="Describe las acciones específicas para responder al riesgo"
                     />
                   </div>
-                  
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Plan de Contingencia</label>
                     <textarea
@@ -1070,7 +1067,7 @@ Las reservas se han actualizado en el proyecto y se reflejarán en todos los mó
                       placeholder="Describe las acciones a tomar si el riesgo se materializa"
                     />
                   </div>
-                  
+
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Condiciones Trigger</label>
                     <textarea
@@ -1117,9 +1114,9 @@ Las reservas se han actualizado en el proyecto y se reflejarán en todos los mó
             {showFileManager ? 'Ocultar' : 'Mostrar'} Gestor
           </button>
         </div>
-        
+
         {showFileManager && (
-          <FileManager 
+          <FileManager
             projectId={currentProjectId}
             category="risk-evidence"
             isContextual={true}

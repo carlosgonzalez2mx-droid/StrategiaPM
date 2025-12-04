@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { debounce } from 'lodash';
 import './App.css';
 import './index.css';
 
@@ -39,11 +38,15 @@ import ErrorBoundary from './components/ErrorBoundary';
 import TrialStatusBanner from './components/subscription/TrialStatusBanner';
 import OverLimitBanner from './components/subscription/OverLimitBanner';
 
+// Hooks personalizados para guardado
+import { useUnsavedChanges, useBeforeUnload, useSaveShortcut } from './hooks/useSaveState';
+
 // Componentes grandes con lazy loading (code splitting)
 const ConsolidatedDashboard = lazy(() => import('./components/ConsolidatedDashboard'));
 const IntegratedPMODashboard = lazy(() => import('./components/IntegratedPMODashboard'));
 const PortfolioStrategic = lazy(() => import('./components/PortfolioStrategic'));
 const ProjectManagementTabs = lazy(() => import('./components/ProjectManagementTabs'));
+const FloatingSaveButton = lazy(() => import('./components/FloatingSaveButton'));
 const ScheduleManagement = lazy(() => import('./components/ScheduleManagement'));
 const FinancialManagement = lazy(() => import('./components/FinancialManagement'));
 const ResourceManagement = lazy(() => import('./components/ResourceManagement'));
@@ -54,7 +57,6 @@ const FileManager = lazy(() => import('./components/FileManager'));
 const ReportsManagement = lazy(() => import('./components/ReportsManagement'));
 const ProjectAudit = lazy(() => import('./components/ProjectAudit'));
 const ProjectArchive = lazy(() => import('./components/ProjectArchive'));
-const BackupManager = lazy(() => import('./components/BackupManager'));
 const OrganizationMembers = lazy(() => import('./components/OrganizationMembers'));
 const UserManagement = lazy(() => import('./components/UserManagement'));
 const UpgradeModal = lazy(() => import('./components/subscription/UpgradeModal'));
@@ -200,6 +202,45 @@ function MainApp() {
     setDataLoaded,
   } = useConfig();
 
+  // ===== ESTADO DE GUARDADO MANUAL =====
+  const [isSaving, setIsSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState(null);
+  const [saveError, setSaveError] = useState(null);
+
+  // Crear objeto con datos actuales para tracking de cambios
+  const currentData = useMemo(() => ({
+    projects,
+    currentProjectId,
+    tasksByProject,
+    risksByProject,
+    minutasByProject,
+    purchaseOrdersByProject,
+    advancesByProject,
+    invoicesByProject,
+    contractsByProject,
+    globalResources,
+    resourceAssignmentsByProject,
+    auditLogsByProject,
+    includeWeekendsByProject
+  }), [
+    projects,
+    currentProjectId,
+    tasksByProject,
+    risksByProject,
+    minutasByProject,
+    purchaseOrdersByProject,
+    advancesByProject,
+    invoicesByProject,
+    contractsByProject,
+    globalResources,
+    resourceAssignmentsByProject,
+    auditLogsByProject,
+    includeWeekendsByProject
+  ]);
+
+  // Hook para detectar cambios sin guardar
+  const { hasUnsavedChanges, markAsSaved } = useUnsavedChanges(currentData);
+
   // NOTA: Script de diagnóstico deshabilitado temporalmente
   // useEffect(() => {
   //   if (process.env.NODE_ENV === 'development') {
@@ -215,50 +256,201 @@ function MainApp() {
   // cleanTasksByProject, getCurrentProjectTasks, cleanCorruptDataOnce
   // MIGRADO A TasksContext - ahora vienen del hook useTasks()
 
-  // Sistema de auto-guardado con debouncing
-  const debouncedSave = useCallback(
-    debounce(async (dataToSave) => {
-      logger.debug(' DEBUG - debouncedSave ejecutándose');
-      logger.debug('   useSupabase:', useSupabase);
-      logger.debug('   isAuthenticated:', supabaseService.isAuthenticated());
+  // ===== SISTEMA DE GUARDADO MANUAL =====
 
-      if (!useSupabase || !supabaseService.isAuthenticated()) {
-        logger.debug(' Saltando guardado - No autenticado o Supabase deshabilitado');
-        logger.debug('   Razón: useSupabase =', useSupabase, ', isAuthenticated =', supabaseService.isAuthenticated());
-        return;
-      }
+  /**
+   * Función principal de guardado manual
+   * Se ejecuta cuando el usuario presiona el botón "Guardar" o Ctrl+S
+   */
+  const handleManualSave = useCallback(async () => {
+    // Validar que hay cambios y no está guardando
+    if (!hasUnsavedChanges || isSaving) {
+      logger.debug('⏭️ Guardado omitido - No hay cambios o ya está guardando');
+      return;
+    }
 
-      logger.debug(' Auto-guardando cambios...');
-      const saveStartTime = Date.now();
+    // Validar autenticación
+    if (!useSupabase || !supabaseService.isAuthenticated()) {
+      logger.warn('⚠️ No se puede guardar - No autenticado o Supabase deshabilitado');
+      setSaveError('No estás autenticado. Por favor, inicia sesión.');
+      return;
+    }
 
-      try {
-        const success = await supabaseService.savePortfolioData(dataToSave);
+    setIsSaving(true);
+    setSaveError(null);
 
-        if (success) {
-          const duration = Date.now() - saveStartTime;
-          logger.debug(`✅ Auto-guardado exitoso en ${duration}ms`);
+    const saveStartTime = Date.now();
+    logger.debug('💾 Iniciando guardado manual...');
 
-          // Disparar evento para actualizar UI
-          const event = new CustomEvent('autoSaveComplete', {
-            detail: { duration, timestamp: new Date().toISOString() }
-          });
-          window.dispatchEvent(event);
-        } else {
-          logger.warn('⚠️ Auto-guardado falló');
+    try {
+      // Preparar datos para guardar
+      const dataToSave = {
+        projects,
+        currentProjectId,
+        tasksByProject,
+        risksByProject,
+        minutasByProject,
+        purchaseOrdersByProject,
+        advancesByProject,
+        invoicesByProject,
+        contractsByProject,
+        globalResources,
+        resourceAssignmentsByProject,
+        auditLogsByProject,
+        includeWeekendsByProject,
+        timestamp: new Date().toISOString()
+      };
+
+      // Guardar en Supabase
+      const success = await supabaseService.savePortfolioData(dataToSave);
+
+      // ✅ NUEVO: Sincronizar archivos de localStorage a Supabase
+      if (success) {
+        logger.debug('📁 Sincronizando archivos de todos los proyectos...');
+
+        try {
+          // Importar dinámicamente useFileStorage para acceder a syncWithSupabase
+          const { default: useFileStorage } = await import('./hooks/useFileStorage');
+
+          let totalFilesSynced = 0;
+
+          // Sincronizar archivos de cada proyecto
+          for (const project of projects) {
+            try {
+              // Verificar si hay archivos en localStorage para este proyecto
+              const key = `project-files-${project.id}`;
+              const savedFiles = localStorage.getItem(key);
+              const localFiles = savedFiles ? JSON.parse(savedFiles) : [];
+
+              // Solo sincronizar si hay archivos locales que no estén en Supabase
+              const filesToSync = localFiles.filter(file => !file.storagePath && file.content);
+
+              if (filesToSync.length > 0) {
+                logger.debug(`📤 Sincronizando ${filesToSync.length} archivos del proyecto ${project.name}...`);
+
+                // Subir cada archivo a Supabase
+                for (const file of filesToSync) {
+                  try {
+                    // Reconstruir File object desde base64
+                    const base64Data = file.content.split(',')[1];
+                    const byteCharacters = atob(base64Data);
+                    const byteNumbers = new Array(byteCharacters.length);
+                    for (let i = 0; i < byteCharacters.length; i++) {
+                      byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    }
+                    const byteArray = new Uint8Array(byteNumbers);
+                    const blob = new Blob([byteArray], { type: file.mimeType });
+                    const fileObject = new File([blob], file.fileName, { type: file.mimeType });
+
+                    // Subir a Supabase con metadata completa
+                    const metadata = {
+                      description: file.description || '',
+                      relatedItemId: file.relatedItemId || null,
+                      originalName: file.fileName,
+                      uploadedBy: supabaseService.getCurrentUser()?.email || 'Usuario',
+                      mimeType: file.mimeType
+                    };
+
+                    const uploadResult = await supabaseService.uploadFileToStorage(
+                      fileObject,
+                      project.id,
+                      file.category || 'general',
+                      metadata
+                    );
+
+                    if (uploadResult.success) {
+                      totalFilesSynced++;
+                      logger.debug(`✅ Archivo sincronizado: ${file.fileName}`);
+                    }
+                  } catch (fileError) {
+                    logger.error(`❌ Error sincronizando archivo ${file.fileName}:`, fileError);
+                  }
+                }
+              }
+            } catch (projectError) {
+              logger.error(`❌ Error sincronizando archivos del proyecto ${project.name}:`, projectError);
+            }
+          }
+
+          if (totalFilesSynced > 0) {
+            logger.debug(`✅ ${totalFilesSynced} archivos sincronizados exitosamente a Supabase`);
+          } else {
+            logger.debug('📂 No hay archivos nuevos para sincronizar');
+          }
+        } catch (syncError) {
+          logger.error('❌ Error en sincronización de archivos (no crítico):', syncError);
+          // No fallar el guardado completo por error en archivos
         }
-      } catch (error) {
-        logger.error('❌ Error en auto-guardado:', error);
       }
-    }, 2000), // Esperar 2 segundos después del último cambio
-    [useSupabase]
-  );
 
-  // Cancelar guardado pendiente al desmontar
+      if (success) {
+        const duration = Date.now() - saveStartTime;
+        logger.debug(`✅ Guardado exitoso en ${duration}ms`);
+
+        // Actualizar estado
+        setLastSaved(new Date());
+        markAsSaved();
+
+        // Disparar evento para actualizar UI
+        const event = new CustomEvent('manualSaveComplete', {
+          detail: { duration, timestamp: new Date().toISOString() }
+        });
+        window.dispatchEvent(event);
+      } else {
+        throw new Error('Error guardando en Supabase');
+      }
+    } catch (error) {
+      logger.error('❌ Error en guardado manual:', error);
+      setSaveError(error.message || 'Error desconocido');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [
+    hasUnsavedChanges,
+    isSaving,
+    useSupabase,
+    projects,
+    currentProjectId,
+    tasksByProject,
+    risksByProject,
+    minutasByProject,
+    purchaseOrdersByProject,
+    advancesByProject,
+    invoicesByProject,
+    contractsByProject,
+    globalResources,
+    resourceAssignmentsByProject,
+    auditLogsByProject,
+    includeWeekendsByProject,
+    markAsSaved
+  ]);
+
+  // ===== AUTO-GUARDADO DE RESPALDO (cada 5 minutos) =====
   useEffect(() => {
+    // Solo activar si hay cambios sin guardar
+    if (!hasUnsavedChanges || !useSupabase) {
+      return;
+    }
+
+    logger.debug('⏰ Programando auto-guardado de respaldo en 5 minutos...');
+
+    const autoSaveTimer = setTimeout(() => {
+      if (hasUnsavedChanges && !isSaving) {
+        logger.debug('🔄 Ejecutando auto-guardado de respaldo...');
+        handleManualSave();
+      }
+    }, 5 * 60 * 1000); // 5 minutos
+
     return () => {
-      debouncedSave.cancel();
+      clearTimeout(autoSaveTimer);
     };
-  }, [debouncedSave]);
+  }, [hasUnsavedChanges, useSupabase, isSaving, handleManualSave]);
+
+  // Prevenir cierre con cambios sin guardar
+  useBeforeUnload(hasUnsavedChanges);
+
+  // Atajo de teclado Ctrl+S / Cmd+S
+  useSaveShortcut(handleManualSave, hasUnsavedChanges);
 
   // NOTA: safeSetTasksByProject, updateCurrentProjectTasks, importTasksToCurrentProject
   // ahora vienen de TasksContext (via useTasks hook)
@@ -399,42 +591,16 @@ function MainApp() {
 
   const handleSaveAndClose = async () => {
     try {
-      logger.debug(' Guardando datos antes de cerrar...');
+      logger.debug('💾 Guardando datos antes de cerrar...');
 
-      // Crear objeto con todos los datos actuales
-      const dataToSave = {
-        projects,
-        currentProjectId,
-        tasksByProject,
-        includeWeekendsByProject,
-        risksByProject,
-        purchaseOrdersByProject,
-        advancesByProject,
-        invoicesByProject,
-        contractsByProject,
-        globalResources,
-        resourceAssignmentsByProject,
-        auditLogsByProject,
-        timestamp: new Date().toISOString()
-      };
+      // Usar la función de guardado manual
+      await handleManualSave();
 
-      // Guardar usando Supabase si está disponible, sino usar localStorage
-      if (useSupabase && supabaseService.isAuthenticated()) {
-        logger.debug(' Guardando en Supabase...');
-        const success = await supabaseService.savePortfolioData(dataToSave);
-        if (success) {
-          logger.debug(' Datos guardados exitosamente en Supabase');
-          alert('✅ Datos guardados exitosamente en la nube. Puedes cerrar la aplicación manualmente.');
-        } else {
-          throw new Error('Error guardando en Supabase');
-        }
+      if (!saveError) {
+        alert('✅ Datos guardados exitosamente. Puedes cerrar la aplicación manualmente.');
       } else {
-        logger.debug(' Guardando en localStorage...');
-        await filePersistenceService.saveData(dataToSave);
-        logger.debug(' Datos guardados exitosamente en localStorage');
-        alert('✅ Datos guardados exitosamente en archivo local. Puedes cerrar la aplicación manualmente.');
+        throw new Error(saveError);
       }
-
     } catch (error) {
       logger.error('❌ Error guardando datos:', error);
       alert('❌ Error al guardar los datos. Por favor, inténtalo de nuevo.');
@@ -1342,24 +1508,12 @@ function MainApp() {
       const { source, data } = event.detail;
       logger.debug(' Evento autoSaveTrigger recibido:', { source, data });
 
-      // Activar el auto-save existente
+      // Activar el guardado manual
       if (source === 'minutaUpdate') {
-        logger.debug(' Activando auto-save por actualización de minuta...');
+        logger.debug(' Activando guardado manual por actualización de minuta...');
 
-        // 🚀 NUEVO: Activar el auto-save manualmente
-        const dataToSave = {
-          projects,
-          tasksByProject,
-          risksByProject,
-          purchaseOrdersByProject,
-          advancesByProject,
-          invoicesByProject,
-          contractsByProject,
-          minutasByProject: data?.minutasTasks || minutasByProject
-        };
-
-        logger.debug(' Ejecutando auto-save manual para minutas...');
-        debouncedSave(dataToSave);
+        // Ejecutar guardado manual
+        handleManualSave();
       }
     };
 
@@ -1372,7 +1526,7 @@ function MainApp() {
       window.removeEventListener('minutaStatusChanged', handleMinutaStatusChanged);
       window.removeEventListener('autoSaveTrigger', handleAutoSaveTrigger);
     };
-  }, [debouncedSave]);
+  }, [handleManualSave]);
 
   // Estados de modales
   const [showPOModal, setShowPOModal] = useState(false);
@@ -1439,7 +1593,6 @@ function MainApp() {
       )}
       <FileStatusIndicator />
       <AutoSaveIndicator />
-      <BackupManager onRestoreData={importData} />
 
       <div className="flex">
         <Sidebar
@@ -1451,6 +1604,10 @@ function MainApp() {
           risks={getCurrentProjectRisks()}
           isCollapsed={isSidebarCollapsed}
           onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          onSave={handleManualSave}
+          hasUnsavedChanges={hasUnsavedChanges}
+          isSaving={isSaving}
+          lastSaved={lastSaved}
         />
 
         <main className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-80 lg:ml-72'}`}>
@@ -1484,6 +1641,8 @@ function MainApp() {
                 purchaseOrdersByProject={purchaseOrdersByProject}
                 advancesByProject={advancesByProject}
                 invoicesByProject={invoicesByProject}
+                hasUnsavedChanges={hasUnsavedChanges}
+                onSave={handleManualSave}
               />
             )}
 
@@ -1521,6 +1680,8 @@ function MainApp() {
                 setIncludeWeekendsByProject={setIncludeWeekendsByProject}
                 getCurrentProjectIncludeWeekends={getCurrentProjectIncludeWeekends}
                 useSupabase={useSupabase}
+                hasUnsavedChanges={hasUnsavedChanges}
+                onSave={handleManualSave}
               />
             )}
 
@@ -1562,6 +1723,8 @@ function MainApp() {
                 resourceAssignments={getCurrentProjectResourceAssignments()}
                 useSupabase={useSupabase}
                 updateProjectMinutas={updateProjectMinutas}
+                hasUnsavedChanges={hasUnsavedChanges}
+                onSave={handleManualSave}
               />
             )}
 

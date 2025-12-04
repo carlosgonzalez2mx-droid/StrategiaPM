@@ -15,7 +15,7 @@ const FileManager = ({
 }) => {
   // Hook de permisos
   const { permissions } = usePermissions();
-  
+
   const {
     files,
     isLoading,
@@ -55,13 +55,13 @@ const FileManager = ({
   // Determinar si se puede mostrar área de subida basado en permisos
   const canUploadFiles = showUploadArea && permissions.canEdit && !isReadOnlyMode;
   const [selectedFiles, setSelectedFiles] = useState([]);
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' o 'list'
+  const [viewMode] = useState('list'); // Solo vista de lista
   const fileInputRef = useRef(null);
 
   // Filtrar archivos según parámetros
   const filteredFiles = useMemo(() => {
     let filtered = files;
-    
+
     console.log('🔍 FileManager - Filtrado:', {
       totalFiles: files.length,
       category,
@@ -69,7 +69,16 @@ const FileManager = ({
       isContextual,
       searchTerm
     });
-    
+
+    // DEBUG: Ver descripciones de archivos
+    if (files.length > 0) {
+      console.log('📄 Archivos con descripciones:', files.map(f => ({
+        nombre: f.fileName,
+        descripcion: f.description,
+        metadata: f.metadata
+      })));
+    }
+
     // Si estamos en modo contextual (category específica), usar esa categoría
     if (category !== 'general' && isContextual) {
       filtered = getFilesByCategory(category);
@@ -79,17 +88,17 @@ const FileManager = ({
       filtered = getFilesByCategory(selectedCategory);
       console.log('📂 Filtrado por categoría seleccionada:', selectedCategory, 'archivos:', filtered.length);
     }
-    
+
     if (relatedItemId) {
       filtered = getFilesByRelatedItem(relatedItemId);
       console.log('🔗 Filtrado por item relacionado:', relatedItemId, 'archivos:', filtered.length);
     }
-    
+
     if (searchTerm) {
       filtered = searchFiles(searchTerm);
       console.log('🔍 Filtrado por búsqueda:', searchTerm, 'archivos:', filtered.length);
     }
-    
+
     console.log('✅ Archivos finales filtrados:', filtered.length);
     return filtered.sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
   }, [files, category, selectedCategory, relatedItemId, searchTerm, isContextual, getFilesByCategory, getFilesByRelatedItem, searchFiles]);
@@ -112,7 +121,7 @@ const FileManager = ({
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    
+
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleFiles(e.dataTransfer.files);
     }
@@ -137,15 +146,15 @@ const FileManager = ({
       for (const file of selectedFiles) {
         await uploadFile(file, selectedCategory, relatedItemId, uploadDescription);
       }
-      
+
       setShowUploadModal(false);
       setSelectedFiles([]);
       setUploadDescription('');
-      
+
       if (onFileUploaded) {
         onFileUploaded();
       }
-      
+
     } catch (error) {
       console.error('Error uploading files:', error);
     }
@@ -218,6 +227,7 @@ const FileManager = ({
     { id: 'invoice', name: 'Facturas', icon: '🧾', color: 'bg-green-100 text-green-800' },
     { id: 'advance', name: 'Anticipos', icon: '💰', color: 'bg-yellow-100 text-yellow-800' },
     { id: 'contract', name: 'Contratos', icon: '📋', color: 'bg-purple-100 text-purple-800' },
+    { id: 'edital', name: 'Edital', icon: '📢', color: 'bg-orange-100 text-orange-800' },
     { id: 'risk-evidence', name: 'Evidencia de Riesgos', icon: '🛡️', color: 'bg-red-100 text-red-800' },
     { id: 'general', name: 'General', icon: '📁', color: 'bg-gray-100 text-gray-800' }
   ];
@@ -226,7 +236,7 @@ const FileManager = ({
   const currentCategory = categories.find(cat => cat.id === selectedCategory);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-32">
       {/* Header con estadísticas - Diseño mejorado */}
       <div className="bg-gradient-to-r from-slate-50 to-gray-50 rounded-xl shadow-sm border border-gray-100 p-6">
         <div className="flex items-center justify-between mb-6">
@@ -241,7 +251,7 @@ const FileManager = ({
               </p>
             </div>
           </div>
-          
+
           <div className="flex items-center space-x-4">
             {/* Estadísticas */}
             <div className="text-right">
@@ -252,7 +262,7 @@ const FileManager = ({
               <div className="text-lg font-semibold text-gray-800">{fileStats.totalSizeMB}MB</div>
               <div className="text-xs text-gray-500">total</div>
             </div>
-            
+
             {/* Botón de upload */}
             {canUploadFiles && (
               <button
@@ -283,7 +293,7 @@ const FileManager = ({
               />
             </div>
           </div>
-          
+
           {/* Selector de categoría */}
           {category === 'general' && (
             <div>
@@ -330,142 +340,14 @@ const FileManager = ({
         </div>
       )}
 
-      {/* Área de upload (drag & drop) - Diseño mejorado */}
-      {canUploadFiles && (
-        <div
-          className={`border-2 border-dashed rounded-xl p-12 text-center transition-all duration-300 ${
-            dragActive 
-              ? 'border-blue-500 bg-gradient-to-r from-blue-50 to-indigo-50 scale-105' 
-              : 'border-gray-300 hover:border-blue-400 hover:bg-gradient-to-r hover:from-gray-50 hover:to-blue-50'
-          }`}
-          onDragEnter={handleDrag}
-          onDragLeave={handleDrag}
-          onDragOver={handleDrag}
-          onDrop={handleDrop}
-        >
-          <div className="space-y-6">
-            <div className="text-6xl">📁</div>
-            <div className="space-y-2">
-              <div className="text-2xl font-bold text-gray-700">
-                Arrastra archivos aquí
-              </div>
-              <div className="text-lg text-gray-600">
-                o haz clic para seleccionar
-              </div>
-            </div>
-            <div className="text-sm text-gray-500 max-w-md mx-auto">
-              Tipos permitidos: PDF, JPG, PNG, DOC, DOCX, XLS, XLSX
-              <br />
-              Tamaño máximo: {fileLimits.maxFileSize / (1024 * 1024)}MB por archivo
-            </div>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="px-8 py-4 bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 rounded-xl hover:from-gray-200 hover:to-gray-300 transition-all duration-200 font-medium shadow-sm hover:shadow-md"
-            >
-              Seleccionar Archivos
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Área de drag & drop eliminada - usar botón "Subir Archivos" arriba */}
 
-      {/* Controles de vista */}
-      {filteredFiles.length > 0 && (
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <span className="text-sm text-gray-600">Vista:</span>
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`p-2 rounded-lg transition-colors ${
-                viewMode === 'grid' 
-                  ? 'bg-blue-100 text-blue-600' 
-                  : 'text-gray-400 hover:text-gray-600'
-              }`}
-            >
-              ⬛⬛
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`p-2 rounded-lg transition-colors ${
-                viewMode === 'list' 
-                  ? 'bg-blue-100 text-blue-600' 
-                  : 'text-gray-400 hover:text-gray-600'
-              }`}
-            >
-              ☰
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Vista de lista única - controles de vista eliminados */}
 
       {/* Lista de archivos - Diseño mejorado */}
       {filteredFiles.length > 0 ? (
         <div className="space-y-4">
-          {viewMode === 'grid' ? (
-            /* Vista Grid - Cards modernas */
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {filteredFiles.map((file) => (
-                <div key={file.id} className="group bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-200 hover:-translate-y-1">
-                  {/* Header del card */}
-                  <div className={`p-4 bg-gradient-to-r ${getFileColor(file)} rounded-t-xl text-white`}>
-                    <div className="flex items-center justify-between">
-                      <span className="text-2xl">{getFileIcon(file)}</span>
-                      <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                        <button
-                          onClick={() => deleteFile(file.id)}
-                          className="p-1 bg-white bg-opacity-20 rounded hover:bg-opacity-30 transition-colors"
-                          title="Eliminar"
-                        >
-                          🗑️
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Contenido del card */}
-                  <div className="p-4">
-                    <div className="space-y-3">
-                      <div>
-                        <div className="font-semibold text-gray-900 truncate" title={file.fileName}>
-                          {file.fileName}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {formatFileSize(file.fileSize)}
-                        </div>
-                      </div>
-                      
-                      {file.description && (
-                        <div className="text-sm text-gray-600 line-clamp-2">
-                          {file.description}
-                        </div>
-                      )}
-                      
-                      <div className="text-xs text-gray-400">
-                        {new Date(file.uploadDate).toLocaleDateString()}
-                      </div>
-                    </div>
-                    
-                    {/* Acciones del card */}
-                    <div className="mt-4 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                      <button
-                        onClick={() => previewFile(file)}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                        title="Vista previa"
-                      >
-                        👁️
-                      </button>
-                      <button
-                        onClick={() => downloadFile(file)}
-                        className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                        title="Descargar"
-                      >
-                        ⬇️
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
+          {
             /* Vista Lista - Tabla moderna */
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="overflow-x-auto">
@@ -473,6 +355,7 @@ const FileManager = ({
                   <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
                     <tr>
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Archivo</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descripción</th>
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tamaño</th>
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
@@ -486,12 +369,14 @@ const FileManager = ({
                             <div className={`p-2 rounded-lg bg-gradient-to-r ${getFileColor(file)} text-white`}>
                               {getFileIcon(file)}
                             </div>
-                            <div>
+                            <div className="max-w-xs">
                               <div className="font-medium text-gray-900">{file.fileName}</div>
-                              {file.description && (
-                                <div className="text-sm text-gray-500">{file.description}</div>
-                              )}
                             </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-600 max-w-md">
+                            {file.description || <span className="text-gray-400 italic">Sin descripción</span>}
                           </div>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-500">
@@ -531,7 +416,7 @@ const FileManager = ({
                 </table>
               </div>
             </div>
-          )}
+          }
         </div>
       ) : (
         /* Estado vacío - Diseño mejorado */
@@ -578,7 +463,7 @@ const FileManager = ({
                   ✕
                 </button>
               </div>
-              
+
               <div className="space-y-6">
                 {/* Categoría */}
                 <div>
@@ -597,7 +482,7 @@ const FileManager = ({
                     ))}
                   </select>
                 </div>
-                
+
                 {/* Descripción */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -611,7 +496,7 @@ const FileManager = ({
                     rows="3"
                   />
                 </div>
-                
+
                 {/* Archivos seleccionados */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -630,7 +515,7 @@ const FileManager = ({
                   </div>
                 </div>
               </div>
-              
+
               {/* Botones de acción */}
               <div className="flex justify-end space-x-3 mt-8">
                 <button

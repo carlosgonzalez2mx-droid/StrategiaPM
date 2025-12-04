@@ -81,11 +81,11 @@ const FileStatusIndicator = () => {
     // Detectar si se está usando Supabase
     const detectSupabaseUsage = () => {
       // Verificar múltiples fuentes para detectar uso de Supabase
-      const useSupabase = localStorage.getItem('useSupabase') === 'true' || 
-                         window.location.search.includes('supabase=true') ||
-                         document.querySelector('[data-supabase-active]') ||
-                         window.supabaseActive === true;
-      
+      const useSupabase = localStorage.getItem('useSupabase') === 'true' ||
+        window.location.search.includes('supabase=true') ||
+        document.querySelector('[data-supabase-active]') ||
+        window.supabaseActive === true;
+
       setStatus(prev => ({
         ...prev,
         isUsingSupabase: useSupabase
@@ -105,7 +105,7 @@ const FileStatusIndicator = () => {
     window.addEventListener('autoBackupCreated', handleAutoBackupCreated);
     window.addEventListener('fileDataImported', handleFileDataImported);
     window.addEventListener('filePersistenceError', handleError);
-    
+
     // Eventos de Supabase
     window.addEventListener('supabaseDataSaved', handleSupabaseDataSaved);
     window.addEventListener('supabaseError', handleSupabaseError);
@@ -126,12 +126,12 @@ const FileStatusIndicator = () => {
       window.removeEventListener('autoBackupCreated', handleAutoBackupCreated);
       window.removeEventListener('fileDataImported', handleFileDataImported);
       window.removeEventListener('filePersistenceError', handleError);
-      
+
       // Remover eventos de Supabase
       window.removeEventListener('supabaseDataSaved', handleSupabaseDataSaved);
       window.removeEventListener('supabaseError', handleSupabaseError);
       window.removeEventListener('supabaseSyncing', handleSupabaseSyncing);
-      
+
       // Remover listener de storage
       window.removeEventListener('storage', handleSupabaseStatusChange);
     };
@@ -163,9 +163,9 @@ const FileStatusIndicator = () => {
   };
 
   const getStatusText = () => {
-    if (status.error) return status.isUsingSupabase ? 'Error en Supabase' : 'Error en archivos';
-    if (status.isUsingSupabase && status.isSyncing) return 'Sincronizando con Supabase';
-    if (status.isUsingSupabase && status.supabaseConnected) return 'Conectado a Supabase';
+    if (status.error) return status.isUsingSupabase ? 'Error en database' : 'Error en archivos';
+    if (status.isUsingSupabase && status.isSyncing) return 'Sincronizando con database';
+    if (status.isUsingSupabase && status.supabaseConnected) return 'Conectado a database';
     if (status.isInitialized && status.isSyncing) return 'Sincronizando';
     if (status.isInitialized) return 'Inicializado';
     return 'Conectando...';
@@ -179,28 +179,39 @@ const FileStatusIndicator = () => {
   };
 
   return (
-    <div className="fixed bottom-4 right-4 bg-white rounded-lg shadow-lg border p-3 z-40">
-      <div className="flex items-center space-x-2">
+    <div className="fixed bottom-4 left-4 z-40">
+      {/* Barra horizontal compacta con todos los indicadores */}
+      <div className="bg-white rounded-lg shadow-lg border px-4 py-2 flex items-center space-x-4">
+        {/* Estado de conexión */}
         <div className={`flex items-center space-x-1 ${getStatusColor()}`}>
           {getStatusIcon()}
-          <span className="text-sm font-medium">{getStatusText()}</span>
+          <span className="text-xs font-medium">{getStatusText()}</span>
         </div>
-        
-        {status.isInitialized && (
-          <div className="text-xs text-gray-500 ml-2">
-            <div>{getStorageIndicator()} {formatTime(status.lastSave)}</div>
-            {status.lastBackup && !status.isUsingSupabase && (
-              <div>📦 {formatTime(status.lastBackup)}</div>
-            )}
+
+        {/* Separador */}
+        {status.isInitialized && status.lastSave && (
+          <div className="h-4 w-px bg-gray-300"></div>
+        )}
+
+        {/* Último guardado */}
+        {status.isInitialized && status.lastSave && (
+          <div className="text-xs text-gray-600 flex items-center space-x-1">
+            <span>💾</span>
+            <span>{formatTime(status.lastSave)}</span>
           </div>
         )}
+
+        {/* Error si existe */}
+        {status.error && (
+          <>
+            <div className="h-4 w-px bg-gray-300"></div>
+            <div className="text-xs text-red-600 flex items-center space-x-1">
+              <AlertCircle className="w-3 h-3" />
+              <span>{status.error}</span>
+            </div>
+          </>
+        )}
       </div>
-      
-      {status.error && (
-        <div className="mt-2 text-xs text-red-600 bg-red-50 p-2 rounded">
-          {status.error}
-        </div>
-      )}
     </div>
   );
 };
