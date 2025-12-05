@@ -110,7 +110,7 @@ const PortfolioDashboard = ({
   };
 
   const getPriorityColor = (priority) => {
-    switch(priority) {
+    switch (priority) {
       case 'high': return 'bg-red-100 text-red-800 border-red-200';
       case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'low': return 'bg-green-100 text-green-800 border-green-200';
@@ -119,7 +119,7 @@ const PortfolioDashboard = ({
   };
 
   const getStatusColor = (status) => {
-    switch(status) {
+    switch (status) {
       case 'active': return 'bg-blue-100 text-blue-800 border-blue-200';
       case 'completed': return 'bg-green-100 text-green-800 border-green-200';
       case 'on-hold': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
@@ -129,7 +129,7 @@ const PortfolioDashboard = ({
   };
 
   const getStatusIcon = (status) => {
-    switch(status) {
+    switch (status) {
       case 'active': return '🔄';
       case 'completed': return '✅';
       case 'on-hold': return '⏸️';
@@ -149,7 +149,7 @@ const PortfolioDashboard = ({
   // Función para validar campos en tiempo real
   const validateField = (fieldName, value) => {
     const newErrors = Object.assign({}, errors);
-    
+
     switch (fieldName) {
       case 'name':
         if (!value || value.trim().length < 3) {
@@ -205,7 +205,7 @@ const PortfolioDashboard = ({
       default:
         break;
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -214,10 +214,10 @@ const PortfolioDashboard = ({
   const handleEditProject = (project) => {
     logger.debug('🔍 Proyecto original para editar:', project);
     logger.debug('🔍 Estado del proyecto original:', project.status);
-    
+
     // Preservar el estado actual del proyecto al editar
     // NO usar valores por defecto que sobrescriban el estado real
-    const projectToEdit = { 
+    const projectToEdit = {
       ...project,
       // Solo usar valores por defecto para campos que realmente no existan
       description: project.description || '',
@@ -228,10 +228,10 @@ const PortfolioDashboard = ({
       // NO sobrescribir campos críticos como status, priority, etc.
       // Estos deben mantenerse exactamente como están en el proyecto original
     };
-    
+
     logger.debug('🔍 Proyecto preparado para editar:', projectToEdit);
     logger.debug('🔍 Estado del proyecto preparado:', projectToEdit.status);
-    
+
     setEditingProject(projectToEdit);
     setErrors({});
     setShowProjectModal(true);
@@ -375,7 +375,7 @@ const PortfolioDashboard = ({
         // Continuar con la creación en caso de error (fail-safe)
       }
     } else {
-      logger.warn('⚠️ No se validó suscripción - editingProject.id:', editingProject.id, 'organizationId:', organizationId);
+      logger.debug('ℹ️ Editando proyecto existente - No se requiere validación de suscripción. ID:', editingProject.id);
     }
 
     // Si no hay errores, proceder a guardar
@@ -394,7 +394,7 @@ const PortfolioDashboard = ({
       setEditingProject(null);
       setErrors({});
     } catch (error) {
-      alert(`❌ Error al guardar el proyecto: ${error.message}`);
+      alert(`❌ Error al guardar el proyecto: ${error.message} `);
     }
   };
 
@@ -418,8 +418,8 @@ const PortfolioDashboard = ({
     const completedProjects = projects.filter(p => p.status === 'completed').length;
     const activeProjectsList = projects.filter(p => p.status === 'active');
     const totalBudget = activeProjectsList.reduce((sum, p) => sum + (p.budget || 0), 0);
-    const averageProgress = activeProjectsList.length > 0 
-      ? activeProjectsList.reduce((sum, p) => sum + (p.progress || 0), 0) / activeProjectsList.length 
+    const averageProgress = activeProjectsList.length > 0
+      ? activeProjectsList.reduce((sum, p) => sum + (p.progress || 0), 0) / activeProjectsList.length
       : 0;
 
     // Métricas adicionales de work packages y riesgos
@@ -450,7 +450,7 @@ const PortfolioDashboard = ({
         <div className="flex items-center">
           <div className="text-blue-600 text-xl mr-3">ℹ️</div>
           <div className="text-blue-800">
-            <strong>Nota:</strong> Las métricas financieras y KPIs solo consideran proyectos con estado "Activo". 
+            <strong>Nota:</strong> Las métricas financieras y KPIs solo consideran proyectos con estado "Activo".
             Los proyectos "Inactivos" o "Completados" no influyen en los indicadores financieros.
           </div>
         </div>
@@ -534,7 +534,7 @@ const PortfolioDashboard = ({
       {/* Lista de Proyectos */}
       <div className="bg-white rounded-lg shadow-sm p-4">
         <h2 className="text-lg font-semibold text-gray-800 mb-4">Proyectos del Portfolio</h2>
-        
+
         {projects.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             <div className="text-4xl mb-2">📁</div>
@@ -551,36 +551,35 @@ const PortfolioDashboard = ({
             {sortProjects(projects).map((project) => (
               <div
                 key={project.id}
-                className={`border rounded-lg p-4 transition-all duration-200 cursor-pointer hover:shadow-md ${
-                  currentProjectId === project.id 
-                    ? 'border-blue-500 bg-blue-50' 
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
+                className={`border rounded - lg p - 4 transition - all duration - 200 cursor - pointer hover: shadow - md ${currentProjectId === project.id
+                  ? 'border-blue-500 bg-blue-50'
+                  : 'border-gray-200 hover:border-gray-300'
+                  } `}
                 onClick={() => setCurrentProjectId(project.id)}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <div className="flex items-center space-x-3 mb-2">
                       <h3 className="font-semibold text-gray-900">{project.name}</h3>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getPriorityColor(project.priority)}`}>
+                      <span className={`px - 2 py - 1 rounded - full text - xs font - medium border ${getPriorityColor(project.priority)} `}>
                         {project.priority}
                       </span>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(project.status)}`}>
+                      <span className={`px - 2 py - 1 rounded - full text - xs font - medium border ${getStatusColor(project.status)} `}>
                         {getStatusIcon(project.status)} {project.status}
                       </span>
                     </div>
-                    
+
                     <div className="text-sm text-gray-600 mb-2">
                       {project.description}
                     </div>
-                    
+
                     <div className="flex items-center space-x-4 text-xs text-gray-500">
                       <span>📅 {project.startDate} - {project.endDate}</span>
                       <span>💰 ${(project.budget / 1000).toFixed(0)}K</span>
                       <span>👤 {project.manager}</span>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center space-x-2">
                     <button
                       onClick={(e) => {
@@ -616,7 +615,7 @@ const PortfolioDashboard = ({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (window.confirm(`¿Archivar proyecto "${project.name}"? Se moverá al archivo y se limpiarán sus datos del sistema activo.`)) {
+                        if (window.confirm(`¿Archivar proyecto "${project.name}" ? Se moverá al archivo y se limpiarán sus datos del sistema activo.`)) {
                           archiveProject(project.id);
                         }
                       }}
@@ -628,7 +627,7 @@ const PortfolioDashboard = ({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        if (window.confirm(`¿Eliminar proyecto "${project.name}"? Esta acción no se puede deshacer.`)) {
+                        if (window.confirm(`¿Eliminar proyecto "${project.name}" ? Esta acción no se puede deshacer.`)) {
                           deleteProject(project.id);
                         }
                       }}
@@ -702,7 +701,7 @@ const PortfolioDashboard = ({
                 </p>
               </div>
             </div>
-            
+
             <button
               onClick={() => {
                 setShowFileManager(false);
@@ -713,12 +712,12 @@ const PortfolioDashboard = ({
               ✕ Cerrar
             </button>
           </div>
-          
-          <FileManager 
+
+          <FileManager
             projectId={selectedProjectForFiles.id}
             category="general"
             isContextual={true}
-            title={`📎 Archivos de ${selectedProjectForFiles.name}`}
+            title={`📎 Archivos de ${selectedProjectForFiles.name} `}
             onFileUploaded={() => {
               // Archivo subido exitosamente desde portfolio de proyectos
             }}
@@ -751,7 +750,7 @@ const PortfolioDashboard = ({
                   <label className="block text-sm font-medium text-gray-700 mb-1">Nombre del Proyecto *</label>
                   <input
                     type="text"
-                    className={`w-full border rounded px-3 py-2 ${errors.name ? 'border-red-500' : 'border-red-300'}`}
+                    className={`w - full border rounded px - 3 py - 2 ${errors.name ? 'border-red-500' : 'border-red-300'} `}
                     value={editingProject?.name || ''}
                     onChange={(e) => {
                       updateProjectField('name', e.target.value);
@@ -767,7 +766,7 @@ const PortfolioDashboard = ({
                   <label className="block text-sm font-medium text-gray-700 mb-1">Manager *</label>
                   <input
                     type="text"
-                    className={`w-full border rounded px-3 py-2 ${errors.manager ? 'border-red-500' : 'border-gray-300'}`}
+                    className={`w - full border rounded px - 3 py - 2 ${errors.manager ? 'border-red-500' : 'border-gray-300'} `}
                     value={editingProject?.manager || ''}
                     onChange={(e) => {
                       updateProjectField('manager', e.target.value);
@@ -783,7 +782,7 @@ const PortfolioDashboard = ({
                   <label className="block text-sm font-medium text-gray-700 mb-1">Sponsor *</label>
                   <input
                     type="text"
-                    className={`w-full border rounded px-3 py-2 ${errors.sponsor ? 'border-red-500' : 'border-gray-300'}`}
+                    className={`w - full border rounded px - 3 py - 2 ${errors.sponsor ? 'border-red-500' : 'border-gray-300'} `}
                     value={editingProject?.sponsor || ''}
                     onChange={(e) => {
                       updateProjectField('sponsor', e.target.value);
@@ -828,7 +827,7 @@ const PortfolioDashboard = ({
                   <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Inicio *</label>
                   <input
                     type="date"
-                    className={`w-full border rounded px-3 py-2 ${errors.startDate ? 'border-red-500' : 'border-gray-300'}`}
+                    className={`w - full border rounded px - 3 py - 2 ${errors.startDate ? 'border-red-500' : 'border-gray-300'} `}
                     value={editingProject?.startDate || ''}
                     onChange={(e) => {
                       updateProjectField('startDate', e.target.value);
@@ -847,7 +846,7 @@ const PortfolioDashboard = ({
                   <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Fin *</label>
                   <input
                     type="text"
-                    className={`w-full border rounded px-3 py-2 ${errors.endDate ? 'border-red-500' : 'border-gray-300'}`}
+                    className={`w - full border rounded px - 3 py - 2 ${errors.endDate ? 'border-red-500' : 'border-gray-300'} `}
                     value={editingProject?.endDate || ''}
                     onChange={(e) => {
                       updateProjectField('endDate', e.target.value);
@@ -863,7 +862,7 @@ const PortfolioDashboard = ({
                   <label className="block text-sm font-medium text-gray-700 mb-1">Presupuesto (USD) *</label>
                   <input
                     type="number"
-                    className={`w-full border rounded px-3 py-2 ${errors.budget ? 'border-red-500' : 'border-gray-300'}`}
+                    className={`w - full border rounded px - 3 py - 2 ${errors.budget ? 'border-red-500' : 'border-gray-300'} `}
                     value={editingProject?.budget || ''}
                     onChange={(e) => {
                       const inputValue = e.target.value;
@@ -888,7 +887,7 @@ const PortfolioDashboard = ({
                   <label className="block text-sm font-medium text-gray-700 mb-1">TIR (%)</label>
                   <input
                     type="number"
-                    className={`w-full border rounded px-3 py-2 ${errors.irr ? 'border-red-500' : 'border-gray-300'}`}
+                    className={`w - full border rounded px - 3 py - 2 ${errors.irr ? 'border-red-500' : 'border-gray-300'} `}
                     value={editingProject?.irr || ''}
                     onChange={(e) => {
                       const inputValue = e.target.value;
@@ -1037,11 +1036,10 @@ const PortfolioDashboard = ({
                 <button
                   onClick={handleSaveProject}
                   disabled={Object.keys(errors).length > 0}
-                  className={`px-4 py-2 rounded transition-colors ${
-                    Object.keys(errors).length > 0
-                      ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
-                      : 'bg-blue-600 text-white hover:bg-blue-700'
-                  }`}
+                  className={`px - 4 py - 2 rounded transition - colors ${Object.keys(errors).length > 0
+                    ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                    } `}
                 >
                   Guardar Proyecto {Object.keys(errors).length > 0 && `(${Object.keys(errors).length} errores)`}
                 </button>
@@ -1075,7 +1073,7 @@ const PortfolioDashboard = ({
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div
                     className="bg-blue-600 h-2 rounded-full"
-                    style={{ width: `${(subscriptionLimit.currentCount / subscriptionLimit.maxCount) * 100}%` }}
+                    style={{ width: `${(subscriptionLimit.currentCount / subscriptionLimit.maxCount) * 100}% ` }}
                   ></div>
                 </div>
               </div>

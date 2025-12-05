@@ -1314,6 +1314,7 @@ function MainApp() {
     // Calcular progreso automático si no se proporciona explícitamente
     const autoProgress = updates.progress !== undefined ? updates.progress : calculateProjectProgress(projectId);
 
+    // Actualizar localmente - el auto-save se encargará de guardar en Supabase
     setProjects(prev => prev.map(project =>
       project.id === projectId
         ? {
@@ -1324,7 +1325,7 @@ function MainApp() {
           endDate: updates.endDate || project.endDate,
           budget: updates.budget || project.budget,
           plannedValue: updates.plannedValue !== undefined ? updates.plannedValue : project.plannedValue,
-          status: updates.status || project.status,
+          status: updates.status !== undefined ? updates.status : project.status, // ✅ CORREGIDO: usar !== undefined
           priority: updates.priority || project.priority,
           manager: updates.manager || project.manager,
           sponsor: updates.sponsor || project.sponsor,

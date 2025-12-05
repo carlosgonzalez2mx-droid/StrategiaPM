@@ -816,33 +816,39 @@ class SupabaseService {
       supabaseLogger.data(`✅ Proyectos cargados: ${projects.length}`);
 
       // Convertir nombres de columnas de snake_case a camelCase
-      const convertedProjects = projects.map(project => ({
-        ...project,
-        startDate: project.start_date || project.startDate,
-        endDate: project.end_date || project.endDate,
-        businessCase: project.business_case || project.businessCase,
-        kickoffDate: project.kickoff_date || project.kickoffDate,
-        contingencyReserve: project.contingency_reserve || project.contingencyReserve,
-        managementReserve: project.management_reserve || project.managementReserve,
-        plannedValue: project.planned_value || project.plannedValue || 0,
-        period: project.period || 3,
-        createdAt: project.created_at || project.createdAt,
-        updatedAt: project.updated_at || project.updatedAt,
-        organizationId: project.organization_id || project.organizationId,
-        ownerId: project.owner_id || project.ownerId,
-        // Mantener nombres originales para compatibilidad
-        start_date: project.start_date,
-        end_date: project.end_date,
-        business_case: project.business_case,
-        kickoff_date: project.kickoff_date,
-        contingency_reserve: project.contingency_reserve,
-        management_reserve: project.management_reserve,
-        planned_value: project.planned_value,
-        created_at: project.created_at,
-        updated_at: project.updated_at,
-        organization_id: project.organization_id,
-        owner_id: project.owner_id
-      }));
+      const convertedProjects = projects.map(project => {
+        // DEBUG: Log del status al cargar desde Supabase
+        supabaseLogger.data(`📥 Cargando proyecto "${project.name}" - Status desde DB: "${project.status}"`);
+
+        return {
+          ...project,
+          status: project.status, // ✅ Preservar status explícitamente
+          startDate: project.start_date || project.startDate,
+          endDate: project.end_date || project.endDate,
+          businessCase: project.business_case || project.businessCase,
+          kickoffDate: project.kickoff_date || project.kickoffDate,
+          contingencyReserve: project.contingency_reserve || project.contingencyReserve,
+          managementReserve: project.management_reserve || project.managementReserve,
+          plannedValue: project.planned_value || project.plannedValue || 0,
+          period: project.period || 3,
+          createdAt: project.created_at || project.createdAt,
+          updatedAt: project.updated_at || project.updatedAt,
+          organizationId: project.organization_id || project.organizationId,
+          ownerId: project.owner_id || project.ownerId,
+          // Mantener nombres originales para compatibilidad
+          start_date: project.start_date,
+          end_date: project.end_date,
+          business_case: project.business_case,
+          kickoff_date: project.kickoff_date,
+          contingency_reserve: project.contingency_reserve,
+          management_reserve: project.management_reserve,
+          planned_value: project.planned_value,
+          created_at: project.created_at,
+          updated_at: project.updated_at,
+          organization_id: project.organization_id,
+          owner_id: project.owner_id
+        };
+      });
 
       // Si no hay proyectos, retornar estructura básica
       if (convertedProjects.length === 0) {
@@ -1288,39 +1294,46 @@ class SupabaseService {
 
     // 1. PROJECTS (31 campos)
     if (data.projects && data.projects.length > 0) {
-      cleanData.projects = data.projects.map(project => ({
-        id: project.id,
-        name: project.name || '',
-        description: project.description || '',
-        status: project.status || 'active',
-        budget: project.budget || 0,
-        start_date: project.startDate || project.start_date || null,
-        end_date: project.endDate || project.end_date || null,
-        manager: project.manager || '',
-        sponsor: project.sponsor || '',
-        priority: project.priority || 'medium',
-        progress: project.progress || 0,
-        organization_id: this.organizationId,
-        created_at: project.createdAt || project.created_at || new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        business_case: project.businessCase || project.business_case || '',
-        objective: project.objective || '',
-        irr: project.irr || 0,
-        roi: project.roi || 0,
-        kickoff_date: project.kickoffDate || project.kickoff_date || null,
-        stakeholders: project.stakeholders || [],
-        contingency_reserve: project.contingencyReserve || project.contingency_reserve || 0,
-        management_reserve: project.managementReserve || project.management_reserve || 0,
-        health: project.health || null,
-        category: project.category || null,
-        is_archived: project.isArchived || project.is_archived || false,
-        is_template: project.isTemplate || project.is_template || false,
-        owner_id: project.ownerId || project.owner_id || this.currentUser.id,
-        team: project.team || [],
-        version: project.version || '1.0.0',
-        planned_value: project.plannedValue || project.planned_value || 0,
-        period: project.period || 3
-      }));
+      cleanData.projects = data.projects.map(project => {
+        const cleanProject = {
+          id: project.id,
+          name: project.name || '',
+          description: project.description || '',
+          status: project.status !== undefined ? project.status : 'active', // ✅ CORREGIDO: usar !== undefined
+          budget: project.budget || 0,
+          start_date: project.startDate || project.start_date || null,
+          end_date: project.endDate || project.end_date || null,
+          manager: project.manager || '',
+          sponsor: project.sponsor || '',
+          priority: project.priority || 'medium',
+          progress: project.progress || 0,
+          organization_id: this.organizationId,
+          created_at: project.createdAt || project.created_at || new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          business_case: project.businessCase || project.business_case || '',
+          objective: project.objective || '',
+          irr: project.irr || 0,
+          roi: project.roi || 0,
+          kickoff_date: project.kickoffDate || project.kickoff_date || null,
+          stakeholders: project.stakeholders || [],
+          contingency_reserve: project.contingencyReserve || project.contingency_reserve || 0,
+          management_reserve: project.managementReserve || project.management_reserve || 0,
+          health: project.health || null,
+          category: project.category || null,
+          is_archived: project.isArchived || project.is_archived || false,
+          is_template: project.isTemplate || project.is_template || false,
+          owner_id: project.ownerId || project.owner_id || this.currentUser.id,
+          team: project.team || [],
+          version: project.version || '1.0.0',
+          planned_value: project.plannedValue || project.planned_value || 0,
+          period: project.period || 3
+        };
+
+        // DEBUG: Log del status para cada proyecto
+        supabaseLogger.data(`📊 Proyecto ${project.name} - Status original: "${project.status}" → Status limpio: "${cleanProject.status}"`);
+
+        return cleanProject;
+      });
     }
 
     // 2. TASKS (24 campos) - Flatten from tasksByProject

@@ -489,11 +489,12 @@ const CashFlowProjection = ({
     const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
     monthEnd.setHours(23, 59, 59, 999);
 
-    // ANTICIPOS PAGADOS
+    // ANTICIPOS PAGADOS - Si tiene paymentDate, se considera pagado
     const monthAdvances = advances?.filter(advance => {
-      if (advance.status !== 'paid') return false;
+      // ✅ CORRECCIÓN: Verificar que tenga paymentDate en lugar de status
+      if (!advance.paymentDate || advance.paymentDate.trim() === '') return false;
 
-      const paymentDate = new Date(advance.paymentDate || advance.date);
+      const paymentDate = new Date(advance.paymentDate + 'T00:00:00');
       const normalizedPaymentDate = new Date(
         paymentDate.getFullYear(),
         paymentDate.getMonth(),
@@ -957,10 +958,10 @@ const CashFlowProjection = ({
                         </td>
                         <td className="px-6 py-4">
                           <span className={`px-3 py-1 rounded-full text-xs font-medium ${month.cumulativeBalance > 0
-                              ? 'bg-green-100 text-green-800'
-                              : month.cumulativeBalance < 0
-                                ? 'bg-red-100 text-red-800'
-                                : 'bg-gray-100 text-gray-800'
+                            ? 'bg-green-100 text-green-800'
+                            : month.cumulativeBalance < 0
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-gray-100 text-gray-800'
                             }`}>
                             {month.cumulativeBalance > 0 ? '✅ Positivo' : month.cumulativeBalance < 0 ? '⚠️ Déficit' : '⚖️ Equilibrio'}
                           </span>
@@ -1008,10 +1009,10 @@ const CashFlowProjection = ({
                       </div>
                       <div
                         className={`w-full rounded-t transition-all duration-300 ${month.netCashFlow > 0
-                            ? 'bg-green-500'
-                            : month.netCashFlow < 0
-                              ? 'bg-red-500'
-                              : 'bg-gray-400'
+                          ? 'bg-green-500'
+                          : month.netCashFlow < 0
+                            ? 'bg-red-500'
+                            : 'bg-gray-400'
                           }`}
                         style={{
                           height: `${height}px`
