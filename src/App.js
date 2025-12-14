@@ -21,6 +21,7 @@ import { logger } from './utils/logger';
 
 // Hooks
 import usePermissions from './hooks/usePermissions';
+import useIdleTimeout from './hooks/useIdleTimeout';
 
 // Utilidades de precarga
 import { preloadComponentsOnIdle } from './utils/preloadComponents';
@@ -108,10 +109,28 @@ const sortTasksByWbsCode = (tasks) => {
 
 // Componente principal de la aplicación (requiere autenticación)
 function MainApp() {
-  const { user, showSplash, completeSplash } = useAuth();
+  const { user, showSplash, completeSplash, logout } = useAuth();
 
   // Hook de permisos para detectar usuarios de solo lectura
   const { isReadOnly, userRole, isLoading: permissionsLoading } = usePermissions();
+
+  // 🔐 Auto-logout después de 5 minutos de inactividad
+  useIdleTimeout(
+    async () => {
+      console.log('⏱️ Sesión expirada por inactividad - cerrando sesión automáticamente');
+      await logout();
+      // Recargar la página para forzar redirect a login
+      window.location.reload();
+    },
+    5 * 60 * 1000, // 5 minutos
+    {
+      onWarning: () => {
+        console.log('⚠️ La sesión expirará en 1 minuto por inactividad');
+        // Opcional: Mostrar notificación al usuario
+      },
+      warningTime: 60 * 1000 // Advertencia 1 minuto antes
+    }
+  );
 
   // Precargar componentes más utilizados cuando el navegador esté idle
   useEffect(() => {

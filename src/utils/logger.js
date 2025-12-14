@@ -34,7 +34,7 @@ const getTimestamp = () => {
  */
 const formatMessage = (level, args) => {
   if (!isDevelopment) return args;
-  
+
   const timestamp = getTimestamp();
   const levelColors = {
     DEBUG: '\x1b[36m', // Cyan
@@ -43,7 +43,7 @@ const formatMessage = (level, args) => {
     ERROR: '\x1b[31m', // Red
   };
   const reset = '\x1b[0m';
-  
+
   return [`${levelColors[level]}[${timestamp}] ${level}${reset}`, ...args];
 };
 
@@ -153,9 +153,13 @@ export const supabaseLogger = {
  * Logger especializado para operaciones de archivos
  */
 export const fileLogger = {
+  debug: (...args) => logger.debug('📁', ...args),
+  load: (...args) => logger.debug('📂', ...args),
+  save: (...args) => logger.debug('💾', ...args),
   upload: (...args) => logger.debug('📤', ...args),
   download: (...args) => logger.debug('📥', ...args),
   delete: (...args) => logger.debug('🗑️', ...args),
+  warn: (...args) => logger.warn('⚠️', ...args),
   error: (...args) => logger.error('❌', ...args),
   success: (...args) => logger.debug('✅', ...args),
 };
