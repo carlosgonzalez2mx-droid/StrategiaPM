@@ -4,34 +4,26 @@ import { cn } from '../lib/utils';
 
 const CorporateAlerts = ({ projects, portfolioMetrics = {} }) => {
 
-  // Identificar proyectos críticos
   const criticalProjects = projects.filter(project => {
-    // Aquí deberíamos tener las métricas EVM de cada proyecto
-    // Por ahora, usamos criterios básicos
     const isOverdue = new Date(project.endDate) < new Date() && project.status !== 'completed';
     const isHighPriority = project.priority === 'high';
     return isOverdue || (isHighPriority && project.status === 'active');
   });
 
-  // Proyectos con presupuesto alto
   const highBudgetProjects = projects.filter(project => {
-    // Verificar que portfolioMetrics.totalBudget exista y sea válido
     if (!portfolioMetrics?.totalBudget || portfolioMetrics.totalBudget <= 0) {
-      return false; // No mostrar alertas si no hay presupuesto total
+      return false;
     }
     return project.budget > portfolioMetrics.totalBudget * 0.3;
   });
 
-  // Proyectos próximos a vencer
   const upcomingDeadlines = projects.filter(project => {
     const daysToEnd = (new Date(project.endDate) - new Date()) / (1000 * 60 * 60 * 24);
     return daysToEnd > 0 && daysToEnd <= 30 && project.status === 'active';
   });
 
-  // Alertas del sistema
   const alerts = [];
 
-  // Alerta de proyectos críticos
   if (criticalProjects.length > 0) {
     alerts.push({
       type: 'critical',
@@ -43,7 +35,6 @@ const CorporateAlerts = ({ projects, portfolioMetrics = {} }) => {
     });
   }
 
-  // Alerta de presupuesto concentrado
   if (highBudgetProjects.length > 0) {
     alerts.push({
       type: 'budget',
@@ -55,7 +46,6 @@ const CorporateAlerts = ({ projects, portfolioMetrics = {} }) => {
     });
   }
 
-  // Alerta de deadlines próximos
   if (upcomingDeadlines.length > 0) {
     alerts.push({
       type: 'deadline',
@@ -70,7 +60,6 @@ const CorporateAlerts = ({ projects, portfolioMetrics = {} }) => {
     });
   }
 
-  // Alerta de capacidad del portfolio
   if (portfolioMetrics?.activeProjects > 5) {
     alerts.push({
       type: 'capacity',
@@ -82,7 +71,6 @@ const CorporateAlerts = ({ projects, portfolioMetrics = {} }) => {
     });
   }
 
-  // Alerta de éxito
   if (portfolioMetrics?.completedProjects > 0 && criticalProjects.length === 0) {
     alerts.push({
       type: 'success',
@@ -96,12 +84,12 @@ const CorporateAlerts = ({ projects, portfolioMetrics = {} }) => {
 
   const getAlertColor = (color) => {
     switch (color) {
-      case 'red': return 'bg-red-50 border-red-200 text-red-800';
-      case 'yellow': return 'bg-amber-50 border-amber-200 text-amber-800';
-      case 'blue': return 'bg-blue-50 border-blue-200 text-blue-800';
-      case 'purple': return 'bg-purple-50 border-purple-200 text-purple-800';
-      case 'green': return 'bg-emerald-50 border-emerald-200 text-emerald-800';
-      default: return 'bg-slate-50 border-slate-200 text-slate-800';
+      case 'red': return 'from-red-500 to-pink-600';
+      case 'yellow': return 'from-amber-500 to-orange-600';
+      case 'blue': return 'from-blue-500 to-indigo-600';
+      case 'purple': return 'from-purple-500 to-pink-600';
+      case 'green': return 'from-emerald-500 to-green-600';
+      default: return 'from-slate-400 to-slate-600';
     }
   };
 
@@ -118,22 +106,22 @@ const CorporateAlerts = ({ projects, portfolioMetrics = {} }) => {
 
   if (alerts.length === 0) {
     return (
-      <Card>
-        <CardContent className="p-8 text-center text-slate-500">
-          <div className="text-4xl mb-3 opacity-30">✅</div>
-          <p className="font-medium text-slate-700">No hay alertas activas</p>
-          <p className="text-sm mt-1">El portfolio está funcionando correctamente</p>
+      <Card className="shadow-xl border-2 border-emerald-100">
+        <CardContent className="p-12 text-center">
+          <div className="text-6xl mb-4 opacity-30">✅</div>
+          <p className="font-bold text-xl text-slate-700">No hay alertas activas</p>
+          <p className="text-sm mt-2 text-slate-500">El portfolio está funcionando correctamente</p>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card>
-      <CardHeader className="border-b border-slate-100 bg-slate-50/50">
-        <CardTitle className="flex items-center text-lg">
+    <Card className="shadow-xl border-2 border-red-100">
+      <CardHeader className="bg-gradient-to-r from-red-50 to-pink-50 border-b-2 border-red-100">
+        <CardTitle className="flex items-center text-lg text-red-900">
           🔔 Alertas Corporativas
-          <span className="ml-3 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+          <span className="ml-3 bg-gradient-to-r from-red-500 to-pink-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg">
             {alerts.filter(a => a.type === 'critical').length}
           </span>
         </CardTitle>
@@ -142,21 +130,29 @@ const CorporateAlerts = ({ projects, portfolioMetrics = {} }) => {
         {alerts.map((alert, index) => (
           <div
             key={index}
-            className={cn("border rounded-lg p-4 transition-all hover:shadow-sm", getAlertColor(alert.color))}
+            className={cn("border-2 rounded-2xl p-6 transition-all hover:shadow-xl relative overflow-hidden",
+              alert.color === 'red' ? 'border-red-200 bg-gradient-to-br from-red-50 to-pink-50' :
+                alert.color === 'yellow' ? 'border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50' :
+                  alert.color === 'blue' ? 'border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50' :
+                    alert.color === 'purple' ? 'border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50' :
+                      alert.color === 'green' ? 'border-emerald-200 bg-gradient-to-br from-emerald-50 to-green-50' :
+                        'border-slate-200 bg-gradient-to-br from-slate-50 to-slate-100'
+            )}
           >
-            <div className="flex items-start gap-4">
-              <span className={cn("text-2xl mt-0.5", getIconColor(alert.color))}>
+            <div className="absolute top-0 right-0 w-32 h-32 bg-white/30 rounded-full -mr-16 -mt-16"></div>
+            <div className="relative z-10 flex items-start gap-4">
+              <span className={cn("text-4xl mt-1", getIconColor(alert.color))}>
                 {alert.icon}
               </span>
               <div className="flex-1">
-                <div className="font-semibold mb-1">{alert.title}</div>
-                <div className="text-sm mb-3 opacity-90">{alert.message}</div>
+                <div className="font-bold text-lg mb-2 text-slate-900">{alert.title}</div>
+                <div className="text-sm mb-3 text-slate-700 font-medium">{alert.message}</div>
 
                 {alert.details && alert.details.length > 0 && (
-                  <div className="text-xs space-y-1.5 opacity-80">
+                  <div className="text-xs space-y-2 text-slate-600">
                     {alert.details.map((detail, detailIndex) => (
-                      <div key={detailIndex} className="flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 bg-current rounded-full"></span>
+                      <div key={detailIndex} className="flex items-center gap-2 bg-white/50 rounded-lg px-3 py-2">
+                        <span className="w-2 h-2 bg-current rounded-full"></span>
                         {detail}
                       </div>
                     ))}
@@ -168,18 +164,20 @@ const CorporateAlerts = ({ projects, portfolioMetrics = {} }) => {
         ))}
 
         {/* Resumen de alertas */}
-        <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-sm">
-          <span className="font-medium text-slate-600">Resumen de Alertas:</span>
-          <div className="flex gap-4">
-            <span className="text-red-600 font-medium">
-              🚨 {alerts.filter(a => a.type === 'critical').length} Críticas
-            </span>
-            <span className="text-amber-600 font-medium">
-              ⚠️ {alerts.filter(a => a.color === 'yellow').length} Advertencias
-            </span>
-            <span className="text-blue-600 font-medium">
-              ℹ️ {alerts.filter(a => a.color === 'blue').length} Informativas
-            </span>
+        <div className="mt-6 p-6 bg-gradient-to-r from-slate-50 to-blue-50 rounded-2xl border-2 border-slate-200">
+          <div className="flex items-center justify-between text-sm">
+            <span className="font-bold text-slate-700">Resumen de Alertas:</span>
+            <div className="flex gap-6">
+              <span className="text-red-600 font-bold flex items-center gap-1">
+                🚨 {alerts.filter(a => a.type === 'critical').length} Críticas
+              </span>
+              <span className="text-amber-600 font-bold flex items-center gap-1">
+                ⚠️ {alerts.filter(a => a.color === 'yellow').length} Advertencias
+              </span>
+              <span className="text-blue-600 font-bold flex items-center gap-1">
+                ℹ️ {alerts.filter(a => a.color === 'blue').length} Informativas
+              </span>
+            </div>
           </div>
         </div>
       </CardContent>

@@ -11,6 +11,7 @@ import ChangeManagement from './ChangeManagement';
 import CashFlowProjection from './CashFlowProjection';
 import usePermissions from '../hooks/usePermissions';
 import FloatingSaveButton from './FloatingSaveButton';
+import { cn } from '../lib/utils';
 
 // Componente para manejar tareas huérfanas
 const OrphanedTasksManager = ({ orphanedTasks, availableMilestones, onReassign, updateMinutaTaskHito }) => {
@@ -44,80 +45,83 @@ const OrphanedTasksManager = ({ orphanedTasks, availableMilestones, onReassign, 
   if (orphanedTasks.length === 0) return null;
 
   return (
-    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-yellow-800 font-semibold flex items-center">
-          <span className="mr-2">⚠️</span>
-          Tareas de Minuta sin Hito Asignado
-        </h3>
-        <span className="text-sm bg-yellow-200 text-yellow-800 px-2 py-1 rounded-full">
-          {orphanedTasks.length} tareas
-        </span>
-      </div>
+    <div className="bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-300 rounded-2xl p-6 mb-6 shadow-lg relative overflow-hidden">
+      <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 rounded-full -mr-16 -mt-16"></div>
+      <div className="relative z-10">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-amber-900 font-bold text-lg flex items-center">
+            <span className="text-2xl mr-3">⚠️</span>
+            Tareas de Minuta sin Hito Asignado
+          </h3>
+          <span className="text-sm bg-gradient-to-r from-amber-500 to-orange-600 text-white px-4 py-1.5 rounded-full font-bold shadow-lg">
+            {orphanedTasks.length} tareas
+          </span>
+        </div>
 
-      <p className="text-yellow-700 text-sm mb-3">
-        Estas tareas perdieron su hito asignado. Reasígnalas para mantener la organización.
-      </p>
+        <p className="text-amber-800 text-sm mb-4 font-medium">
+          Estas tareas perdieron su hito asignado. Reasígnalas para mantener la organización.
+        </p>
 
-      <div className="space-y-2">
-        {orphanedTasks.map(task => {
-          const daysUntilDeadline = Math.ceil((new Date(task.fecha) - new Date()) / (1000 * 60 * 60 * 24));
-          const urgencyColor = daysUntilDeadline <= 3 ? 'text-red-600 bg-red-100' :
-            daysUntilDeadline <= 7 ? 'text-orange-600 bg-orange-100' :
-              'text-yellow-600 bg-yellow-100';
+        <div className="space-y-3">
+          {orphanedTasks.map(task => {
+            const daysUntilDeadline = Math.ceil((new Date(task.fecha) - new Date()) / (1000 * 60 * 60 * 24));
+            const urgencyColor = daysUntilDeadline <= 3 ? 'bg-gradient-to-r from-red-500 to-pink-600 text-white border-red-300' :
+              daysUntilDeadline <= 7 ? 'bg-gradient-to-r from-orange-500 to-amber-600 text-white border-orange-300' :
+                'bg-gradient-to-r from-amber-400 to-yellow-500 text-white border-amber-300';
 
-          return (
-            <div key={task.id} className="bg-white p-3 rounded border border-yellow-200">
-              <div className="flex items-center space-x-3">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2 mb-1">
-                    <span className="text-sm font-medium text-gray-800">{task.tarea}</span>
-                    <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center">
-                      <span className="mr-1">📝</span>
-                      Minuta
-                    </span>
+            return (
+              <div key={task.id} className="bg-white p-4 rounded-xl border-2 border-amber-200 shadow-md hover:shadow-lg transition-all">
+                <div className="flex items-center space-x-3">
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <span className="text-sm font-bold text-slate-900">{task.tarea}</span>
+                      <span className="text-xs bg-gradient-to-r from-emerald-500 to-green-600 text-white px-3 py-1 rounded-full flex items-center font-bold shadow-sm">
+                        <span className="mr-1">📝</span>
+                        Minuta
+                      </span>
+                    </div>
+                    <div className="flex items-center space-x-4 text-xs text-slate-600">
+                      <span className="font-medium">👤 {task.responsable}</span>
+                      <span className="font-medium">📅 {new Date(task.fecha).toLocaleDateString('es-ES')}</span>
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold border-2 ${task.estatus === 'Completado' ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white border-emerald-300' :
+                        task.estatus === 'En Proceso' ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-white border-amber-300' :
+                          'bg-slate-100 text-slate-700 border-slate-200'
+                        }`}>
+                        {task.estatus}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-4 text-xs text-gray-500">
-                    <span>👤 {task.responsable}</span>
-                    <span>📅 {new Date(task.fecha).toLocaleDateString('es-ES')}</span>
-                    <span className={`px-2 py-1 rounded-full text-xs ${task.estatus === 'Completado' ? 'bg-green-100 text-green-800' :
-                      task.estatus === 'En Proceso' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                      {task.estatus}
+
+                  <div className="flex items-center space-x-2">
+                    <span className={`px-3 py-1.5 rounded-full text-xs font-bold border-2 shadow-lg ${urgencyColor}`}>
+                      {daysUntilDeadline === 0 ? 'Hoy' :
+                        daysUntilDeadline === 1 ? 'Mañana' :
+                          `${daysUntilDeadline} días`}
                     </span>
+
+                    <select
+                      value={task.hitoId || ''}
+                      onChange={(e) => handleReassign(task.id, e.target.value)}
+                      disabled={reassigning[task.id]}
+                      className="text-xs border-2 border-slate-200 rounded-lg px-3 py-2 min-w-[200px] focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none font-medium"
+                    >
+                      <option value="">Seleccionar hito...</option>
+                      {availableMilestones.map(milestone => (
+                        <option key={milestone.id} value={milestone.id}>
+                          {milestone.name}
+                        </option>
+                      ))}
+                    </select>
+
+                    {reassigning[task.id] && (
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-amber-600"></div>
+                    )}
                   </div>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${urgencyColor}`}>
-                    {daysUntilDeadline === 0 ? 'Hoy' :
-                      daysUntilDeadline === 1 ? 'Mañana' :
-                        `${daysUntilDeadline} días`}
-                  </span>
-
-                  <select
-                    value={task.hitoId || ''}
-                    onChange={(e) => handleReassign(task.id, e.target.value)}
-                    disabled={reassigning[task.id]}
-                    className="text-xs border border-gray-300 rounded px-2 py-1 min-w-[200px]"
-                  >
-                    <option value="">Seleccionar hito...</option>
-                    {availableMilestones.map(milestone => (
-                      <option key={milestone.id} value={milestone.id}>
-                        {milestone.name}
-                      </option>
-                    ))}
-                  </select>
-
-                  {reassigning[task.id] && (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-600"></div>
-                  )}
                 </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -727,47 +731,45 @@ const ProjectManagementTabs = ({
 
   return (
     <div className="space-y-6">
-      {/* Header del Proyecto */}
-      <div className="bg-gradient-to-r from-blue-50 to-purple-100 rounded-2xl shadow-lg p-6 text-gray-800 relative overflow-hidden">
+      {/* Header del Proyecto - Premium Colorful */}
+      <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-2xl shadow-xl p-8 text-white relative overflow-hidden">
         {/* Elementos decorativos de fondo */}
-        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-100/30 rounded-full -translate-y-16 translate-x-16"></div>
-        <div className="absolute bottom-0 left-0 w-24 h-24 bg-purple-100/30 rounded-full translate-y-12 -translate-x-12"></div>
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32"></div>
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/10 rounded-full -ml-24 -mb-24"></div>
 
         <div className="relative z-10">
           <div className="flex items-center justify-between">
             <div className="flex items-center">
-              <div className="bg-white/60 backdrop-blur rounded-2xl p-3 mr-4 shadow-sm">
-                <span className="text-3xl">📊</span>
+              <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-4 mr-4 shadow-lg border border-white/30">
+                <span className="text-4xl">📊</span>
               </div>
               <div>
-                <h1 className="text-4xl font-bold mb-2 text-gray-800">{currentProject.name}</h1>
-                <p className="text-gray-600 text-lg">
+                <h1 className="text-4xl font-bold mb-2 tracking-tight">{currentProject.name}</h1>
+                <p className="text-blue-100 text-lg tracking-wide">
                   {currentProject.description || 'Gestión integral del proyecto - PMBOK v7'}
                 </p>
-                <div className="flex items-center space-x-4 mt-2 text-sm text-gray-700">
-                  <span className="flex items-center space-x-1">
-                    <span className="text-gray-500">👤</span>
-                    <span>{currentProject.manager}</span>
+                <div className="flex items-center space-x-4 mt-3 text-sm">
+                  <span className="flex items-center space-x-1 bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-white/30">
+                    <span>👤</span>
+                    <span className="font-medium">{currentProject.manager}</span>
                   </span>
-                  <span className="flex items-center space-x-1">
-                    <span className="text-yellow-600">💰</span>
-                    <span>${(currentProject.budget / 1000).toFixed(0)}K</span>
+                  <span className="flex items-center space-x-1 bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-white/30">
+                    <span>💰</span>
+                    <span className="font-bold">${(currentProject.budget / 1000).toFixed(0)}K</span>
                   </span>
-                  <span className="flex items-center space-x-1">
-                    <span className="text-green-500">💼</span>
-                    <span className="px-2 py-1 rounded bg-gray-100 text-gray-800 ml-2">
-                      {evmMetrics.percentComplete?.toFixed(1) || 0}% completado
-                    </span>
+                  <span className="flex items-center space-x-1 bg-white/20 backdrop-blur-sm px-3 py-1.5 rounded-lg border border-white/30">
+                    <span>💼</span>
+                    <span className="font-bold">{evmMetrics.percentComplete?.toFixed(1) || 0}% completado</span>
                   </span>
                 </div>
                 {/* Caso de negocio del proyecto */}
-                <div className="mt-3">
-                  <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-4 border border-green-200">
-                    <div className="flex items-start space-x-2">
-                      <span className="text-green-600 text-lg">💼</span>
+                <div className="mt-4">
+                  <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 border border-white/30">
+                    <div className="flex items-start space-x-3">
+                      <span className="text-2xl">💼</span>
                       <div>
-                        <h4 className="font-semibold text-green-800 mb-2">Caso de Negocio</h4>
-                        <p className="text-gray-700 text-sm leading-relaxed">
+                        <h4 className="font-bold text-white mb-2">Caso de Negocio</h4>
+                        <p className="text-blue-100 text-sm leading-relaxed">
                           {currentProject.businessCase || 'Sin caso de negocio definido'}
                         </p>
                       </div>
@@ -777,28 +779,28 @@ const ProjectManagementTabs = ({
               </div>
             </div>
             <div className="text-right">
-              <div className="text-sm text-gray-600 mb-1">Fecha de Reporte</div>
+              <div className="text-sm text-blue-100 mb-2 font-medium">Fecha de Reporte</div>
               <input
                 type="date"
                 value={reportingDate}
                 onChange={(e) => setReportingDate(e.target.value)}
-                className="px-3 py-1 rounded bg-white text-gray-800 text-sm border border-gray-300 shadow-sm"
+                className="px-4 py-2 rounded-lg bg-white/90 text-slate-900 text-sm border-0 shadow-lg outline-none font-medium"
               />
             </div>
           </div>
         </div>
       </div>
 
-      {/* Selector de Proyectos Activos */}
-      <div className="bg-white rounded-lg shadow-sm p-4">
-        <div className="flex items-center justify-between mb-2">
-          <label className="block text-sm font-medium text-gray-700">
+      {/* Selector de Proyectos Activos - Premium */}
+      <div className="bg-white rounded-2xl shadow-lg p-6 border-2 border-slate-200">
+        <div className="flex items-center justify-between mb-4">
+          <label className="block text-sm font-bold text-slate-900">
             Proyecto Activo
           </label>
           <div
-            className={`px-4 py-2 rounded-lg text-sm font-medium ${useSupabase
-              ? 'bg-green-100 text-green-800 border border-green-300'
-              : 'bg-red-100 text-red-800 border border-red-300'
+            className={`px-4 py-2 rounded-xl text-sm font-bold shadow-lg border-2 ${useSupabase
+              ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white border-emerald-300'
+              : 'bg-gradient-to-r from-red-500 to-pink-600 text-white border-red-300'
               }`}
           >
             {useSupabase ? '🟢 Estado: Online' : '🔴 Estado: Offline'}
@@ -807,7 +809,7 @@ const ProjectManagementTabs = ({
         <select
           value={currentProjectId}
           onChange={(e) => setCurrentProjectId(e.target.value)}
-          className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          className="w-full p-3 border-2 border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
         >
           <option value="" disabled>Seleccionar proyecto activo</option>
           {activeProjects.map(project => (
@@ -819,10 +821,10 @@ const ProjectManagementTabs = ({
 
         {/* Mensaje informativo sobre filtrado implementado */}
         {currentProjectId && (
-          <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-            <div className="flex items-center text-green-800 text-sm">
-              <span className="mr-2">✅</span>
-              <span>
+          <div className="mt-4 p-4 bg-gradient-to-br from-emerald-50 to-green-50 border-2 border-emerald-200 rounded-xl max-w-full">
+            <div className="flex items-start text-emerald-800 text-sm">
+              <span className="text-xl mr-3 flex-shrink-0">✅</span>
+              <span className="break-words">
                 <strong>Filtrado por proyecto implementado:</strong> Todas las pestañas muestran únicamente la información de
                 <strong> {currentProject?.name}</strong>. Los datos de otros proyectos NO se incluyen en las métricas ni en los módulos.
               </span>
@@ -831,23 +833,22 @@ const ProjectManagementTabs = ({
         )}
       </div>
 
-      {/* Pestañas de Navegación */}
-      <div className="bg-white rounded-lg shadow-sm">
-        <div className="border-b border-gray-200">
-          <nav className="flex flex-wrap gap-1 px-4 overflow-x-auto scrollbar-hide tab-container">
+      {/* Pestañas de Navegación - Premium */}
+      <div className="bg-white rounded-2xl shadow-xl border-2 border-slate-200 overflow-hidden">
+        <div className="border-b-2 border-slate-100">
+          <nav className="flex flex-wrap gap-2 p-2 overflow-x-auto scrollbar-hide tab-container">
             {projectTabs.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`
-                  py-3 px-2 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap min-w-fit
-                  ${activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }
-                `}
+                className={cn(
+                  "py-3 px-5 rounded-xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap min-w-fit",
+                  activeTab === tab.id
+                    ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-xl shadow-blue-500/30 scale-105'
+                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                )}
               >
-                <span className="mr-1 sm:mr-2">{tab.icon}</span>
+                <span className="text-lg mr-1 sm:mr-2">{tab.icon}</span>
                 <span className="hidden sm:inline">{tab.name}</span>
                 <span className="sm:hidden">{tab.name.split(' ')[0]}</span>
               </button>
@@ -858,179 +859,217 @@ const ProjectManagementTabs = ({
         {/* Contenido de las Pestañas */}
         <div>
           {activeTab === 'summary' && (
-            <div className="space-y-8">
+            <div className="space-y-6">
               {/* Header del Dashboard */}
-              <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600 rounded-xl shadow-lg p-6 text-white">
-                <h1 className="text-3xl font-bold mb-2">📊 Dashboard Resumen</h1>
-                <p className="text-indigo-100 text-lg">
-                  {currentProject?.name || 'Proyecto no seleccionado'} - Vista ejecutiva del estado del proyecto
-                </p>
+              <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600 rounded-2xl shadow-xl p-8 text-white relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 rounded-full -mr-24 -mt-24"></div>
+                <div className="relative z-10">
+                  <h1 className="text-4xl font-bold mb-2 flex items-center gap-3 tracking-tight">
+                    <span className="text-5xl">📊</span>
+                    Dashboard Resumen
+                  </h1>
+                  <p className="text-indigo-100 text-lg tracking-wide">
+                    {currentProject?.name || 'Proyecto no seleccionado'} - Vista ejecutiva del estado del proyecto
+                  </p>
+                </div>
               </div>
 
               {/* 1. Información del Proyecto */}
-              <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-blue-500">
-                <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center">
-                  <span className="text-3xl mr-3">📈</span>
+              <div className="bg-white rounded-2xl shadow-xl p-8 border-2 border-blue-100 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-full -mr-16 -mt-16"></div>
+                <h2 className="text-2xl font-bold text-slate-900 mb-6 flex items-center relative z-10 tracking-tight">
+                  <span className="text-4xl mr-4">📈</span>
                   Información del Proyecto
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-lg border border-blue-200">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-2xl">💰</span>
-                      <span className="text-sm font-medium text-blue-600">Presupuesto</span>
-                    </div>
-                    <div className="text-3xl font-bold text-blue-800">
-                      ${((currentProject?.budget || 0) / 1000).toFixed(0)}K
-                    </div>
-                    <div className="text-sm text-blue-600 mt-1">
-                      Presupuesto asignado
-                    </div>
-                  </div>
-
-                  <div className="bg-gradient-to-br from-green-50 to-green-100 p-6 rounded-lg border border-green-200">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-2xl">📅</span>
-                      <span className="text-sm font-medium text-green-600">Inicio</span>
-                    </div>
-                    <div className="text-xl font-bold text-green-800">
-                      {projectStartDate ? new Date(projectStartDate).toLocaleDateString('es-ES') : 'N/A'}
-                    </div>
-                    <div className="text-sm text-green-600 mt-1">
-                      Fecha de inicio del cronograma
+                  <div className="bg-gradient-to-br from-blue-500 to-indigo-600 p-6 rounded-2xl shadow-xl shadow-blue-500/30 text-white relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12"></div>
+                    <div className="relative z-10">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-3xl">💰</span>
+                        <span className="text-xs font-bold text-blue-100 uppercase">Presupuesto</span>
+                      </div>
+                      <div className="text-4xl font-bold">
+                        ${((currentProject?.budget || 0) / 1000).toFixed(0)}K
+                      </div>
+                      <div className="text-sm text-blue-100 mt-2">
+                        Presupuesto asignado
+                      </div>
                     </div>
                   </div>
 
-                  <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-6 rounded-lg border border-purple-200">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-2xl">🏁</span>
-                      <span className="text-sm font-medium text-purple-600">Fin</span>
+                  <div className="bg-gradient-to-br from-emerald-500 to-green-600 p-6 rounded-2xl shadow-xl shadow-emerald-500/30 text-white relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12"></div>
+                    <div className="relative z-10">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-3xl">📅</span>
+                        <span className="text-xs font-bold text-emerald-100 uppercase">Inicio</span>
+                      </div>
+                      <div className="text-2xl font-bold">
+                        {projectStartDate ? new Date(projectStartDate).toLocaleDateString('es-ES') : 'N/A'}
+                      </div>
+                      <div className="text-sm text-emerald-100 mt-2">
+                        Fecha de inicio del cronograma
+                      </div>
                     </div>
-                    <div className="text-xl font-bold text-purple-800">
-                      {projectEndDate ? new Date(projectEndDate).toLocaleDateString('es-ES') : 'N/A'}
-                    </div>
-                    <div className="text-sm text-purple-600 mt-1">
-                      Fecha de fin del cronograma
+                  </div>
+
+                  <div className="bg-gradient-to-br from-purple-500 to-pink-600 p-6 rounded-2xl shadow-xl shadow-purple-500/30 text-white relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12"></div>
+                    <div className="relative z-10">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-3xl">🏁</span>
+                        <span className="text-xs font-bold text-purple-100 uppercase">Fin</span>
+                      </div>
+                      <div className="text-2xl font-bold">
+                        {projectEndDate ? new Date(projectEndDate).toLocaleDateString('es-ES') : 'N/A'}
+                      </div>
+                      <div className="text-sm text-purple-100 mt-2">
+                        Fecha de fin del cronograma
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* 2. Gestión Financiera */}
-              <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-green-500">
-                <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center">
-                  <span className="text-3xl mr-3">💳</span>
+              <div className="bg-white rounded-2xl shadow-xl p-8 border-2 border-emerald-100 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50 rounded-full -mr-16 -mt-16"></div>
+                <h2 className="text-2xl font-bold text-slate-900 mb-6 flex items-center relative z-10 tracking-tight">
+                  <span className="text-4xl mr-4">💳</span>
                   Gestión Financiera
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 p-6 rounded-lg border border-emerald-200">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-2xl">📋</span>
-                      <span className="text-sm font-medium text-emerald-600">Órdenes de Compra</span>
-                    </div>
-                    <div className="text-3xl font-bold text-emerald-800">
-                      ${((projectPurchaseOrders?.reduce((sum, po) => sum + (po.totalAmount || 0), 0) || 0) / 1000).toFixed(0)}K
-                    </div>
-                    <div className="text-sm text-emerald-600 mt-1">
-                      Monto en OC aprobadas
-                    </div>
-                  </div>
-
-                  <div className="bg-gradient-to-br from-amber-50 to-amber-100 p-6 rounded-lg border border-amber-200">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-2xl">💸</span>
-                      <span className="text-sm font-medium text-amber-600">Anticipos</span>
-                    </div>
-                    <div className="text-3xl font-bold text-amber-800">
-                      ${((projectAdvances?.reduce((sum, adv) => sum + (adv.amount || 0), 0) || 0) / 1000).toFixed(0)}K
-                    </div>
-                    <div className="text-sm text-amber-600 mt-1">
-                      Anticipos solicitados
+                  <div className="bg-gradient-to-br from-emerald-500 to-green-600 p-6 rounded-2xl shadow-xl shadow-emerald-500/30 text-white relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12"></div>
+                    <div className="relative z-10">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-3xl">📋</span>
+                        <span className="text-xs font-bold text-emerald-100 uppercase">Órdenes de Compra</span>
+                      </div>
+                      <div className="text-4xl font-bold">
+                        ${((projectPurchaseOrders?.reduce((sum, po) => sum + (po.totalAmount || 0), 0) || 0) / 1000).toFixed(0)}K
+                      </div>
+                      <div className="text-sm text-emerald-100 mt-2">
+                        Monto en OC aprobadas
+                      </div>
                     </div>
                   </div>
 
-                  <div className="bg-gradient-to-br from-cyan-50 to-cyan-100 p-6 rounded-lg border border-cyan-200">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-2xl">🧾</span>
-                      <span className="text-sm font-medium text-cyan-600">Facturas</span>
+                  <div className="bg-gradient-to-br from-amber-500 to-orange-600 p-6 rounded-2xl shadow-xl shadow-amber-500/30 text-white relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12"></div>
+                    <div className="relative z-10">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-3xl">💸</span>
+                        <span className="text-xs font-bold text-amber-100 uppercase">Anticipos</span>
+                      </div>
+                      <div className="text-4xl font-bold">
+                        ${((projectAdvances?.reduce((sum, adv) => sum + (adv.amount || 0), 0) || 0) / 1000).toFixed(0)}K
+                      </div>
+                      <div className="text-sm text-amber-100 mt-2">
+                        Anticipos solicitados
+                      </div>
                     </div>
-                    <div className="text-3xl font-bold text-cyan-800">
-                      ${((projectInvoices?.reduce((sum, inv) => sum + (inv.amount || 0), 0) || 0) / 1000).toFixed(0)}K
-                    </div>
-                    <div className="text-sm text-cyan-600 mt-1">
-                      Facturas ingresadas
+                  </div>
+
+                  <div className="bg-gradient-to-br from-cyan-500 to-blue-600 p-6 rounded-2xl shadow-xl shadow-cyan-500/30 text-white relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12"></div>
+                    <div className="relative z-10">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-3xl">🧾</span>
+                        <span className="text-xs font-bold text-cyan-100 uppercase">Facturas</span>
+                      </div>
+                      <div className="text-4xl font-bold">
+                        ${((projectInvoices?.reduce((sum, inv) => sum + (inv.amount || 0), 0) || 0) / 1000).toFixed(0)}K
+                      </div>
+                      <div className="text-sm text-cyan-100 mt-2">
+                        Facturas ingresadas
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* 3. Reservas y Riesgos */}
-              <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-red-500">
-                <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center">
-                  <span className="text-3xl mr-3">🛡️</span>
+              <div className="bg-white rounded-2xl shadow-xl p-8 border-2 border-red-100 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-red-50 rounded-full -mr-16 -mt-16"></div>
+                <h2 className="text-2xl font-bold text-slate-900 mb-6 flex items-center relative z-10 tracking-tight">
+                  <span className="text-4xl mr-4">🛡️</span>
                   Reservas y Riesgos
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
-                    <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-6 rounded-lg border border-orange-200">
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-2xl">⚠️</span>
-                        <span className="text-sm font-medium text-orange-600">Reserva de Contingencia</span>
-                      </div>
-                      <div className="text-3xl font-bold text-orange-800">
-                        ${((currentProject?.budget || 0) * 0.05 / 1000).toFixed(0)}K
-                      </div>
-                      <div className="text-sm text-orange-600 mt-1">
-                        5% del presupuesto total
+                    <div className="bg-gradient-to-br from-orange-500 to-amber-600 p-6 rounded-2xl shadow-xl shadow-orange-500/30 text-white relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12"></div>
+                      <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-3xl">⚠️</span>
+                          <span className="text-xs font-bold text-orange-100 uppercase">Contingencia</span>
+                        </div>
+                        <div className="text-4xl font-bold">
+                          ${((currentProject?.budget || 0) * 0.05 / 1000).toFixed(0)}K
+                        </div>
+                        <div className="text-sm text-orange-100 mt-2">
+                          5% del presupuesto total
+                        </div>
                       </div>
                     </div>
 
-                    <div className="bg-gradient-to-br from-pink-50 to-pink-100 p-6 rounded-lg border border-pink-200">
-                      <div className="flex items-center justify-between mb-3">
-                        <span className="text-2xl">🎯</span>
-                        <span className="text-sm font-medium text-pink-600">Reserva de Gestión</span>
-                      </div>
-                      <div className="text-3xl font-bold text-pink-800">
-                        ${((currentProject?.budget || 0) * 0.1 / 1000).toFixed(0)}K
-                      </div>
-                      <div className="text-sm text-pink-600 mt-1">
-                        10% del presupuesto total
+                    <div className="bg-gradient-to-br from-pink-500 to-rose-600 p-6 rounded-2xl shadow-xl shadow-pink-500/30 text-white relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12"></div>
+                      <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-3xl">🎯</span>
+                          <span className="text-xs font-bold text-pink-100 uppercase">Gestión</span>
+                        </div>
+                        <div className="text-4xl font-bold">
+                          ${((currentProject?.budget || 0) * 0.1 / 1000).toFixed(0)}K
+                        </div>
+                        <div className="text-sm text-pink-100 mt-2">
+                          10% del presupuesto total
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="bg-gradient-to-br from-red-50 to-red-100 p-6 rounded-lg border border-red-200">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="text-2xl">🚨</span>
-                      <span className="text-sm font-medium text-red-600">Principales Riesgos</span>
+                  <div className="bg-gradient-to-br from-red-50 to-pink-50 p-6 rounded-2xl border-2 border-red-200">
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="text-3xl">🚨</span>
+                      <span className="text-sm font-bold text-red-700 uppercase">Principales Riesgos</span>
                     </div>
                     <div className="space-y-3">
                       {projectRisks?.slice(0, 3).map((risk, index) => {
-                        // Calcular el Expected Monetary Value (EMV) = Probabilidad × Impacto en Costos
                         const emv = (risk.probability || 0) * (risk.costImpact || 0);
                         return (
-                          <div key={risk.id} className="p-3 bg-white rounded-lg border">
+                          <div key={risk.id} className="p-4 bg-white rounded-xl border-2 border-slate-200 shadow-md hover:shadow-lg transition-all">
                             <div className="flex items-center justify-between mb-2">
                               <div className="flex items-center space-x-3">
-                                <span className={`w-3 h-3 rounded-full ${risk.priority === 'high' ? 'bg-red-500' :
-                                  risk.priority === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
-                                  }`}></span>
-                                <span className="text-sm font-medium text-gray-800 truncate">
+                                <span className={cn(
+                                  "w-3 h-3 rounded-full shadow-lg",
+                                  risk.priority === 'high' ? 'bg-gradient-to-r from-red-500 to-pink-600' :
+                                    risk.priority === 'medium' ? 'bg-gradient-to-r from-amber-400 to-yellow-500' :
+                                      'bg-gradient-to-r from-emerald-400 to-green-500'
+                                )}></span>
+                                <span className="text-sm font-bold text-slate-900 truncate">
                                   {risk.name}
                                 </span>
                               </div>
-                              <span className={`text-xs px-2 py-1 rounded-full ${risk.priority === 'high' ? 'bg-red-100 text-red-800' :
-                                risk.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'
-                                }`}>
+                              <span className={cn(
+                                "text-xs px-2.5 py-1 rounded-full font-bold border-2 shadow-sm",
+                                risk.priority === 'high' ? 'bg-gradient-to-r from-red-500 to-pink-600 text-white border-red-300' :
+                                  risk.priority === 'medium' ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-white border-amber-300' :
+                                    'bg-gradient-to-r from-emerald-400 to-green-500 text-white border-emerald-300'
+                              )}>
                                 {risk.priority}
                               </span>
                             </div>
-                            <div className="flex items-center justify-between text-xs text-gray-600">
+                            <div className="flex items-center justify-between text-xs text-slate-600 font-medium">
                               <span>Costo probable:</span>
-                              <span className="font-semibold text-red-600">
+                              <span className="font-bold text-red-600">
                                 ${(emv / 1000).toFixed(1)}K
                               </span>
                             </div>
-                            <div className="flex items-center justify-between text-xs text-gray-500 mt-1">
+                            <div className="flex items-center justify-between text-xs text-slate-500 mt-1">
                               <span>Prob: {((risk.probability || 0) * 100).toFixed(0)}%</span>
                               <span>Impacto: ${((risk.costImpact || 0) / 1000).toFixed(0)}K</span>
                             </div>
@@ -1038,8 +1077,9 @@ const ProjectManagementTabs = ({
                         );
                       })}
                       {(!projectRisks || projectRisks.length === 0) && (
-                        <div className="text-center text-gray-500 py-4">
-                          No hay riesgos registrados
+                        <div className="text-center text-slate-500 py-8">
+                          <span className="text-4xl mb-2 block opacity-20">🛡️</span>
+                          <p className="font-medium">No hay riesgos registrados</p>
                         </div>
                       )}
                     </div>
@@ -1048,17 +1088,18 @@ const ProjectManagementTabs = ({
               </div>
 
               {/* 4. Hitos del Proyecto */}
-              <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-purple-500">
-                <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center justify-between">
+              <div className="bg-white rounded-2xl shadow-xl p-8 border-2 border-purple-100 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-purple-50 rounded-full -mr-16 -mt-16"></div>
+                <h2 className="text-2xl font-bold text-slate-900 mb-6 flex items-center justify-between relative z-10 tracking-tight">
                   <div className="flex items-center">
-                    <span className="text-3xl mr-3">🎯</span>
+                    <span className="text-4xl mr-4">🎯</span>
                     Hitos del Proyecto
                   </div>
-                  <span className="text-sm bg-purple-100 text-purple-800 px-3 py-1 rounded-full">
+                  <span className="text-sm bg-gradient-to-r from-purple-500 to-pink-600 text-white px-4 py-1.5 rounded-full font-bold shadow-lg">
                     {projectTasks?.filter(task => task.isMilestone).length || 0} hitos
                   </span>
                 </h2>
-                <div className="space-y-4 max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+                <div className="space-y-4 max-h-96 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-slate-100">
                   {(() => {
                     const milestones = projectTasks?.filter(task => task.isMilestone) || [];
                     logger.debug('🎯 Dashboard - Hitos actualizados:', milestones.map(m => ({
@@ -1070,27 +1111,29 @@ const ProjectManagementTabs = ({
                     return milestones;
                   })()
                     .sort((a, b) => {
-                      // CORRECCIÓN: Ordenar por fecha de inicio para seguir secuencia del cronograma
                       const aDate = new Date(a.startDate || a.endDate || '1900-01-01');
                       const bDate = new Date(b.startDate || b.endDate || '1900-01-01');
                       return aDate - bDate;
                     })
                     .map((milestone, index) => (
-                      <div key={milestone.id} className="bg-gradient-to-r from-gray-50 to-gray-100 p-4 rounded-lg border border-gray-200">
+                      <div key={milestone.id} className="bg-gradient-to-r from-slate-50 to-purple-50 p-5 rounded-2xl border-2 border-slate-200 hover:border-purple-300 hover:shadow-lg transition-all">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-4">
-                            <div className={`w-4 h-4 rounded-full ${milestone.status === 'completed' ? 'bg-green-500' :
-                              milestone.status === 'in-progress' ? 'bg-yellow-500' :
-                                milestone.status === 'delayed' ? 'bg-red-500' : 'bg-gray-400'
-                              }`}></div>
+                            <div className={cn(
+                              "w-4 h-4 rounded-full shadow-lg",
+                              milestone.status === 'completed' ? 'bg-gradient-to-r from-emerald-500 to-green-600' :
+                                milestone.status === 'in-progress' ? 'bg-gradient-to-r from-amber-400 to-yellow-500' :
+                                  milestone.status === 'delayed' ? 'bg-gradient-to-r from-red-500 to-pink-600' :
+                                    'bg-slate-400'
+                            )}></div>
                             <div>
-                              <h3 className="font-semibold text-gray-800">
+                              <h3 className="font-bold text-slate-900">
                                 {milestone.name}
-                                <span className="ml-2 text-sm font-medium text-blue-600">
+                                <span className="ml-2 text-sm font-bold text-blue-600">
                                   [{calculateMilestoneProgress(milestone, projectTasks)}%]
                                 </span>
                               </h3>
-                              <p className="text-sm text-gray-600">
+                              <p className="text-sm text-slate-600 font-medium">
                                 {milestone.endDate ? new Date(milestone.endDate).toLocaleDateString('es-ES') : 'Sin fecha'}
                               </p>
                             </div>
@@ -1123,24 +1166,30 @@ const ProjectManagementTabs = ({
 
                                   setTasks(updatedTasks);
                                 }}
-                                className={`px-3 py-1 rounded-full text-xs font-medium border-0 focus:ring-2 focus:ring-blue-500 ${milestone.status === 'completed' ? 'bg-green-100 text-green-800' :
-                                  milestone.status === 'in-progress' ? 'bg-yellow-100 text-yellow-800' :
-                                    milestone.status === 'delayed' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
-                                  }`}
+                                className={cn(
+                                  "px-3 py-1.5 rounded-full text-xs font-bold border-2 focus:ring-2 focus:ring-blue-500/20 outline-none shadow-sm",
+                                  milestone.status === 'completed' ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white border-emerald-300' :
+                                    milestone.status === 'in-progress' ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-white border-amber-300' :
+                                      milestone.status === 'delayed' ? 'bg-gradient-to-r from-red-500 to-pink-600 text-white border-red-300' :
+                                        'bg-slate-100 text-slate-700 border-slate-200'
+                                )}
                               >
-                                <option value="in-progress" className="bg-yellow-100 text-yellow-800">En Proceso</option>
-                                <option value="completed" className="bg-green-100 text-green-800">Realizado</option>
-                                <option value="delayed" className="bg-red-100 text-red-800">Atrasado</option>
+                                <option value="in-progress">En Proceso</option>
+                                <option value="completed">Realizado</option>
+                                <option value="delayed">Atrasado</option>
                               </select>
                             ) : (
-                              <div className={`px-3 py-1 rounded-full text-xs font-medium ${milestone.status === 'completed' ? 'bg-green-100 text-green-800' :
-                                milestone.status === 'in-progress' ? 'bg-yellow-100 text-yellow-800' :
-                                  milestone.status === 'delayed' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
-                                }`}>
+                              <div className={cn(
+                                "px-3 py-1.5 rounded-full text-xs font-bold border-2 shadow-sm",
+                                milestone.status === 'completed' ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white border-emerald-300' :
+                                  milestone.status === 'in-progress' ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-white border-amber-300' :
+                                    milestone.status === 'delayed' ? 'bg-gradient-to-r from-red-500 to-pink-600 text-white border-red-300' :
+                                      'bg-slate-100 text-slate-700 border-slate-200'
+                              )}>
                                 {milestone.status === 'completed' ? 'Realizado' :
                                   milestone.status === 'in-progress' ? 'En Proceso' :
                                     milestone.status === 'delayed' ? 'Atrasado' : 'Pendiente'}
-                                <span className="ml-1 text-gray-500">👀</span>
+                                <span className="ml-1">👀</span>
                               </div>
                             )}
                           </div>
@@ -1148,23 +1197,26 @@ const ProjectManagementTabs = ({
                       </div>
                     ))}
                   {(!projectTasks || projectTasks.filter(task => task.isMilestone).length === 0) && (
-                    <div className="text-center text-gray-500 py-8">
-                      <span className="text-4xl mb-4 block">🎯</span>
-                      <p>No hay hitos definidos para este proyecto</p>
+                    <div className="text-center text-slate-500 py-12">
+                      <span className="text-6xl mb-4 block opacity-20">🎯</span>
+                      <p className="font-bold text-lg">No hay hitos definidos para este proyecto</p>
                     </div>
                   )}
                 </div>
               </div>
 
               {/* 5. Alerta Tareas por Vencer */}
-              <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-orange-500">
-                <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center justify-between">
+              <div className="bg-white rounded-2xl shadow-xl p-8 border-2 border-orange-100 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-orange-50 rounded-full -mr-16 -mt-16"></div>
+                <h2 className="text-2xl font-bold text-slate-900 mb-6 flex items-center justify-between relative z-10 tracking-tight">
                   <div className="flex items-center">
-                    <span className="text-3xl mr-3">⚠️</span>
-                    Alerta Tareas por Vencer
-                    <span className="text-sm text-gray-500 ml-2">(Vencidas + Próximas a vencer - Cronograma + Minutas)</span>
+                    <span className="text-4xl mr-4">⚠️</span>
+                    <div>
+                      <div>Alerta Tareas por Vencer</div>
+                      <span className="text-xs text-slate-500 font-normal tracking-normal">(Vencidas + Próximas a vencer - Cronograma + Minutas)</span>
+                    </div>
                   </div>
-                  <span className="text-sm bg-orange-100 text-orange-800 px-3 py-1 rounded-full">
+                  <span className="text-sm bg-gradient-to-r from-orange-500 to-red-600 text-white px-4 py-1.5 rounded-full font-bold shadow-lg">
                     {(() => {
                       const orphanedTasks = getOrphanedMinutaTasks(minutaTasks, projectTasks);
                       const unifiedTasks = getUnifiedTasksNearDeadline(projectTasks, minutaTasks);
@@ -1186,7 +1238,6 @@ const ProjectManagementTabs = ({
                           orphanedTasks={orphanedTasks}
                           availableMilestones={projectTasks.filter(t => t.isMilestone)}
                           onReassign={(taskId, newHitoId) => {
-                            // Actualizar estado local
                             setMinutaTasks(prev => prev.map(task =>
                               task.id === taskId ? { ...task, hitoId: newHitoId } : task
                             ));
@@ -1197,72 +1248,72 @@ const ProjectManagementTabs = ({
 
                       {/* Mostrar grupos normales */}
                       {unifiedTasks.map((group, groupIndex) => (
-                        <div key={group.milestone.id} className="bg-gradient-to-r from-orange-50 to-red-50 p-4 rounded-lg border border-orange-200">
-                          <div className="flex items-center mb-3">
-                            <div className="w-3 h-3 rounded-full bg-orange-500 mr-3"></div>
-                            <h3 className="font-semibold text-gray-800 text-lg">
+                        <div key={group.milestone.id} className="bg-gradient-to-br from-orange-50 to-red-50 p-5 rounded-2xl border-2 border-orange-200">
+                          <div className="flex items-center mb-4">
+                            <div className="w-3 h-3 rounded-full bg-gradient-to-r from-orange-500 to-red-600 mr-3 shadow-lg"></div>
+                            <h3 className="font-bold text-slate-900 text-lg">
                               {group.milestone.name}
                             </h3>
-                            <span className="ml-2 text-sm text-orange-600">
-                              ({group.tasks.length} tareas)
+                            <span className="ml-2 text-sm bg-gradient-to-r from-orange-500 to-red-600 text-white px-3 py-1 rounded-full font-bold shadow-sm">
+                              {group.tasks.length} tareas
                             </span>
                           </div>
 
-                          <div className="space-y-2">
+                          <div className="space-y-3">
                             {group.tasks.map((task, taskIndex) => {
                               const daysUntilDeadline = Math.ceil((new Date(task.endDate) - new Date()) / (1000 * 60 * 60 * 24));
                               const isOverdue = daysUntilDeadline < 0;
 
-                              // Colores mejorados para distinguir tareas vencidas vs próximas a vencer
-                              const urgencyColor = isOverdue ? 'text-red-700 bg-red-200 border-red-300' : // Tareas vencidas
-                                daysUntilDeadline === 0 ? 'text-red-600 bg-red-100 border-red-200' : // Vence hoy
-                                  daysUntilDeadline <= 3 ? 'text-orange-600 bg-orange-100 border-orange-200' : // 1-3 días
-                                    daysUntilDeadline <= 7 ? 'text-yellow-600 bg-yellow-100 border-yellow-200' : // 4-7 días
-                                      'text-blue-600 bg-blue-100 border-blue-200'; // 8-15 días
+                              const urgencyColor = isOverdue ? 'bg-gradient-to-r from-red-500 to-pink-600 text-white border-red-300' :
+                                daysUntilDeadline === 0 ? 'bg-gradient-to-r from-red-400 to-pink-500 text-white border-red-200' :
+                                  daysUntilDeadline <= 3 ? 'bg-gradient-to-r from-orange-500 to-amber-600 text-white border-orange-300' :
+                                    daysUntilDeadline <= 7 ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-white border-amber-300' :
+                                      'bg-gradient-to-r from-blue-400 to-indigo-500 text-white border-blue-300';
 
                               return (
-                                <div key={task.id} className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm">
+                                <div key={task.id} className="bg-white p-4 rounded-xl border-2 border-slate-200 shadow-md hover:shadow-lg transition-all">
                                   <div className="flex items-center justify-between">
                                     <div className="flex-1">
-                                      <div className="flex items-center space-x-2 mb-1">
-                                        <h4 className="font-medium text-gray-800">{task.name}</h4>
-                                        {/* Badge diferenciador de origen */}
+                                      <div className="flex items-center space-x-2 mb-2">
+                                        <h4 className="font-bold text-slate-900">{task.name}</h4>
                                         {task.source === 'cronograma' ? (
-                                          <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full flex items-center">
+                                          <span className="text-xs bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-3 py-1 rounded-full flex items-center font-bold shadow-sm">
                                             <span className="mr-1">📋</span>
                                             Cronograma
                                           </span>
                                         ) : (
-                                          <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center">
+                                          <span className="text-xs bg-gradient-to-r from-emerald-500 to-green-600 text-white px-3 py-1 rounded-full flex items-center font-bold shadow-sm">
                                             <span className="mr-1">📝</span>
                                             Minuta
                                           </span>
                                         )}
                                       </div>
-                                      <div className="flex items-center space-x-4 mt-1 text-sm text-gray-600">
+                                      <div className="flex items-center space-x-4 text-sm text-slate-600 font-medium">
                                         <span>📅 {new Date(task.endDate).toLocaleDateString('es-ES')}</span>
                                         <span>👤 {task.assignedTo || task.responsable || 'Sin asignar'}</span>
                                         <span>📊 {task.progress || 0}% completado</span>
                                         {task.estatus && (
-                                          <span className={`px-2 py-1 rounded-full text-xs ${task.estatus === 'Completado' ? 'bg-green-100 text-green-800' :
-                                            task.estatus === 'En Proceso' ? 'bg-yellow-100 text-yellow-800' :
-                                              'bg-gray-100 text-gray-800'
-                                            }`}>
+                                          <span className={cn(
+                                            "px-2.5 py-1 rounded-full text-xs font-bold border-2",
+                                            task.estatus === 'Completado' ? 'bg-gradient-to-r from-emerald-500 to-green-600 text-white border-emerald-300' :
+                                              task.estatus === 'En Proceso' ? 'bg-gradient-to-r from-amber-400 to-yellow-500 text-white border-amber-300' :
+                                                'bg-slate-100 text-slate-700 border-slate-200'
+                                          )}>
                                             {task.estatus}
                                           </span>
                                         )}
                                       </div>
                                     </div>
-                                    <div className="flex items-center space-x-2">
-                                      <span className={`px-2 py-1 rounded-full text-xs font-medium border ${urgencyColor}`}>
+                                    <div className="flex items-center space-x-3">
+                                      <span className={cn("px-3 py-1.5 rounded-full text-xs font-bold border-2 shadow-lg", urgencyColor)}>
                                         {isOverdue ? `Vencida hace ${Math.abs(daysUntilDeadline)} días` :
                                           daysUntilDeadline === 0 ? 'Vence hoy' :
                                             daysUntilDeadline === 1 ? 'Vence mañana' :
                                               `Vence en ${daysUntilDeadline} días`}
                                       </span>
-                                      <div className="w-16 bg-gray-200 rounded-full h-2">
+                                      <div className="w-16 bg-slate-200 rounded-full h-2.5 shadow-inner">
                                         <div
-                                          className="bg-blue-500 h-2 rounded-full"
+                                          className="bg-gradient-to-r from-blue-500 to-indigo-600 h-2.5 rounded-full shadow-sm"
                                           style={{ width: `${task.progress || 0}%` }}
                                         ></div>
                                       </div>
@@ -1276,9 +1327,9 @@ const ProjectManagementTabs = ({
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center text-gray-500 py-8">
-                      <span className="text-4xl mb-4 block">✅</span>
-                      <p>¡Excelente! No hay tareas próximas a vencer</p>
+                    <div className="text-center text-slate-500 py-12">
+                      <span className="text-6xl mb-4 block opacity-20">✅</span>
+                      <p className="font-bold text-lg">¡Excelente! No hay tareas próximas a vencer</p>
                       <p className="text-sm mt-2">Todas las tareas del cronograma y minutas están al día o completadas</p>
                     </div>
                   );
@@ -1408,7 +1459,7 @@ const ProjectManagementTabs = ({
         onSave={onSave}
         hasUnsavedChanges={hasUnsavedChanges}
       />
-    </div>
+    </div >
   );
 };
 

@@ -5971,23 +5971,23 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
           </div>
 
           {/* Tabla tipo Excel */}
-          <div className="overflow-y-auto max-h-[85vh] border border-gray-200 rounded-lg">
+          <div className="overflow-x-auto overflow-y-auto max-h-[85vh] border border-gray-200 rounded-lg">
             <table className="min-w-full border-collapse border border-gray-300 text-xs">
               <thead className="sticky top-0 bg-gray-50 z-10">
                 <tr>
                   <th className="border border-gray-300 px-1 py-1 text-left text-xs font-medium text-gray-700" style={{ width: '30px' }}>#</th>
-                  <th className="border border-gray-300 px-1 py-1 text-center text-xs font-medium text-gray-700" style={{ width: '70px' }}>Acción</th>
-                  <th className="border border-gray-300 px-2 py-1 text-left text-xs font-medium text-gray-700" style={{ minWidth: '150px' }}>Tarea</th>
-                  <th className="border border-gray-300 px-1 py-1 text-center text-xs font-medium text-gray-700" style={{ width: '35px' }}>🏹</th>
-                  <th className="border border-gray-300 px-1 py-1 text-left text-xs font-medium text-gray-700" style={{ width: '55px' }}>Duración</th>
-                  <th className="border border-gray-300 px-1 py-1 text-left text-xs font-medium text-gray-700" style={{ width: '85px' }}>Inicio</th>
-                  <th className="border border-gray-300 px-1 py-1 text-left text-xs font-medium text-gray-700" style={{ width: '85px' }}>Fin</th>
-                  <th className="border border-gray-300 px-1 py-1 text-left text-xs font-medium text-gray-700" style={{ width: '80px' }}>Progreso</th>
-                  <th className="border border-gray-300 px-1 py-1 text-left text-xs font-medium text-gray-700" style={{ width: '70px' }}>Prioridad</th>
-                  <th className="border border-gray-300 px-1 py-1 text-left text-xs font-medium text-gray-700" style={{ width: '90px' }}>Asignado</th>
-                  <th className="border border-gray-300 px-1 py-1 text-left text-xs font-medium text-gray-700" style={{ width: '70px' }}>Costo</th>
-                  <th className="border border-gray-300 px-1 py-1 text-left text-xs font-medium text-gray-700" style={{ width: '70px' }}>💰 Valor</th>
-                  <th className="border border-gray-300 px-1 py-1 text-left text-xs font-medium text-gray-700" style={{ width: '90px' }}>Predecesoras</th>
+                  <th className="border border-gray-300 px-1 py-1 text-center text-xs font-medium text-gray-700" style={{ width: '45px' }}>Acción</th>
+                  <th className="border border-gray-300 px-2 py-1 text-left text-xs font-medium text-gray-700" style={{ minWidth: '120px' }}>Tarea</th>
+                  <th className="border border-gray-300 px-1 py-1 text-center text-xs font-medium text-gray-700" style={{ width: '30px' }}>🏹</th>
+                  <th className="border border-gray-300 px-1 py-1 text-left text-xs font-medium text-gray-700" style={{ width: '50px' }}>Duración</th>
+                  <th className="border border-gray-300 px-1 py-1 text-left text-xs font-medium text-gray-700" style={{ width: '80px' }}>Inicio</th>
+                  <th className="border border-gray-300 px-1 py-1 text-left text-xs font-medium text-gray-700" style={{ width: '80px' }}>Fin</th>
+                  <th className="border border-gray-300 px-1 py-1 text-left text-xs font-medium text-gray-700" style={{ width: '70px' }}>Progreso</th>
+                  <th className="border border-gray-300 px-1 py-1 text-left text-xs font-medium text-gray-700" style={{ width: '65px' }}>Prioridad</th>
+                  <th className="border border-gray-300 px-1 py-1 text-left text-xs font-medium text-gray-700" style={{ width: '80px' }}>Asignado</th>
+                  <th className="border border-gray-300 px-1 py-1 text-left text-xs font-medium text-gray-700" style={{ width: '60px' }}>Costo</th>
+                  <th className="border border-gray-300 px-1 py-1 text-left text-xs font-medium text-gray-700" style={{ width: '60px' }}>💰 Valor</th>
+                  <th className="border border-gray-300 px-1 py-1 text-left text-xs font-medium text-gray-700" style={{ width: '80px' }}>Predecesoras</th>
                 </tr>
               </thead>
               <tbody onKeyDown={handleKeyDown}>
@@ -6056,15 +6056,15 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                         </td>
 
                         {/* Acciones */}
-                        <td className="border border-gray-300 px-2 py-1">
-                          <div className="flex space-x-1 justify-center">
+                        <td className="border border-gray-300 px-1 py-1">
+                          <div className="flex space-x-0.5 justify-center">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 insertTaskAtPosition(task.id, index);
                               }}
                               disabled={isReadOnlyMode}
-                              className={`text-sm px-2 py-1 rounded-md shadow-sm transition-colors duration-200 flex items-center justify-center min-w-[32px] ${isReadOnlyMode
+                              className={`text-xs px-1 py-0.5 rounded shadow-sm transition-colors duration-200 flex items-center justify-center min-w-[24px] ${isReadOnlyMode
                                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                                 : 'bg-green-500 hover:bg-green-600 text-white'
                                 }`}
@@ -6077,7 +6077,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                                 e.stopPropagation();
                                 deleteTask(task.id);
                               }}
-                              className="bg-red-500 hover:bg-red-600 text-white text-sm px-2 py-1 rounded-md shadow-sm transition-colors duration-200 flex items-center justify-center min-w-[32px]"
+                              className="bg-red-500 hover:bg-red-600 text-white text-xs px-1 py-0.5 rounded shadow-sm transition-colors duration-200 flex items-center justify-center min-w-[24px]"
                               title="Eliminar tarea"
                             >
                               🗑️
@@ -6310,8 +6310,9 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                             <div
                               className="cursor-pointer hover:bg-gray-100 px-2 py-1 rounded min-h-[24px] flex items-center"
                               onClick={() => startEditing(task.id, 'cost', task.cost)}
+                              title={`$${task.cost.toLocaleString()}`}
                             >
-                              ${task.cost.toLocaleString()}
+                              ${task.cost >= 1000 ? `${(task.cost / 1000).toFixed(0)}K` : task.cost}
                             </div>
                           )}
                         </td>
@@ -6333,9 +6334,9 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                             <div
                               className="cursor-pointer hover:bg-indigo-100 px-2 py-1 rounded min-h-[24px] flex items-center"
                               onClick={() => startEditing(task.id, 'businessValue', task.businessValue || 0)}
-                              title="Valor de negocio según PMBOK 7"
+                              title={`Valor de negocio: $${(task.businessValue || 0).toLocaleString()}`}
                             >
-                              ${(task.businessValue || 0).toLocaleString()}
+                              ${(task.businessValue || 0) >= 1000 ? `${((task.businessValue || 0) / 1000).toFixed(0)}K` : (task.businessValue || 0)}
                             </div>
                           )}
                         </td>
@@ -6611,8 +6612,8 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                     <div
                       className="flex"
                       style={{
-                        width: Math.max(chartWidthPx + 100, 800),
-                        minWidth: Math.max(chartWidthPx + 100, 800)
+                        width: chartWidthPx + 100,
+                        minWidth: chartWidthPx + 100
                       }}
                     >
                       {generateTimelineHeaders().map((header, index) => (
@@ -6635,7 +6636,7 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                   onScroll={onRightScroll}
                   className="flex-1 overflow-x-auto overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-200"
                 >
-                  <div style={{ width: Math.max(chartWidthPx + 100, 800) }}>
+                  <div style={{ width: chartWidthPx + 100 }}>
 
                     {/* Barras del Gantt */}
                     <div className="relative">

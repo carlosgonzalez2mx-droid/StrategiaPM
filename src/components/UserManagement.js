@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import OrganizationMembers from './OrganizationMembers';
 import ChangeFlowDiagram from './change-management/ChangeFlowDiagram';
+import { cn } from '../lib/utils';
 
-const UserManagement = ({ 
-  currentProject, 
+const UserManagement = ({
+  currentProject,
   useSupabase = false,
   projects = []
 }) => {
@@ -49,11 +50,11 @@ const UserManagement = ({
 
   const getRoleColor = (role) => {
     switch (role) {
-      case 'super_admin': return 'bg-red-100 text-red-800 border-red-200';
-      case 'organization_owner': return 'bg-purple-100 text-purple-800 border-purple-200';
-      case 'organization_member_write': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'organization_member_read': return 'bg-green-100 text-green-800 border-green-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'super_admin': return 'bg-gradient-to-br from-red-500 to-pink-600 text-white border-red-300';
+      case 'organization_owner': return 'bg-gradient-to-br from-purple-500 to-indigo-600 text-white border-purple-300';
+      case 'organization_member_write': return 'bg-gradient-to-br from-blue-500 to-cyan-600 text-white border-blue-300';
+      case 'organization_member_read': return 'bg-gradient-to-br from-emerald-500 to-green-600 text-white border-emerald-300';
+      default: return 'bg-slate-100 text-slate-700 border-slate-200';
     }
   };
 
@@ -69,43 +70,54 @@ const UserManagement = ({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="bg-white rounded-lg shadow-sm border p-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-800">Gestión de Usuarios</h1>
-            <p className="text-gray-600 mt-2">
-              Administra usuarios, roles y permisos de tu organización
-            </p>
-          </div>
-          <div className="text-right">
-            <div className="text-2xl font-bold text-blue-600">
-              {organizationStats.activeProjects}
+      {/* Header - Premium */}
+      <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600 rounded-2xl shadow-xl p-8 text-white relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32"></div>
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/10 rounded-full -ml-24 -mb-24"></div>
+        <div className="relative z-10">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-bold mb-2 flex items-center gap-3">
+                <span className="text-5xl">👥</span>
+                Gestión de Usuarios
+              </h1>
+              <p className="text-indigo-100 text-lg">
+                Administra usuarios, roles y permisos de tu organización
+              </p>
             </div>
-            <div className="text-sm text-gray-500">Proyectos Activos</div>
+            <div className="text-right bg-white/20 backdrop-blur-sm rounded-2xl p-6 border border-white/30">
+              <div className="text-4xl font-bold">
+                {organizationStats.activeProjects}
+              </div>
+              <div className="text-sm text-indigo-100 mt-1">Proyectos Activos</div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="bg-white rounded-lg shadow-sm border">
-        <div className="border-b border-gray-200">
-          <nav className="flex space-x-8 px-6">
+      {/* Tabs - Premium */}
+      <div className="bg-white rounded-2xl shadow-xl border-2 border-slate-200">
+        <div className="border-b-2 border-slate-200">
+          <nav className="flex space-x-2 px-4 py-2">
             {tabs.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                className={cn(
+                  "py-3 px-5 rounded-xl font-bold text-sm transition-all",
                   activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                    ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-xl shadow-blue-500/30 scale-105'
+                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                )}
               >
                 <div className="flex items-center space-x-2">
-                  <span className="text-lg">{tab.icon}</span>
-                  <div>
-                    <div className="font-medium">{tab.name}</div>
-                    <div className="text-xs text-gray-400">{tab.description}</div>
+                  <span className="text-xl">{tab.icon}</span>
+                  <div className="text-left">
+                    <div className="font-bold">{tab.name}</div>
+                    <div className={cn(
+                      "text-xs",
+                      activeTab === tab.id ? 'text-blue-100' : 'text-slate-400'
+                    )}>{tab.description}</div>
                   </div>
                 </div>
               </button>
@@ -177,28 +189,34 @@ const UserManagement = ({
                     ]
                   }
                 ].map(({ role, permissions }) => (
-                  <div key={role} className={`border rounded-lg p-4 ${getRoleColor(role)}`}>
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-semibold text-lg">
-                        {getRoleLabel(role)}
-                      </h4>
-                      <span className="text-sm font-medium">
-                        {role}
-                      </span>
-                    </div>
-                    <p className="text-sm mb-3 opacity-80">
-                      {getRoleDescription(role)}
-                    </p>
-                    <div>
-                      <h5 className="font-medium mb-2">Permisos:</h5>
-                      <ul className="text-sm space-y-1">
-                        {permissions.map((permission, index) => (
-                          <li key={index} className="flex items-start">
-                            <span className="text-green-500 mr-2">✓</span>
-                            {permission}
-                          </li>
-                        ))}
-                      </ul>
+                  <div key={role} className={cn(
+                    "border-2 rounded-2xl p-6 shadow-xl relative overflow-hidden",
+                    getRoleColor(role)
+                  )}>
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12"></div>
+                    <div className="relative z-10">
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="font-bold text-xl">
+                          {getRoleLabel(role)}
+                        </h4>
+                        <span className="text-xs font-bold bg-white/20 px-3 py-1 rounded-full border border-white/30">
+                          {role}
+                        </span>
+                      </div>
+                      <p className="text-sm mb-4 opacity-90 font-medium">
+                        {getRoleDescription(role)}
+                      </p>
+                      <div>
+                        <h5 className="font-bold mb-3 text-sm uppercase tracking-wide">Permisos:</h5>
+                        <ul className="text-sm space-y-2">
+                          {permissions.map((permission, index) => (
+                            <li key={index} className="flex items-start">
+                              <span className="text-white mr-2 font-bold">✓</span>
+                              <span className="font-medium">{permission}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -218,25 +236,25 @@ const UserManagement = ({
                 </p>
               </div>
 
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-2xl p-6">
                 <div className="flex items-start">
-                  <span className="text-blue-500 text-xl mr-3">ℹ️</span>
+                  <span className="text-blue-500 text-3xl mr-4">ℹ️</span>
                   <div>
-                    <h4 className="font-semibold text-blue-800 mb-2">
+                    <h4 className="font-bold text-blue-900 mb-3 text-lg">
                       Cómo Funciona el Sistema de Invitaciones
                     </h4>
-                    <ol className="text-sm text-blue-700 space-y-2">
+                    <ol className="text-sm text-blue-800 space-y-3 font-medium">
                       <li>
-                        <strong>1. Invitar Usuario:</strong> Envías una invitación con el email y rol deseado
+                        <strong className="text-blue-900">1. Invitar Usuario:</strong> Envías una invitación con el email y rol deseado
                       </li>
                       <li>
-                        <strong>2. Estado Pendiente:</strong> La invitación queda en estado "pendiente" hasta que el usuario se registre
+                        <strong className="text-blue-900">2. Estado Pendiente:</strong> La invitación queda en estado "pendiente" hasta que el usuario se registre
                       </li>
                       <li>
-                        <strong>3. Registro del Usuario:</strong> Cuando el usuario se registra con ese email, automáticamente se une a la organización
+                        <strong className="text-blue-900">3. Registro del Usuario:</strong> Cuando el usuario se registra con ese email, automáticamente se une a la organización
                       </li>
                       <li>
-                        <strong>4. Acceso Inmediato:</strong> El usuario obtiene acceso según el rol asignado
+                        <strong className="text-blue-900">4. Acceso Inmediato:</strong> El usuario obtiene acceso según el rol asignado
                       </li>
                     </ol>
                   </div>
@@ -244,32 +262,39 @@ const UserManagement = ({
               </div>
 
               <div className="grid md:grid-cols-2 gap-6">
-                <div className="bg-white border rounded-lg p-4">
-                  <h4 className="font-semibold text-gray-800 mb-3">📧 Enviar Invitación</h4>
-                  <p className="text-sm text-gray-600 mb-4">
+                <div className="bg-gradient-to-br from-emerald-50 to-green-50 border-2 border-emerald-200 rounded-2xl p-6 shadow-lg">
+                  <h4 className="font-bold text-emerald-900 mb-3 text-lg flex items-center gap-2">
+                    <span className="text-2xl">📧</span>
+                    Enviar Invitación
+                  </h4>
+                  <p className="text-sm text-emerald-800 mb-4 font-medium">
                     Para invitar un nuevo usuario, ve a la pestaña "Miembros" y haz clic en "Invitar Miembro".
                   </p>
-                  <div className="text-sm text-gray-500">
-                    <p>• Ingresa el email del usuario</p>
-                    <p>• Selecciona el rol apropiado</p>
-                    <p>• El usuario recibirá acceso al registrarse</p>
+                  <div className="text-sm text-emerald-700 space-y-2 font-medium">
+                    <p className="flex items-center"><span className="text-emerald-600 mr-2">•</span> Ingresa el email del usuario</p>
+                    <p className="flex items-center"><span className="text-emerald-600 mr-2">•</span> Selecciona el rol apropiado</p>
+                    <p className="flex items-center"><span className="text-emerald-600 mr-2">•</span> El usuario recibirá acceso al registrarse</p>
                   </div>
                 </div>
 
-                <div className="bg-white border rounded-lg p-4">
-                  <h4 className="font-semibold text-gray-800 mb-3">🔗 Compartir Enlace</h4>
-                  <p className="text-sm text-gray-600 mb-4">
+                <div className="bg-gradient-to-br from-purple-50 to-indigo-50 border-2 border-purple-200 rounded-2xl p-6 shadow-lg">
+                  <h4 className="font-bold text-purple-900 mb-3 text-lg flex items-center gap-2">
+                    <span className="text-2xl">🔗</span>
+                    Compartir Enlace
+                  </h4>
+                  <p className="text-sm text-purple-800 mb-4 font-medium">
                     Puedes compartir este enlace para que los usuarios se registren:
                   </p>
-                  <div className="bg-gray-100 rounded p-2 text-sm font-mono break-all">
-                    {window.location.hostname === 'localhost' 
-                      ? 'https://strategiapm.vercel.app' 
+                  <div className="bg-white rounded-lg p-3 text-sm font-mono break-all border-2 border-purple-200 shadow-inner">
+                    {window.location.hostname === 'localhost'
+                      ? 'https://strategiapm.vercel.app'
                       : window.location.origin
                     }
                   </div>
                   {window.location.hostname === 'localhost' && (
-                    <p className="text-xs text-amber-600 mt-2">
-                      ⚠️ En desarrollo local - Usa el enlace de producción para compartir
+                    <p className="text-xs text-amber-700 mt-3 font-bold flex items-center">
+                      <span className="mr-1">⚠️</span>
+                      En desarrollo local - Usa el enlace de producción para compartir
                     </p>
                   )}
                 </div>
@@ -285,22 +310,22 @@ const UserManagement = ({
                   🔄 Proceso de Control de Cambios
                 </h3>
                 <p className="text-gray-600 mb-6">
-                  Este diagrama muestra cómo participan los roles funcionales en el proceso de gestión de cambios. 
+                  Este diagrama muestra cómo participan los roles funcionales en el proceso de gestión de cambios.
                   Úsalo como referencia al asignar roles a los miembros de tu organización.
                 </p>
               </div>
-              
+
               <ChangeFlowDiagram />
-              
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-6">
+
+              <div className="bg-gradient-to-br from-amber-50 to-yellow-50 border-2 border-amber-200 rounded-2xl p-6 mt-6 shadow-lg">
                 <div className="flex items-start">
-                  <span className="text-yellow-600 text-xl mr-3">💡</span>
+                  <span className="text-amber-500 text-3xl mr-4">💡</span>
                   <div>
-                    <h4 className="font-semibold text-yellow-800 mb-2">
+                    <h4 className="font-bold text-amber-900 mb-3 text-lg">
                       Tip: Asigna Roles Estratégicamente
                     </h4>
-                    <p className="text-sm text-yellow-700">
-                      Al asignar roles funcionales a tus miembros, considera el nivel de autoridad que necesitan en el control de cambios. 
+                    <p className="text-sm text-amber-800 font-medium">
+                      Al asignar roles funcionales a tus miembros, considera el nivel de autoridad que necesitan en el control de cambios.
                       Por ejemplo, un Project Manager puede aprobar cambios hasta $25K, mientras que un Sponsor puede aprobar hasta $100K.
                     </p>
                   </div>

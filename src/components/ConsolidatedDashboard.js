@@ -4,6 +4,7 @@ import CorporateAlerts from './CorporateAlerts';
 import ConsolidatedCashFlow from './ConsolidatedCashFlow';
 import CashFlowChart from './dashboard/CashFlowChart';
 import FloatingSaveButton from './FloatingSaveButton';
+import { cn } from '../lib/utils';
 
 const ConsolidatedDashboard = ({
   projects,
@@ -221,279 +222,318 @@ const ConsolidatedDashboard = ({
 
   return (
     <div className="space-y-8">
-      {/* Header Ejecutivo */}
-      <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600 rounded-xl shadow-lg p-6 text-white">
-        <h1 className="text-3xl font-bold mb-2">📈 Dashboard Consolidado</h1>
-        <p className="text-indigo-100 text-lg">
-          Vista ejecutiva del estado general del portfolio de proyectos
-        </p>
+      {/* Header Ejecutivo - Premium */}
+      <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600 rounded-2xl shadow-xl p-8 text-white relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32"></div>
+        <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/10 rounded-full -ml-24 -mb-24"></div>
+        <div className="relative z-10">
+          <h1 className="text-4xl font-bold mb-2 flex items-center gap-3">
+            <span className="text-5xl">📈</span>
+            Dashboard Consolidado
+          </h1>
+          <p className="text-indigo-100 text-lg">
+            Vista ejecutiva del estado general del portfolio de proyectos
+          </p>
+        </div>
       </div>
 
       {/* 1. Vista General del Portfolio */}
-      <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-blue-500">
-        <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center">
-          <span className="text-3xl mr-3">🏢</span>
+      <div className="bg-white rounded-2xl shadow-xl p-8 border-2 border-blue-100 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-full -mr-16 -mt-16"></div>
+        <h2 className="text-2xl font-bold text-slate-900 mb-6 flex items-center relative z-10">
+          <span className="text-4xl mr-4">🏢</span>
           Vista General del Portfolio
         </h2>
 
         {/* Primera fila: Métricas básicas */}
-        <h3 className="text-sm font-semibold text-gray-600 mb-3 uppercase tracking-wide">Métricas Básicas</h3>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <h3 className="text-sm font-bold text-slate-600 mb-4 uppercase tracking-wide">Métricas Básicas</h3>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           {/* Proyectos Activos */}
-          <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xl">📊</span>
-              <span className="text-xs font-medium text-blue-600">Proyectos Activos</span>
-            </div>
-            <div className="text-2xl font-bold text-blue-800">
-              {activeProjects.length}
-            </div>
-            <div className="text-xs text-blue-600 mt-1">
-              de {projects?.length || 0} total
+          <div className="bg-gradient-to-br from-blue-500 to-indigo-600 p-6 rounded-2xl shadow-xl shadow-blue-500/30 text-white relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12"></div>
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-3xl">📊</span>
+                <span className="text-xs font-bold text-blue-100 uppercase">Proyectos Activos</span>
+              </div>
+              <div className="text-4xl font-bold">
+                {activeProjects.length}
+              </div>
+              <div className="text-sm text-blue-100 mt-2">
+                de {projects?.length || 0} total
+              </div>
             </div>
           </div>
 
           {/* Presupuesto Total */}
-          <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-lg border border-green-200">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xl">💰</span>
-              <span className="text-xs font-medium text-green-600">Presupuesto Total</span>
-            </div>
-            <div className="text-2xl font-bold text-green-800">
-              ${(() => {
-                const totalBudget = activeProjects.reduce((sum, p) => sum + (p.budget || 0), 0);
-                return (totalBudget / 1000).toFixed(0);
-              })()}K
-            </div>
-            <div className="text-xs text-green-600 mt-1">
-              Presupuesto asignado
+          <div className="bg-gradient-to-br from-emerald-500 to-green-600 p-6 rounded-2xl shadow-xl shadow-emerald-500/30 text-white relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12"></div>
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-3xl">💰</span>
+                <span className="text-xs font-bold text-emerald-100 uppercase">Presupuesto Total</span>
+              </div>
+              <div className="text-4xl font-bold">
+                ${(() => {
+                  const totalBudget = activeProjects.reduce((sum, p) => sum + (p.budget || 0), 0);
+                  return (totalBudget / 1000).toFixed(0);
+                })()}K
+              </div>
+              <div className="text-sm text-emerald-100 mt-2">
+                Presupuesto asignado
+              </div>
             </div>
           </div>
 
           {/* Inicio Más Temprano */}
-          <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-lg border border-purple-200">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xl">📅</span>
-              <span className="text-xs font-medium text-purple-600">Inicio Más Temprano</span>
-            </div>
-            <div className="text-lg font-bold text-purple-800">
-              {(() => {
-                let earliestDate = null;
-                activeProjects.forEach(project => {
-                  const projectTasks = tasksByProject[project.id] || [];
-                  projectTasks.forEach(task => {
-                    if (task.startDate) {
-                      const taskStart = new Date(task.startDate);
-                      if (!earliestDate || taskStart < earliestDate) {
-                        earliestDate = taskStart;
+          <div className="bg-gradient-to-br from-purple-500 to-pink-600 p-6 rounded-2xl shadow-xl shadow-purple-500/30 text-white relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12"></div>
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-3xl">📅</span>
+                <span className="text-xs font-bold text-purple-100 uppercase">Inicio Más Temprano</span>
+              </div>
+              <div className="text-2xl font-bold">
+                {(() => {
+                  let earliestDate = null;
+                  activeProjects.forEach(project => {
+                    const projectTasks = tasksByProject[project.id] || [];
+                    projectTasks.forEach(task => {
+                      if (task.startDate) {
+                        const taskStart = new Date(task.startDate);
+                        if (!earliestDate || taskStart < earliestDate) {
+                          earliestDate = taskStart;
+                        }
                       }
-                    }
+                    });
                   });
-                });
-                return earliestDate ? earliestDate.toLocaleDateString('es-ES') : 'N/A';
-              })()}
-            </div>
-            <div className="text-xs text-purple-600 mt-1">
-              Fecha de inicio del portfolio
+                  return earliestDate ? earliestDate.toLocaleDateString('es-ES') : 'N/A';
+                })()}
+              </div>
+              <div className="text-sm text-purple-100 mt-2">
+                Fecha de inicio del portfolio
+              </div>
             </div>
           </div>
 
           {/* Fin Más Tardío */}
-          <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-lg border border-orange-200">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xl">🏁</span>
-              <span className="text-xs font-medium text-orange-600">Fin Más Tardío</span>
-            </div>
-            <div className="text-lg font-bold text-orange-800">
-              {(() => {
-                let latestDate = null;
-                activeProjects.forEach(project => {
-                  const projectTasks = tasksByProject[project.id] || [];
-                  projectTasks.forEach(task => {
-                    if (task.endDate) {
-                      const taskEnd = new Date(task.endDate);
-                      if (!latestDate || taskEnd > latestDate) {
-                        latestDate = taskEnd;
+          <div className="bg-gradient-to-br from-amber-500 to-orange-600 p-6 rounded-2xl shadow-xl shadow-amber-500/30 text-white relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12"></div>
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-3xl">🏁</span>
+                <span className="text-xs font-bold text-amber-100 uppercase">Fin Más Tardío</span>
+              </div>
+              <div className="text-2xl font-bold">
+                {(() => {
+                  let latestDate = null;
+                  activeProjects.forEach(project => {
+                    const projectTasks = tasksByProject[project.id] || [];
+                    projectTasks.forEach(task => {
+                      if (task.endDate) {
+                        const taskEnd = new Date(task.endDate);
+                        if (!latestDate || taskEnd > latestDate) {
+                          latestDate = taskEnd;
+                        }
                       }
-                    }
+                    });
                   });
-                });
-                return latestDate ? latestDate.toLocaleDateString('es-ES') : 'N/A';
-              })()}
-            </div>
-            <div className="text-xs text-orange-600 mt-1">
-              Fecha de fin del portfolio
+                  return latestDate ? latestDate.toLocaleDateString('es-ES') : 'N/A';
+                })()}
+              </div>
+              <div className="text-sm text-amber-100 mt-2">
+                Fecha de fin del portfolio
+              </div>
             </div>
           </div>
         </div>
 
         {/* Segunda fila: Indicadores de desempeño */}
-        <h3 className="text-sm font-semibold text-gray-600 mb-3 uppercase tracking-wide">Indicadores de Desempeño</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <h3 className="text-sm font-bold text-slate-600 mb-4 uppercase tracking-wide">Indicadores de Desempeño</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           {/* % Cumplimiento Promedio */}
-          <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 p-4 rounded-lg border border-emerald-200">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xl">✅</span>
-              <span className="text-xs font-medium text-emerald-600">% Cumplimiento Promedio</span>
-            </div>
-            <div className="text-2xl font-bold text-emerald-800">
-              {(() => {
-                const currentDate = new Date();
-                let totalCompliance = 0;
-                let projectCount = 0;
+          <div className="bg-gradient-to-br from-emerald-500 to-green-600 p-6 rounded-2xl shadow-xl shadow-emerald-500/30 text-white relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12"></div>
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-3xl">✅</span>
+                <span className="text-xs font-bold text-emerald-100 uppercase">% Cumplimiento Promedio</span>
+              </div>
+              <div className="text-4xl font-bold">
+                {(() => {
+                  const currentDate = new Date();
+                  let totalCompliance = 0;
+                  let projectCount = 0;
 
-                activeProjects.forEach(project => {
-                  const projectTasks = tasksByProject[project.id] || [];
-                  const overdueTasks = projectTasks.filter(task => {
-                    if (!task.endDate) return false;
-                    return new Date(task.endDate) < currentDate;
+                  activeProjects.forEach(project => {
+                    const projectTasks = tasksByProject[project.id] || [];
+                    const overdueTasks = projectTasks.filter(task => {
+                      if (!task.endDate) return false;
+                      return new Date(task.endDate) < currentDate;
+                    });
+
+                    if (overdueTasks.length > 0) {
+                      const completedOverdue = overdueTasks.filter(task => (task.progress || 0) >= 100).length;
+                      const compliance = (completedOverdue / overdueTasks.length) * 100;
+                      totalCompliance += compliance;
+                      projectCount++;
+                    }
                   });
 
-                  if (overdueTasks.length > 0) {
-                    const completedOverdue = overdueTasks.filter(task => (task.progress || 0) >= 100).length;
-                    const compliance = (completedOverdue / overdueTasks.length) * 100;
-                    totalCompliance += compliance;
-                    projectCount++;
-                  }
-                });
-
-                const avgCompliance = projectCount > 0 ? totalCompliance / projectCount : 100;
-                return avgCompliance.toFixed(1);
-              })()}%
-            </div>
-            <div className="text-xs text-emerald-600 mt-1">
-              Tareas cumplidas a tiempo
+                  const avgCompliance = projectCount > 0 ? totalCompliance / projectCount : 100;
+                  return avgCompliance.toFixed(1);
+                })()}%
+              </div>
+              <div className="text-sm text-emerald-100 mt-2">
+                Tareas cumplidas a tiempo
+              </div>
             </div>
           </div>
 
           {/* Avance Cronograma Promedio */}
-          <div className="bg-gradient-to-br from-cyan-50 to-cyan-100 p-4 rounded-lg border border-cyan-200">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xl">📈</span>
-              <span className="text-xs font-medium text-cyan-600">Avance Cronograma Promedio</span>
-            </div>
-            <div className="text-2xl font-bold text-cyan-800">
-              {(() => {
-                const totalProgress = activeProjects.reduce((sum, p) => sum + (p.progress || 0), 0);
-                const avgProgress = activeProjects.length > 0 ? totalProgress / activeProjects.length : 0;
-                return Math.round(avgProgress);
-              })()}%
-            </div>
-            <div className="text-xs text-cyan-600 mt-1">
-              Progreso general del portfolio
+          <div className="bg-gradient-to-br from-cyan-500 to-blue-600 p-6 rounded-2xl shadow-xl shadow-cyan-500/30 text-white relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12"></div>
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-3xl">📈</span>
+                <span className="text-xs font-bold text-cyan-100 uppercase">Avance Cronograma Promedio</span>
+              </div>
+              <div className="text-4xl font-bold">
+                {(() => {
+                  const totalProgress = activeProjects.reduce((sum, p) => sum + (p.progress || 0), 0);
+                  const avgProgress = activeProjects.length > 0 ? totalProgress / activeProjects.length : 0;
+                  return Math.round(avgProgress);
+                })()}%
+              </div>
+              <div className="text-sm text-cyan-100 mt-2">
+                Progreso general del portfolio
+              </div>
             </div>
           </div>
 
           {/* Riesgos Activos Totales */}
-          <div className="bg-gradient-to-br from-red-50 to-red-100 p-4 rounded-lg border border-red-200">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xl">⚠️</span>
-              <span className="text-xs font-medium text-red-600">Riesgos Activos Totales</span>
-            </div>
-            <div className="text-2xl font-bold text-red-800">
-              {(() => {
-                let totalRisks = 0;
-                activeProjects.forEach(project => {
-                  const projectRisks = risks?.filter(r => r.projectId === project.id && r.status === 'active') || [];
-                  totalRisks += projectRisks.length;
-                });
-                return totalRisks;
-              })()}
-            </div>
-            <div className="text-xs text-red-600 mt-1">
-              Riesgos que requieren atención
+          <div className="bg-gradient-to-br from-red-500 to-pink-600 p-6 rounded-2xl shadow-xl shadow-red-500/30 text-white relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12"></div>
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-3xl">⚠️</span>
+                <span className="text-xs font-bold text-red-100 uppercase">Riesgos Activos Totales</span>
+              </div>
+              <div className="text-4xl font-bold">
+                {(() => {
+                  let totalRisks = 0;
+                  activeProjects.forEach(project => {
+                    const projectRisks = risks?.filter(r => r.projectId === project.id && r.status === 'active') || [];
+                    totalRisks += projectRisks.length;
+                  });
+                  return totalRisks;
+                })()}
+              </div>
+              <div className="text-sm text-red-100 mt-2">
+                Riesgos que requieren atención
+              </div>
             </div>
           </div>
         </div>
 
         {/* Tercera fila: Indicadores financieros */}
-        <h3 className="text-sm font-semibold text-gray-600 mb-3 uppercase tracking-wide">Indicadores Financieros</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <h3 className="text-sm font-bold text-slate-600 mb-4 uppercase tracking-wide">Indicadores Financieros</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Órdenes de Compra Totales */}
-          <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 p-4 rounded-lg border border-indigo-200">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xl">🛒</span>
-              <span className="text-xs font-medium text-indigo-600">Órdenes de Compra</span>
-            </div>
-            <div className="text-2xl font-bold text-indigo-800">
-              ${(() => {
-                let totalPOs = 0;
-                activeProjects.forEach(project => {
-                  const projectPOs = purchaseOrdersByProject[project.id] || [];
-                  totalPOs += projectPOs.reduce((sum, po) => sum + (po.totalAmount || 0), 0);
-                });
-                return (totalPOs / 1000).toFixed(0);
-              })()}K
-            </div>
-            <div className="text-xs text-indigo-600 mt-1">
-              Total comprometido
+          <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-6 rounded-2xl shadow-xl shadow-indigo-500/30 text-white relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12"></div>
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-3xl">🛒</span>
+                <span className="text-xs font-bold text-indigo-100 uppercase">Órdenes de Compra</span>
+              </div>
+              <div className="text-4xl font-bold">
+                ${(() => {
+                  let totalPOs = 0;
+                  activeProjects.forEach(project => {
+                    const projectPOs = purchaseOrdersByProject[project.id] || [];
+                    totalPOs += projectPOs.reduce((sum, po) => sum + (po.totalAmount || 0), 0);
+                  });
+                  return (totalPOs / 1000).toFixed(0);
+                })()}K
+              </div>
+              <div className="text-sm text-indigo-100 mt-2">
+                Total comprometido
+              </div>
             </div>
           </div>
 
           {/* Anticipos Totales */}
-          <div className="bg-gradient-to-br from-violet-50 to-violet-100 p-4 rounded-lg border border-violet-200">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xl">💵</span>
-              <span className="text-xs font-medium text-violet-600">Anticipos</span>
-            </div>
-            <div className="text-2xl font-bold text-violet-800">
-              ${(() => {
-                let totalAdvances = 0;
-                activeProjects.forEach(project => {
-                  const projectAdvances = advancesByProject[project.id] || [];
-                  totalAdvances += projectAdvances.reduce((sum, adv) => sum + (adv.amount || 0), 0);
-                });
-                return (totalAdvances / 1000).toFixed(0);
-              })()}K
-            </div>
-            <div className="text-xs text-violet-600 mt-1">
-              Anticipos otorgados
+          <div className="bg-gradient-to-br from-violet-500 to-fuchsia-600 p-6 rounded-2xl shadow-xl shadow-violet-500/30 text-white relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12"></div>
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-3xl">💵</span>
+                <span className="text-xs font-bold text-violet-100 uppercase">Anticipos</span>
+              </div>
+              <div className="text-4xl font-bold">
+                ${(() => {
+                  let totalAdvances = 0;
+                  activeProjects.forEach(project => {
+                    const projectAdvances = advancesByProject[project.id] || [];
+                    totalAdvances += projectAdvances.reduce((sum, adv) => sum + (adv.amount || 0), 0);
+                  });
+                  return (totalAdvances / 1000).toFixed(0);
+                })()}K
+              </div>
+              <div className="text-sm text-violet-100 mt-2">
+                Anticipos otorgados
+              </div>
             </div>
           </div>
 
           {/* Facturación Total */}
-          <div className="bg-gradient-to-br from-teal-50 to-teal-100 p-4 rounded-lg border border-teal-200">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xl">📄</span>
-              <span className="text-xs font-medium text-teal-600">Facturación</span>
-            </div>
-            <div className="text-2xl font-bold text-teal-800">
-              ${(() => {
-                let totalInvoices = 0;
-                activeProjects.forEach(project => {
-                  const projectInvoices = invoicesByProject[project.id] || [];
-                  totalInvoices += projectInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
-                });
-                return (totalInvoices / 1000).toFixed(0);
-              })()}K
-            </div>
-            <div className="text-xs text-teal-600 mt-1">
-              Total facturado
+          <div className="bg-gradient-to-br from-teal-500 to-cyan-600 p-6 rounded-2xl shadow-xl shadow-teal-500/30 text-white relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-12 -mt-12"></div>
+            <div className="relative z-10">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-3xl">📄</span>
+                <span className="text-xs font-bold text-teal-100 uppercase">Facturación</span>
+              </div>
+              <div className="text-4xl font-bold">
+                ${(() => {
+                  let totalInvoices = 0;
+                  activeProjects.forEach(project => {
+                    const projectInvoices = invoicesByProject[project.id] || [];
+                    totalInvoices += projectInvoices.reduce((sum, inv) => sum + (inv.amount || 0), 0);
+                  });
+                  return (totalInvoices / 1000).toFixed(0);
+                })()}K
+              </div>
+              <div className="text-sm text-teal-100 mt-2">
+                Total facturado
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       {/* 2. Indicadores por Proyecto */}
-      <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-green-500">
-        <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center">
-          <span className="text-3xl mr-3">📊</span>
+      <div className="bg-white rounded-2xl shadow-xl p-8 border-2 border-emerald-100 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50 rounded-full -mr-16 -mt-16"></div>
+        <h2 className="text-2xl font-bold text-slate-900 mb-6 flex items-center relative z-10">
+          <span className="text-4xl mr-4">📊</span>
           Indicadores por Proyecto
         </h2>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
             <thead>
-              <tr className="bg-gray-50">
-                <th className="px-3 py-2 text-left font-semibold text-gray-700">Proyecto</th>
-                <th className="px-2 py-2 text-center font-semibold text-gray-700">Fecha<br />Inicio</th>
-                <th className="px-2 py-2 text-center font-semibold text-gray-700">Fecha<br />Fin</th>
-                <th className="px-2 py-2 text-center font-semibold text-gray-700">%<br />Cumplimiento</th>
-                <th className="px-2 py-2 text-center font-semibold text-gray-700">Avance<br />Cronograma</th>
-                <th className="px-2 py-2 text-center font-semibold text-gray-700">Riesgos<br />Activos</th>
-                <th className="px-2 py-2 text-right font-semibold text-gray-700">Presupuesto<br />Asignado</th>
-                <th className="px-2 py-2 text-right font-semibold text-gray-700">Órdenes de<br />Compra</th>
-                <th className="px-2 py-2 text-right font-semibold text-gray-700">Anticipos</th>
-                <th className="px-2 py-2 text-right font-semibold text-gray-700">Facturación</th>
+              <tr className="bg-gradient-to-r from-slate-50 to-emerald-50">
+                <th className="px-3 py-3 text-left font-bold text-slate-700">Proyecto</th>
+                <th className="px-2 py-3 text-center font-bold text-slate-700">Fecha<br />Inicio</th>
+                <th className="px-2 py-3 text-center font-bold text-slate-700">Fecha<br />Fin</th>
+                <th className="px-2 py-3 text-center font-bold text-slate-700">%<br />Cumplimiento</th>
+                <th className="px-2 py-3 text-center font-bold text-slate-700">Avance<br />Cronograma</th>
+                <th className="px-2 py-3 text-center font-bold text-slate-700">Riesgos<br />Activos</th>
+                <th className="px-2 py-3 text-right font-bold text-slate-700">Presupuesto<br />Asignado</th>
+                <th className="px-2 py-3 text-right font-bold text-slate-700">Órdenes de<br />Compra</th>
+                <th className="px-2 py-3 text-right font-bold text-slate-700">Anticipos</th>
+                <th className="px-2 py-3 text-right font-bold text-slate-700">Facturación</th>
               </tr>
             </thead>
             <tbody>
@@ -630,22 +670,23 @@ const ConsolidatedDashboard = ({
       </div>
 
       {/* 3. Indicadores PMBOK v7 con Explicaciones */}
-      <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-indigo-500">
-        <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center">
-          <span className="text-3xl mr-3">📊</span>
+      <div className="bg-white rounded-2xl shadow-xl p-8 border-2 border-indigo-100 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-full -mr-16 -mt-16"></div>
+        <h2 className="text-2xl font-bold text-slate-900 mb-6 flex items-center relative z-10">
+          <span className="text-4xl mr-4">📊</span>
           Indicadores PMBOK v7 - Gestión de Costos
         </h2>
 
         {/* Nota informativa sobre el cálculo */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-2xl p-5 mb-8">
           <div className="flex items-center">
-            <div className="text-blue-600 text-xl mr-3">ℹ️</div>
-            <div className="text-blue-800">
-              <strong>Fuente de datos:</strong> {workPackages && workPackages.length > 0
+            <div className="text-blue-600 text-2xl mr-4">ℹ️</div>
+            <div className="text-blue-900">
+              <strong className="text-lg">Fuente de datos:</strong> {workPackages && workPackages.length > 0
                 ? `Calculado basado en ${workPackages.length} paquetes de trabajo`
                 : `Calculado basado en ${Object.values(tasksByProject || {}).flat().length} tareas del cronograma`}
               {!(workPackages && workPackages.length > 0) && (
-                <span className="block text-sm mt-1">
+                <span className="block text-sm mt-2 font-medium">
                   Los costos se estiman basándose en el campo "Costo" de cada tarea y su progreso actual.
                 </span>
               )}
@@ -654,78 +695,90 @@ const ConsolidatedDashboard = ({
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div className="space-y-6">
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-lg border border-blue-200">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-blue-800">CPI - Cost Performance Index</h3>
-                <span className="text-2xl">💰</span>
-              </div>
-              <div className="text-3xl font-bold text-blue-800 mb-2">
-                {consolidatedCPI.toFixed(2)}
-              </div>
-              <div className={`text-sm font-medium mb-2 ${getIndicatorColor(consolidatedCPI, 'cpi')}`}>
-                {consolidatedCPI >= 1 ? '✅ Eficiencia de costos positiva' :
-                  consolidatedCPI >= 0.9 ? '⚠️ Eficiencia de costos aceptable' :
-                    '❌ Eficiencia de costos deficiente'}
-              </div>
-              <div className="text-xs text-gray-600">
-                <strong>¿Qué significa?</strong> Mide la eficiencia del costo del trabajo realizado.
-                Valores ≥ 1.0 indican que el proyecto está dentro del presupuesto.
+            <div className="bg-gradient-to-br from-blue-500 to-indigo-600 p-6 rounded-2xl shadow-xl shadow-blue-500/30 text-white relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-bold">CPI - Cost Performance Index</h3>
+                  <span className="text-3xl">💰</span>
+                </div>
+                <div className="text-5xl font-bold mb-3">
+                  {consolidatedCPI.toFixed(2)}
+                </div>
+                <div className="text-sm font-bold mb-3">
+                  {consolidatedCPI >= 1 ? '✅ Eficiencia de costos positiva' :
+                    consolidatedCPI >= 0.9 ? '⚠️ Eficiencia de costos aceptable' :
+                      '❌ Eficiencia de costos deficiente'}
+                </div>
+                <div className="text-xs text-blue-100 font-medium">
+                  <strong>¿Qué significa?</strong> Mide la eficiencia del costo del trabajo realizado.
+                  Valores ≥ 1.0 indican que el proyecto está dentro del presupuesto.
+                </div>
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-green-50 to-green-100 p-6 rounded-lg border border-green-200">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-green-800">SPI - Schedule Performance Index</h3>
-                <span className="text-2xl">📅</span>
-              </div>
-              <div className="text-3xl font-bold text-green-800 mb-2">
-                {consolidatedSPI.toFixed(2)}
-              </div>
-              <div className={`text-sm font-medium mb-2 ${getIndicatorColor(consolidatedSPI, 'spi')}`}>
-                {consolidatedSPI >= 1 ? '✅ Eficiencia de cronograma positiva' :
-                  consolidatedSPI >= 0.9 ? '⚠️ Eficiencia de cronograma aceptable' :
-                    '❌ Eficiencia de cronograma deficiente'}
-              </div>
-              <div className="text-xs text-gray-600">
-                <strong>¿Qué significa?</strong> Mide la eficiencia del cronograma del trabajo realizado.
-                Valores ≥ 1.0 indican que el proyecto está adelantado.
+            <div className="bg-gradient-to-br from-emerald-500 to-green-600 p-6 rounded-2xl shadow-xl shadow-emerald-500/30 text-white relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-bold">SPI - Schedule Performance Index</h3>
+                  <span className="text-3xl">📅</span>
+                </div>
+                <div className="text-5xl font-bold mb-3">
+                  {consolidatedSPI.toFixed(2)}
+                </div>
+                <div className="text-sm font-bold mb-3">
+                  {consolidatedSPI >= 1 ? '✅ Eficiencia de cronograma positiva' :
+                    consolidatedSPI >= 0.9 ? '⚠️ Eficiencia de cronograma aceptable' :
+                      '❌ Eficiencia de cronograma deficiente'}
+                </div>
+                <div className="text-xs text-emerald-100 font-medium">
+                  <strong>¿Qué significa?</strong> Mide la eficiencia del cronograma del trabajo realizado.
+                  Valores ≥ 1.0 indican que el proyecto está adelantado.
+                </div>
               </div>
             </div>
           </div>
 
           <div className="space-y-6">
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-6 rounded-lg border border-purple-200">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-purple-800">VAC - Variance at Completion</h3>
-                <span className="text-2xl">📊</span>
-              </div>
-              <div className={`text-3xl font-bold mb-2 ${getIndicatorColor(consolidatedVAC, 'variance')}`}>
-                ${(consolidatedVAC / 1000).toFixed(0)}K
-              </div>
-              <div className={`text-sm font-medium mb-2 ${getIndicatorColor(consolidatedVAC, 'variance')}`}>
-                {consolidatedVAC >= 0 ? '✅ Proyecto dentro del presupuesto' :
-                  '❌ Proyecto excederá el presupuesto'}
-              </div>
-              <div className="text-xs text-gray-600">
-                <strong>¿Qué significa?</strong> Predice la diferencia entre el presupuesto total y el costo final estimado.
-                Valores positivos indican ahorro proyectado.
+            <div className="bg-gradient-to-br from-purple-500 to-pink-600 p-6 rounded-2xl shadow-xl shadow-purple-500/30 text-white relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-bold">VAC - Variance at Completion</h3>
+                  <span className="text-3xl">📊</span>
+                </div>
+                <div className="text-5xl font-bold mb-3">
+                  ${(consolidatedVAC / 1000).toFixed(0)}K
+                </div>
+                <div className="text-sm font-bold mb-3">
+                  {consolidatedVAC >= 0 ? '✅ Proyecto dentro del presupuesto' :
+                    '❌ Proyecto excederá el presupuesto'}
+                </div>
+                <div className="text-xs text-purple-100 font-medium">
+                  <strong>¿Qué significa?</strong> Predice la diferencia entre el presupuesto total y el costo final estimado.
+                  Valores positivos indican ahorro proyectado.
+                </div>
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-6 rounded-lg border border-orange-200">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-orange-800">EAC - Estimate at Completion</h3>
-                <span className="text-2xl">🎯</span>
-              </div>
-              <div className="text-3xl font-bold text-orange-800 mb-2">
-                ${(consolidatedEAC / 1000).toFixed(0)}K
-              </div>
-              <div className="text-sm font-medium mb-2 text-orange-700">
-                Costo total estimado del proyecto
-              </div>
-              <div className="text-xs text-gray-600">
-                <strong>¿Qué significa?</strong> Predice el costo total del proyecto basado en el rendimiento actual.
-                Se calcula como: Presupuesto Total ÷ CPI.
+            <div className="bg-gradient-to-br from-amber-500 to-orange-600 p-6 rounded-2xl shadow-xl shadow-amber-500/30 text-white relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -mr-16 -mt-16"></div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xl font-bold">EAC - Estimate at Completion</h3>
+                  <span className="text-3xl">🎯</span>
+                </div>
+                <div className="text-5xl font-bold mb-3">
+                  ${(consolidatedEAC / 1000).toFixed(0)}K
+                </div>
+                <div className="text-sm font-bold mb-3 text-amber-100">
+                  Costo total estimado del proyecto
+                </div>
+                <div className="text-xs text-amber-100 font-medium">
+                  <strong>¿Qué significa?</strong> Predice el costo total del proyecto basado en el rendimiento actual.
+                  Se calcula como: Presupuesto Total ÷ CPI.
+                </div>
               </div>
             </div>
           </div>

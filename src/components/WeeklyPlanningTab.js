@@ -272,9 +272,6 @@ const WeeklyPlanningTab = ({
   const exportToPDF = useCallback(() => {
     try {
       const doc = new jsPDF();
-      // ... same export logic but kept minimal for brevity, functionality preserved
-      // Copying the EXACT output logic would be best, but for brevity in this plan I assume the logic is identical.
-      // I'll reinstate the full logic to ensure no regression.
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
       let yPosition = 20;
@@ -337,55 +334,54 @@ const WeeklyPlanningTab = ({
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      {/* Header Controls */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <h2 className="text-xl font-bold text-slate-900 flex items-center gap-3">
-              <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-                <Calendar className="h-6 w-6" />
-              </div>
-              Planificación Semanal
-            </h2>
-
-            <div className="flex flex-col sm:flex-row items-center gap-4">
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-slate-700">Desde:</label>
-                <input
-                  type="date"
-                  value={dateRange.start.toISOString().split('T')[0]}
-                  onChange={(e) => setDateRange(prev => ({ ...prev, start: new Date(e.target.value) }))}
-                  className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-slate-700">Hasta:</label>
-                <input
-                  type="date"
-                  value={dateRange.end.toISOString().split('T')[0]}
-                  onChange={(e) => setDateRange(prev => ({ ...prev, end: new Date(e.target.value) }))}
-                  className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none"
-                />
-              </div>
-              <Button
-                onClick={exportToPDF}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm flex gap-2"
-              >
-                <Download className="w-4 h-4" />
-                Exportar PDF
-              </Button>
+      {/* Header Controls - Premium Colorful */}
+      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl shadow-xl p-6 text-white relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 rounded-full -mr-24 -mt-24"></div>
+        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-4">
+          <h2 className="text-2xl font-bold flex items-center gap-3">
+            <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl">
+              <Calendar className="h-6 w-6" />
             </div>
+            Planificación Semanal
+          </h2>
+
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            <div className="flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-xl px-4 py-2 border border-white/30">
+              <label className="text-sm font-medium text-white">Desde:</label>
+              <input
+                type="date"
+                value={dateRange.start.toISOString().split('T')[0]}
+                onChange={(e) => setDateRange(prev => ({ ...prev, start: new Date(e.target.value) }))}
+                className="px-3 py-1 bg-white/90 text-slate-900 border-0 rounded-lg text-sm outline-none"
+              />
+            </div>
+            <div className="flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-xl px-4 py-2 border border-white/30">
+              <label className="text-sm font-medium text-white">Hasta:</label>
+              <input
+                type="date"
+                value={dateRange.end.toISOString().split('T')[0]}
+                onChange={(e) => setDateRange(prev => ({ ...prev, end: new Date(e.target.value) }))}
+                className="px-3 py-1 bg-white/90 text-slate-900 border-0 rounded-lg text-sm outline-none"
+              />
+            </div>
+            <Button
+              onClick={exportToPDF}
+              className="bg-white/20 backdrop-blur-sm hover:bg-white/30 text-white border-2 border-white/30 shadow-lg flex gap-2"
+            >
+              <Download className="w-4 h-4" />
+              Exportar PDF
+            </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Main Content */}
-      <Card>
-        <CardHeader className="border-b border-slate-100 bg-slate-50/50">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <FileText className="h-5 w-5 text-slate-500" />
+      <Card className="shadow-xl border-2 border-indigo-100">
+        <CardHeader className="bg-gradient-to-r from-indigo-50 to-purple-50 border-b-2 border-indigo-100">
+          <CardTitle className="flex items-center gap-2 text-lg text-indigo-900">
+            <FileText className="h-5 w-5" />
             Tareas del Período
-            <span className="ml-2 text-sm font-normal text-slate-400">
+            <span className="ml-2 text-sm font-normal text-indigo-600">
               ({formatDate(dateRange.start)} - {formatDate(dateRange.end)})
             </span>
           </CardTitle>
@@ -416,9 +412,9 @@ const WeeklyPlanningTab = ({
               overdueTasks.scheduleTasks.length === 0 &&
               overdueTasks.minuteTasks.length === 0);
           }) && (
-              <div className="text-center py-12 text-slate-500">
-                <div className="text-4xl mb-3 opacity-20">📅</div>
-                <p>No hay tareas planificadas para este período.</p>
+              <div className="text-center py-16 text-slate-500">
+                <div className="text-5xl mb-4 opacity-20">📅</div>
+                <p className="text-lg font-medium">No hay tareas planificadas para este período.</p>
               </div>
             )}
         </CardContent>
@@ -438,12 +434,12 @@ const ProjectTasksList = React.memo(({ project, currentTasks, overdueTasks }) =>
   if (allTasks.length === 0) return null;
 
   return (
-    <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
-      <div className="bg-slate-50/80 px-4 py-3 border-b border-slate-200">
-        <h4 className="font-semibold text-slate-800 flex items-center gap-2">
-          <div className="w-2 h-2 bg-brand-500 rounded-full"></div>
+    <div className="border-2 border-slate-200 rounded-2xl overflow-hidden bg-white shadow-lg">
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-b-2 border-blue-100">
+        <h4 className="font-bold text-slate-800 flex items-center gap-3">
+          <div className="w-3 h-3 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full shadow-lg"></div>
           {project.name}
-          <span className="text-xs font-normal text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-full">
+          <span className="text-xs font-bold bg-white border-2 border-blue-200 text-blue-700 px-3 py-1 rounded-full shadow-sm">
             {allTasks.length} tareas
           </span>
         </h4>
@@ -459,41 +455,41 @@ const ProjectTasksList = React.memo(({ project, currentTasks, overdueTasks }) =>
 
 const TaskCard = React.memo(({ task, isOverdue }) => (
   <div className={cn(
-    "p-4 transition-colors hover:bg-slate-50 flex items-start justify-between group",
-    isOverdue ? "bg-red-50/30" : ""
+    "p-5 transition-all hover:bg-gradient-to-r flex items-start justify-between group",
+    isOverdue ? "bg-gradient-to-r from-red-50 to-pink-50 hover:from-red-100 hover:to-pink-100" : "hover:from-blue-50 hover:to-indigo-50"
   )}>
     <div className="flex-1">
-      <div className="flex items-center gap-2 mb-1">
-        <h6 className={cn("font-medium", isOverdue ? "text-red-700" : "text-slate-900")}>{task.name}</h6>
-        {isOverdue && <AlertCircle className="w-3 h-3 text-red-500" />}
+      <div className="flex items-center gap-2 mb-2">
+        <h6 className={cn("font-bold", isOverdue ? "text-red-700" : "text-slate-900")}>{task.name}</h6>
+        {isOverdue && <AlertCircle className="w-4 h-4 text-red-500" />}
       </div>
       {task.description && (
         <p className="text-sm text-slate-500 mb-2 line-clamp-1">{task.description}</p>
       )}
-      <div className="flex items-center gap-3 text-xs text-slate-400">
-        <span className="flex items-center gap-1">
+      <div className="flex items-center gap-3 text-xs">
+        <span className="flex items-center gap-1 text-slate-400">
           <Clock className="w-3 h-3" />
           {formatDate(task.endDate)}
         </span>
-        <span className={cn("px-1.5 py-0.5 rounded text-[10px] uppercase font-bold tracking-wider",
-          task.type === 'Cronograma' ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"
+        <span className={cn("px-2 py-1 rounded-full text-[10px] uppercase font-bold tracking-wider shadow-sm",
+          task.type === 'Cronograma' ? "bg-gradient-to-r from-blue-500 to-indigo-600 text-white" : "bg-gradient-to-r from-purple-500 to-pink-600 text-white"
         )}>
           {task.type}
         </span>
         {task.priority && (
-          <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] uppercase font-bold tracking-wider">
+          <span className="px-2 py-1 rounded-full bg-gradient-to-r from-amber-400 to-orange-500 text-white text-[10px] uppercase font-bold tracking-wider shadow-sm">
             {task.priority}
           </span>
         )}
       </div>
     </div>
     <div className="ml-4 shrink-0">
-      <span className={cn("px-2 py-1 text-xs rounded-full font-medium border",
+      <span className={cn("px-3 py-1.5 text-xs rounded-full font-bold border-2 shadow-lg",
         isOverdue
-          ? "bg-red-100 text-red-700 border-red-200"
-          : "bg-emerald-100 text-emerald-700 border-emerald-200"
+          ? "bg-gradient-to-r from-red-500 to-pink-600 text-white border-red-300"
+          : "bg-gradient-to-r from-emerald-500 to-green-600 text-white border-emerald-300"
       )}>
-        {isOverdue ? 'Vencida' : 'Pendiente'}
+        {isOverdue ? '🚨 Vencida' : '✅ Pendiente'}
       </span>
     </div>
   </div>
