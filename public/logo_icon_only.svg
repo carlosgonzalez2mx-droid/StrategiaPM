@@ -1,0 +1,16 @@
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Fondo con esquinas redondeadas en verde -->
+  <rect width="48" height="48" rx="10" fill="#059669"/>
+  
+  <!-- Icono de capas apiladas en blanco -->
+  <g transform="translate(12, 14)">
+    <!-- Capa superior -->
+    <path d="M12 4L2 9L12 14L22 9L12 4Z" fill="white" stroke="white" stroke-width="1.5" stroke-linejoin="round"/>
+    
+    <!-- Capa media -->
+    <path d="M2 13L12 18L22 13" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    
+    <!-- Capa inferior -->
+    <path d="M2 17L12 22L22 17" fill="none" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

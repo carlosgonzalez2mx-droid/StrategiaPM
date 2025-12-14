@@ -31,7 +31,8 @@ const Sidebar = ({
     { id: 'portfolio', name: 'Portafolio de Proyectos', icon: '🏢', requiresEdit: true },
     { id: 'project-management', name: 'Gestión de Proyectos', icon: '📊', requiresEdit: false },
     { id: 'executive', name: 'Dashboard Ejecutivo', icon: '📈', requiresEdit: false },
-    { id: 'user-management', name: 'Gestión de Usuarios', icon: '👥', requiresEdit: true }
+    { id: 'user-management', name: 'Gestión de Usuarios', icon: '👥', requiresEdit: true },
+    { id: 'help', name: 'Ayuda', icon: '📖', requiresEdit: false, isHelp: true }
   ];
 
   // Filtrar navegación basado en permisos del usuario
@@ -48,22 +49,34 @@ const Sidebar = ({
       case 'project-management': return 'Control operativo con módulos de riesgos, cronograma y finanzas';
       case 'executive': return 'KPIs consolidados y métricas ejecutivas de todos los proyectos activos';
       case 'user-management': return 'Gestionar usuarios, roles y permisos de la organización';
+      case 'help': return 'Descargar manual de usuario y documentación';
       default: return '';
     }
+  };
+
+  // Función para abrir el manual de usuario
+  const handleDownloadManual = () => {
+    // Abrir el PDF en una nueva pestaña (más confiable que forzar descarga)
+    window.open('/Manual_StrategiaPM_v1.0.pdf', '_blank');
   };
 
   const currentProject = projects?.find(p => p.id === currentProjectId);
 
   return (
     <>
-      {/* Botón flotante para expandir cuando está colapsado */}
+      {/* Botón flotante con logo para expandir cuando está colapsado */}
       {isCollapsed && (
         <button
           onClick={onToggleCollapse}
-          className="fixed top-4 left-4 z-50 bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-full shadow-lg transition-all duration-200 hover:shadow-xl"
+          className="fixed top-0 left-0 w-16 z-50 bg-transparent hover:opacity-80 transition-all duration-200 flex items-center justify-center"
+          style={{ height: '60px' }}
           title="Expandir menú"
         >
-          <span className="text-lg font-bold">☰</span>
+          <img
+            src="/logo_icon_only.svg"
+            alt="StrategiaPM"
+            className="h-10 w-10"
+          />
         </button>
       )}
 
@@ -74,12 +87,14 @@ const Sidebar = ({
         transition-all duration-300
       `}>
         {/* Header */}
-        <div className={`border-b border-gray-200 ${isCollapsed ? 'p-2' : 'p-6'}`}>
+        <div className={`border-b border-gray-200 ${isCollapsed ? 'p-2' : 'p-4'}`}>
           <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
             {!isCollapsed && (
-              <h1 className="text-2xl font-bold text-gray-800 mb-2">
-                StrategiaPM
-              </h1>
+              <img
+                src="/logo_strategiapm.svg"
+                alt="StrategiaPM"
+                className="h-10 w-auto mb-2"
+              />
             )}
             <button
               onClick={onToggleCollapse}
@@ -195,14 +210,14 @@ const Sidebar = ({
 
         {/* Navigation */}
         {!isCollapsed && (
-          <nav className="p-3">
-            <ul className="space-y-1">
+          <nav className="p-2">
+            <ul className="space-y-0.5">
               {navigation.map(section => (
                 <li key={section.id}>
                   <button
-                    onClick={() => onSectionChange(section.id)}
+                    onClick={() => section.isHelp ? handleDownloadManual() : onSectionChange(section.id)}
                     className={`
-                      w-full flex items-center px-3 py-2 text-left rounded-lg transition-colors
+                      w-full flex items-center px-2 py-1.5 text-left rounded-lg transition-colors
                       ${activeSection === section.id
                         ? 'bg-blue-100 text-blue-700 border-l-4 border-blue-500'
                         : 'text-gray-700 hover:bg-gray-100'
@@ -239,8 +254,8 @@ const Sidebar = ({
                 onClick={onSave}
                 disabled={!hasUnsavedChanges || isSaving}
                 className={`w-full p-3 rounded-lg transition-colors duration-200 flex items-center justify-center ${hasUnsavedChanges && !isSaving
-                    ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                    : 'bg-gray-300 cursor-not-allowed text-gray-500'
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                  : 'bg-gray-300 cursor-not-allowed text-gray-500'
                   }`}
                 title={isSaving ? 'Guardando...' : hasUnsavedChanges ? 'Guardar (Ctrl+S)' : 'No hay cambios'}
               >

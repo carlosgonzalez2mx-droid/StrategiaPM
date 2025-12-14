@@ -1,0 +1,44 @@
+<svg width="300" height="80" viewBox="0 0 300 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Gradiente para el Icono (Esmeralda Vibrante a Oscuro) -->
+    <linearGradient id="iconGradient" x1="0" y1="0" x2="48" y2="48" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#10b981" /> <!-- emerald-500 -->
+      <stop offset="1" stop-color="#047857" /> <!-- emerald-700 -->
+    </linearGradient>
+    
+    <!-- Gradiente para el Texto 'Strategia' (Slate Elegante) -->
+    <linearGradient id="textGradient" x1="0" y1="0" x2="100" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1e293b" /> <!-- slate-800 -->
+      <stop offset="1" stop-color="#475569" /> <!-- slate-600 -->
+    </linearGradient>
+    
+    <!-- Sombra suave para el icono -->
+    <filter id="softShadow" x="-10" y="-10" width="80" height="80">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000" flood-opacity="0.15"/>
+    </filter>
+  </defs>
+
+  <!-- GRUPO DEL ICONO -->
+  <g transform="translate(10, 15)">
+    <!-- Fondo del Icono con bordes redondeados y sombra -->
+    <rect x="0" y="0" width="50" height="50" rx="12" fill="url(#iconGradient)" filter="url(#softShadow)" />
+    
+    <!-- Trazado del Icono (Capas/Layers) -->
+    <!-- Centrado dentro del recuadro de 50x50 -->
+    <g transform="translate(13, 13)"> 
+      <path d="M12 2L2 7L12 12L22 7L12 2Z" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M2 17L12 22L22 17" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M2 12L12 17L22 12" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+  </g>
+
+  <!-- GRUPO DE TEXTO -->
+  <!-- Usamos una fuente estándar sans-serif para asegurar compatibilidad, 
+       pero se puede cambiar a la fuente corporativa específica en un editor vectorial -->
+  <text x="75" y="52" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="36" letter-spacing="-1">
+    <!-- Parte 1: Strategia (Color Slate Degradado) -->
+    <tspan fill="url(#textGradient)">Strategia</tspan>
+    <!-- Parte 2: PM (Color Esmeralda Solido para contraste) -->
+    <tspan fill="#059669">PM</tspan>
+  </text>
+</svg>

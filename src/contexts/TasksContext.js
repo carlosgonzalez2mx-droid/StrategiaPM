@@ -102,6 +102,9 @@ export const TasksProvider = ({ children }) => {
   const [includeWeekendsByProject, setIncludeWeekendsByProject] = useState({});
   const [auditLogsByProject, setAuditLogsByProject] = useState({});
 
+  // ===== TIMESTAMPS PARA CONTROL DE CONCURRENCIA =====
+  const [taskTimestamps, setTaskTimestamps] = useState(new Map());
+
   // Obtener currentProjectId del contexto de proyectos
   const { currentProjectId } = useProjects();
 
@@ -163,6 +166,20 @@ export const TasksProvider = ({ children }) => {
     if (!currentProjectId) return;
 
     const safeTasks = Array.isArray(newTasks) ? newTasks : [];
+
+    // Guardar timestamps originales para control de concurrencia
+    const timestamps = new Map();
+    safeTasks.forEach(task => {
+      if (task.updated_at) {
+        timestamps.set(task.id, task.updated_at);
+      }
+    });
+
+    setTaskTimestamps(prev => {
+      const updated = new Map(prev);
+      updated.set(currentProjectId, timestamps);
+      return updated;
+    });
 
     setTasksByProject(prev => ({
       ...prev,
@@ -268,6 +285,14 @@ export const TasksProvider = ({ children }) => {
     setTasksByProject(cleaned);
   }, []);
 
+  /**
+   * Obtener timestamp original de una tarea
+   */
+  const getTaskTimestamp = useCallback((taskId) => {
+    const projectTimestamps = taskTimestamps.get(currentProjectId);
+    return projectTimestamps?.get(taskId);
+  }, [taskTimestamps, currentProjectId]);
+
   // ===== VALOR DEL CONTEXTO =====
   const value = {
     // Estado completo (por proyecto)
@@ -289,6 +314,7 @@ export const TasksProvider = ({ children }) => {
     getCurrentProjectRisks,
     getCurrentProjectIncludeWeekends,
     getCurrentProjectAuditLogs,
+    getTaskTimestamp,
 
     // Helpers para proyecto actual (setters)
     updateCurrentProjectTasks,

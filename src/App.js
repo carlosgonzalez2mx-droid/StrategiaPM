@@ -14,6 +14,7 @@ import { ProjectsProvider, useProjects } from './contexts/ProjectsContext';
 import { FinancialProvider, useFinancial } from './contexts/FinancialContext';
 import { TasksProvider, useTasks } from './contexts/TasksContext';
 import { ConfigProvider, useConfig } from './contexts/ConfigContext';
+import { ConcurrencyProvider } from './contexts/ConcurrencyContext';
 
 // Logger
 import { logger } from './utils/logger';
@@ -60,6 +61,7 @@ const ProjectArchive = lazy(() => import('./components/ProjectArchive'));
 const OrganizationMembers = lazy(() => import('./components/OrganizationMembers'));
 const UserManagement = lazy(() => import('./components/UserManagement'));
 const UpgradeModal = lazy(() => import('./components/subscription/UpgradeModal'));
+const ConflictResolutionDialog = lazy(() => import('./components/ConflictResolutionDialog'));
 
 // Subscription Components (lazy loading)
 const SubscriptionSuccess = lazy(() => import('./components/subscription/SubscriptionSuccess'));
@@ -207,6 +209,10 @@ function MainApp() {
   const [lastSaved, setLastSaved] = useState(null);
   const [saveError, setSaveError] = useState(null);
 
+  // ===== ESTADO DE CONFLICTOS =====
+  const [conflicts, setConflicts] = useState([]);
+  const [showConflictDialog, setShowConflictDialog] = useState(false);
+
   // Crear objeto con datos actuales para tracking de cambios
   const currentData = useMemo(() => ({
     projects,
@@ -302,7 +308,19 @@ function MainApp() {
       };
 
       // Guardar en Supabase
-      const success = await supabaseService.savePortfolioData(dataToSave);
+      const result = await supabaseService.savePortfolioData(dataToSave);
+
+      // ✅ NUEVO: Manejar conflictos
+      if (result && result.conflicts && result.conflicts.length > 0) {
+        logger.warn('🔴 Conflictos detectados:', result.conflicts);
+        setConflicts(result.conflicts);
+        setShowConflictDialog(true);
+        setIsSaving(false);
+        return; // No continuar con sincronización de archivos
+      }
+
+      // ✅ NUEVO: Verificar si el guardado fue exitoso
+      const success = result === true || (result && result.success === true);
 
       // ✅ NUEVO: Sincronizar archivos de localStorage a Supabase
       if (success) {
@@ -424,6 +442,83 @@ function MainApp() {
     includeWeekendsByProject,
     markAsSaved
   ]);
+
+  /**
+   * Manejar resolución de conflictos
+   */
+  const handleConflictResolve = useCallback(async (resolutions) => {
+    logger.debug('🔧 Resolviendo conflictos:', resolutions);
+
+    try {
+      // Aplicar resoluciones a los datos
+      const resolvedConflicts = conflicts.map((conflict, index) => {
+        const resolution = resolutions[index];
+
+        if (!resolution) {
+          logger.warn(`⚠️ No hay resolución para conflicto ${index}`);
+          return null;
+        }
+
+        let resolvedValue;
+        if (resolution.choice === 'yours') {
+          resolvedValue = conflict.yourData;
+        } else if (resolution.choice === 'theirs') {
+          resolvedValue = conflict.currentData;
+        } else if (resolution.choice === 'custom') {
+          try {
+            // Intentar parsear como JSON si es posible
+            resolvedValue = JSON.parse(resolution.customValue);
+          } catch {
+            // Si no es JSON válido, usar como string
+            resolvedValue = resolution.customValue;
+          }
+        }
+
+        return {
+          table: conflict.table,
+          recordId: conflict.recordId,
+          resolvedData: resolvedValue
+        };
+      }).filter(Boolean);
+
+      logger.debug('✅ Conflictos resueltos:', resolvedConflicts);
+
+      // Aplicar cambios resueltos al estado local
+      resolvedConflicts.forEach(resolved => {
+        if (resolved.table === 'tasks') {
+          setTasksByProject(prev => ({
+            ...prev,
+            [currentProjectId]: prev[currentProjectId].map(task =>
+              task.id === resolved.recordId ? { ...task, ...resolved.resolvedData } : task
+            )
+          }));
+        }
+        // Agregar más tablas según sea necesario
+      });
+
+      // Cerrar diálogo
+      setShowConflictDialog(false);
+      setConflicts([]);
+
+      // Reintentar guardado
+      logger.debug('🔄 Reintentando guardado después de resolver conflictos...');
+      await handleManualSave();
+
+    } catch (error) {
+      logger.error('❌ Error resolviendo conflictos:', error);
+      setSaveError(`Error resolviendo conflictos: ${error.message}`);
+    }
+  }, [conflicts, currentProjectId, handleManualSave]);
+
+  /**
+   * Cancelar resolución de conflictos
+   */
+  const handleConflictCancel = useCallback(() => {
+    logger.debug('❌ Usuario canceló resolución de conflictos');
+    setShowConflictDialog(false);
+    setConflicts([]);
+    setIsSaving(false);
+  }, []);
 
   // ===== AUTO-GUARDADO DE RESPALDO (cada 5 minutos) =====
   useEffect(() => {
@@ -781,7 +876,21 @@ function MainApp() {
 
     const reloadProjectData = async () => {
       try {
-        logger.debug(' Recargando datos para el proyecto actual:', currentProjectId);
+        // ✅ NUEVO: Verificar si hay cambios sin guardar antes de recargar
+        if (hasUnsavedChanges) {
+          const userConfirmed = window.confirm(
+            '⚠️ Tienes cambios sin guardar en el proyecto actual. ¿Deseas guardarlos antes de cambiar de proyecto?'
+          );
+
+          if (userConfirmed) {
+            await handleManualSave();
+          } else {
+            // Usuario decidió no guardar - marcar como guardado para evitar advertencias
+            markAsSaved();
+          }
+        }
+
+        logger.debug('🔄 Recargando datos para el proyecto actual:', currentProjectId);
         const savedData = await supabaseService.loadPortfolioData();
 
         if (savedData) {
@@ -1611,6 +1720,25 @@ function MainApp() {
           lastSaved={lastSaved}
         />
 
+        {/* Floating Save Button */}
+        <FloatingSaveButton
+          hasUnsavedChanges={hasUnsavedChanges}
+          isSaving={isSaving}
+          lastSaved={lastSaved}
+          onSave={handleManualSave}
+        />
+
+        {/* Conflict Resolution Dialog */}
+        {showConflictDialog && (
+          <Suspense fallback={<div>Cargando...</div>}>
+            <ConflictResolutionDialog
+              conflicts={conflicts}
+              onResolve={handleConflictResolve}
+              onCancel={handleConflictCancel}
+            />
+          </Suspense>
+        )}
+
         <main className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-80 lg:ml-72'}`}>
           <div className={`transition-all duration-300 ${isSidebarCollapsed ? 'p-4' : 'p-6'}`}>
             {/* Over Limit Banner (priority - must show first) */}
@@ -1771,40 +1899,42 @@ function App() {
         <AuthProvider>
           <ProjectsProvider>
             <FinancialProvider>
-              <TasksProvider>
-                <ProjectProvider>
-                  <ErrorBoundary>
-                    <Suspense fallback={<LoadingFallback message="Cargando aplicación..." />}>
-                      <Routes>
-                        {/* Rutas de Suscripción */}
-                        <Route path="/subscription/success" element={<SubscriptionSuccess />} />
-                        <Route path="/subscription/cancelled" element={<SubscriptionCancelled />} />
+              <ConcurrencyProvider>
+                <TasksProvider>
+                  <ProjectProvider>
+                    <ErrorBoundary>
+                      <Suspense fallback={<LoadingFallback message="Cargando aplicación..." />}>
+                        <Routes>
+                          {/* Rutas de Suscripción */}
+                          <Route path="/subscription/success" element={<SubscriptionSuccess />} />
+                          <Route path="/subscription/cancelled" element={<SubscriptionCancelled />} />
 
-                        {/* Rutas de Super-Admin */}
-                        <Route
-                          path="/admin"
-                          element={
-                            <SuperAdminRoute>
-                              <SuperAdminDashboard />
-                            </SuperAdminRoute>
-                          }
-                        />
-                        <Route
-                          path="/admin/organizations/:orgId"
-                          element={
-                            <SuperAdminRoute>
-                              <OrganizationDetails />
-                            </SuperAdminRoute>
-                          }
-                        />
+                          {/* Rutas de Super-Admin */}
+                          <Route
+                            path="/admin"
+                            element={
+                              <SuperAdminRoute>
+                                <SuperAdminDashboard />
+                              </SuperAdminRoute>
+                            }
+                          />
+                          <Route
+                            path="/admin/organizations/:orgId"
+                            element={
+                              <SuperAdminRoute>
+                                <OrganizationDetails />
+                              </SuperAdminRoute>
+                            }
+                          />
 
-                        {/* Ruta principal - App normal */}
-                        <Route path="/*" element={<AppContent />} />
-                      </Routes>
-                    </Suspense>
-                  </ErrorBoundary>
-                </ProjectProvider>
-              </TasksProvider>
+                          {/* Ruta principal - App normal */}
+                          <Route path="/*" element={<AppContent />} />
+                        </Routes>
+                      </Suspense>
+                    </ErrorBoundary>
+                  </ProjectProvider>
+                </TasksProvider>
+              </ConcurrencyProvider>
             </FinancialProvider>
           </ProjectsProvider>
         </AuthProvider>

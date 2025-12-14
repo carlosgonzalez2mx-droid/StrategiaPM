@@ -31,6 +31,7 @@ executable/
 !vercel-env-setup.md
 !stripe-setup.md
 !PR_DESCRIPTION.md
+!WBS_GUIA_PROGRAMADORES.md
 *.txt
 !public/robots.txt
 .DS_Store

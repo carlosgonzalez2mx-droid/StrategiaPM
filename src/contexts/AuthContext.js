@@ -126,10 +126,10 @@ export const AuthProvider = ({ children }) => {
 
       // 2. Verificar si hay usuario autenticado en Supabase
       const supabaseUser = supabaseService.getCurrentUser();
-      
+
       if (supabaseUser) {
         console.log('✅ Usuario autenticado encontrado:', supabaseUser.email);
-        
+
         // 3. Cargar datos del usuario y configurar contexto
         await syncUserFromSupabase(supabaseUser);
       } else {
@@ -155,14 +155,14 @@ export const AuthProvider = ({ children }) => {
       console.error('❌ Error inicializando autenticación:', error);
     } finally {
       setLoading(false);
-      setShowSplash(false);
+      // setShowSplash(false); // Comentado: dejar que SplashScreen controle su propia duración
     }
   };
 
   // 🧹 NUEVA FUNCIÓN: Limpiar datos locales
   const clearLocalData = () => {
     console.log('🧹 Limpiando datos locales...');
-    
+
     // Limpiar localStorage de datos de portfolio
     const keysToClean = [
       'mi-dashboard-portfolio',
@@ -171,34 +171,34 @@ export const AuthProvider = ({ children }) => {
       'portfolioData',
       'currentProjectId'
     ];
-    
+
     keysToClean.forEach(key => {
       if (localStorage.getItem(key)) {
         localStorage.removeItem(key);
         console.log(`   🗑️ Limpiado: ${key}`);
       }
     });
-    
+
     // Limpiar IndexedDB
     try {
       const dbName = 'mi-dashboard-portfolio';
       const deleteRequest = indexedDB.deleteDatabase(dbName);
-      
+
       deleteRequest.onsuccess = () => {
         console.log('   ✅ IndexedDB limpiado exitosamente');
       };
-      
+
       deleteRequest.onerror = (event) => {
         console.warn('   ⚠️ Error limpiando IndexedDB:', event);
       };
-      
+
       deleteRequest.onblocked = () => {
         console.warn('   ⚠️ Limpieza de IndexedDB bloqueada (pestañas abiertas)');
       };
     } catch (error) {
       console.warn('   ⚠️ Error al intentar limpiar IndexedDB:', error);
     }
-    
+
     console.log('✅ Datos locales limpiados');
   };
 
@@ -323,7 +323,7 @@ export const AuthProvider = ({ children }) => {
 
       // 1. Logout de Supabase
       const result = await supabaseService.signOut();
-      
+
       if (!result.success) {
         console.warn('⚠️ Error en logout de Supabase:', result.error);
       }
@@ -387,27 +387,27 @@ export const AuthProvider = ({ children }) => {
   // 🔍 Verificar si el usuario tiene un permiso específico
   const hasPermission = (requiredPermission) => {
     if (!permissions || permissions.length === 0) return false;
-    
+
     // Si tiene permisos de administrador, puede todo
     if (permissions.includes("*:*")) return true;
-    
+
     // Verificar permiso específico
     if (permissions.includes(requiredPermission)) return true;
-    
+
     // Verificar permiso de módulo completo (ej: "portfolio:*")
     const [module, action] = requiredPermission.split(':');
     if (permissions.includes(`${module}:*`)) return true;
-    
+
     return false;
   };
 
   // 🔍 Verificar si el usuario tiene acceso a un módulo
   const hasModuleAccess = (module) => {
     if (!permissions || permissions.length === 0) return false;
-    
+
     if (permissions.includes("*:*")) return true;
-    
-    return permissions.some(permission => 
+
+    return permissions.some(permission =>
       permission.startsWith(`${module}:`) || permission === `${module}:*`
     );
   };
@@ -449,12 +449,12 @@ export const AuthProvider = ({ children }) => {
     loading,
     showSplash,
     organizationId,
-    
+
     // Funciones de autenticación
     login,
     logout,
     register,
-    
+
     // Funciones de utilidad
     hasPermission,
     hasModuleAccess,
@@ -464,7 +464,7 @@ export const AuthProvider = ({ children }) => {
     completeSplash,
     reloadSession,
     clearLocalData, // 🆕 NUEVA: Exportar función de limpieza
-    
+
     // Función para actualizar usuario manualmente (si es necesario)
     syncUserFromSupabase
   };

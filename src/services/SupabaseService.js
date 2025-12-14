@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { supabaseLogger } from '../utils/logger';
+import ConcurrencyService from './ConcurrencyService';
 
 // Configuración de Supabase desde variables de entorno
 const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL;
@@ -19,7 +20,8 @@ class SupabaseService {
     this.supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     this.currentUser = null;
     this.organizationId = null;
-    this.isSaving = false; // Flag para prevenir guardados simultáneos
+    this.savingOperations = new Map(); // Locks por recurso (reemplaza isSaving)
+    this.concurrencyService = null; // Se inicializa después
   }
 
   // Generar ID determinístico basado en proyecto + identificador único
@@ -83,6 +85,9 @@ class SupabaseService {
         supabaseLogger.warning(' No hay usuario autenticado');
         this.organizationId = null;
       }
+
+      // Inicializar ConcurrencyService
+      this.concurrencyService = new ConcurrencyService(this);
 
       return true;
     } catch (error) {
@@ -1581,6 +1586,42 @@ class SupabaseService {
     return cleanData;
   }
 
+  /**
+   * Guardar con lock por recurso (previene guardados simultáneos del mismo recurso)
+   * 
+   * @param {string} key - Clave del recurso (ej: 'portfolio-orgId')
+   * @param {Function} operation - Operación de guardado a ejecutar
+   * @param {number} timeout - Timeout en ms (default: 30000)
+   * @returns {Promise<any>} Resultado de la operación
+   */
+  async saveWithLock(key, operation, timeout = 30000) {
+    // Verificar si ya hay una operación en progreso para este recurso
+    if (this.savingOperations.has(key)) {
+      const existingOp = this.savingOperations.get(key);
+      const elapsed = Date.now() - existingOp.startTime;
+
+      if (elapsed < timeout) {
+        supabaseLogger.warning(`⚠️ Operación en progreso para ${key}, omitiendo`);
+        throw new Error(`Operación en progreso para ${key}`);
+      } else {
+        supabaseLogger.warning(`⏰ Timeout en operación ${key}, liberando lock`);
+        this.savingOperations.delete(key);
+      }
+    }
+
+    // Registrar inicio de operación
+    this.savingOperations.set(key, { startTime: Date.now() });
+
+    try {
+      const result = await operation();
+      return result;
+    } finally {
+      // Liberar lock siempre, incluso si hay error
+      this.savingOperations.delete(key);
+      supabaseLogger.data(`🔓 Lock liberado para ${key}`);
+    }
+  }
+
   // Guardar datos del portafolio
   async savePortfolioData(data) {
     if (!this.currentUser || !this.organizationId) {
@@ -1588,214 +1629,275 @@ class SupabaseService {
       return false;
     }
 
-    // PREVENIR GUARDADOS SIMULTÁNEOS
-    if (this.isSaving) {
-      supabaseLogger.warning('⚠️ savePortfolioData - GUARDADO EN PROGRESO, OMITIENDO');
-      return false;
-    }
+    // Usar lock por recurso en lugar de flag global
+    const lockKey = `portfolio-${this.organizationId}`;
 
-    this.isSaving = true;
-    supabaseLogger.save(' Guardando datos del portafolio en Supabase...');
+    return this.saveWithLock(lockKey, async () => {
+      supabaseLogger.save('💾 Guardando datos del portafolio en Supabase...');
 
-    // Disparar evento de inicio de sincronización
-    const syncStartEvent = new CustomEvent('supabaseSyncing', {
-      detail: {
-        timestamp: new Date().toISOString(),
-        message: 'Iniciando sincronización con Supabase'
-      }
-    });
-    window.dispatchEvent(syncStartEvent);
-
-    try {
-      // ========================================
-      // GUARDADO HÍBRIDO: Atómico para tablas limpias
-      // ========================================
-
-      supabaseLogger.save('💾 Usando guardado atómico híbrido...');
-
-      // 1. Preparar datos de tablas limpias
-      const cleanData = this.prepareCleanTablesForAtomic(data);
-
-      supabaseLogger.data('📦 Datos preparados para guardado atómico:', {
-        projects: cleanData.projects?.length || 0,
-        tasks: cleanData.tasks?.length || 0,
-        contracts: cleanData.contracts?.length || 0,
-        resources: cleanData.resources?.length || 0,
-        resource_assignments: cleanData.resource_assignments?.length || 0,
-        risks: cleanData.risks?.length || 0,
-        purchase_orders: cleanData.purchase_orders?.length || 0,
-        advances: cleanData.advances?.length || 0,
-        invoices: cleanData.invoices?.length || 0
-      });
-
-      // 2. Llamar función atómica COMPLETA (9 tablas)
-      const { data: atomicResult, error: atomicError } = await this.supabase
-        .rpc('save_portfolio_atomic_full', {
-          p_user_id: this.currentUser.id,
-          p_organization_id: this.organizationId,
-          p_data: cleanData
-        });
-
-      if (atomicError) {
-        supabaseLogger.error('❌ Error en guardado atómico:', atomicError);
-        throw atomicError;
-      }
-
-      if (!atomicResult?.success) {
-        supabaseLogger.error('❌ Guardado atómico falló:', atomicResult);
-        throw new Error(atomicResult?.error || 'Error desconocido en guardado atómico');
-      }
-
-      supabaseLogger.success('✅ Guardado atómico completo exitoso (9 tablas)');
-      supabaseLogger.data('📊 Registros guardados:', atomicResult.counts);
-
-      // ========================================
-      // GUARDADO ADICIONAL: Alertas corporativas
-      // ========================================
-
-      supabaseLogger.save('💾 Guardando alertas corporativas...');
-
-      // Guardar/actualizar alertas corporativas (no incluidas en atomic)
-      if (data.corporateAlerts && data.corporateAlerts.length > 0) {
-        const alertsToUpsert = data.corporateAlerts.map(alert => ({
-          ...alert,
-          organization_id: this.organizationId,
-          owner_id: this.currentUser.id,
-          updated_at: new Date().toISOString()
-        }));
-
-        const { error: alertsError } = await this.supabase
-          .from('corporate_alerts')
-          .upsert(alertsToUpsert, { onConflict: 'id' });
-
-        if (alertsError) {
-          supabaseLogger.warning('⚠️ Error guardando alertas:', alertsError);
+      // Disparar evento de inicio de sincronización
+      const syncStartEvent = new CustomEvent('supabaseSyncing', {
+        detail: {
+          timestamp: new Date().toISOString(),
+          message: 'Iniciando sincronización con Supabase'
         }
-      }
+      });
+      window.dispatchEvent(syncStartEvent);
 
-      // NOTA: Los logs de auditoría se guardan en localStorage solamente
-      // La tabla 'audit_logs' en Supabase no tiene la estructura correcta
-      // Los logs se manejan a través de useAuditLog hook y localStorage
-      if (data.auditLogsByProject) {
-        supabaseLogger.data(`📋 Audit logs detectados pero no se guardan en Supabase (se usan localStorage)`);
-      }
+      // Medir tiempo de guardado
+      const saveStartTime = Date.now();
 
-      // Guardar/actualizar minutas por proyecto
-      if (data.minutasByProject) {
-        for (const projectId in data.minutasByProject) {
-          const minutas = data.minutasByProject[projectId];
-          if (minutas && minutas.length > 0) {
-            supabaseLogger.data(`📋 Guardando minutas para proyecto ${projectId}: ${minutas.length} minutas`);
+      try {
+        // ========================================
+        // ✅ NUEVO: DETECCIÓN DE CONFLICTOS PRE-RPC
+        // ========================================
 
-            try {
-              // Usar upsert para manejar duplicados sin eliminar minutas existentes
-              const result = await this.saveMinutas(projectId, minutas);
-              if (!result.success) {
-                supabaseLogger.warning(`⚠️ Error guardando minutas para proyecto ${projectId}:`, result.error);
-                supabaseLogger.warning(`⚠️ Continuando con el guardado de otros datos...`);
-                // NO lanzar error - continuar con el resto del guardado
-              } else {
-                supabaseLogger.data(`✅ Minutas guardadas exitosamente para proyecto ${projectId}`);
-              }
-            } catch (minutasError) {
-              supabaseLogger.error(`❌ Error inesperado guardando minutas para proyecto ${projectId}:`, minutasError);
-              supabaseLogger.warning(`⚠️ Continuando con el guardado de otros datos...`);
-              // NO lanzar error - continuar con el resto del guardado
+        const conflicts = [];
+
+        // Validar conflictos en tareas
+        if (data.tasksByProject && Object.keys(data.tasksByProject).length > 0) {
+          for (const projectId in data.tasksByProject) {
+            const localTasks = data.tasksByProject[projectId];
+
+            if (!Array.isArray(localTasks) || localTasks.length === 0) continue;
+
+            // Obtener tasks actuales de la DB para este proyecto
+            const { data: dbTasks, error: fetchError } = await this.supabase
+              .from('tasks')
+              .select('id, updated_at')
+              .eq('project_id', projectId);
+
+            if (fetchError) {
+              supabaseLogger.error('Error fetching tasks for conflict detection:', fetchError);
+              continue;
+            }
+
+            // Comparar timestamps
+            if (dbTasks && dbTasks.length > 0) {
+              localTasks.forEach(localTask => {
+                const dbTask = dbTasks.find(t => t.id === localTask.id);
+
+                if (dbTask && localTask.updated_at) {
+                  const dbTimestamp = new Date(dbTask.updated_at).getTime();
+                  const localTimestamp = new Date(localTask.updated_at).getTime();
+
+                  // Si el timestamp de la DB es más reciente, hay conflicto
+                  if (dbTimestamp > localTimestamp) {
+                    supabaseLogger.warn('🔴 CONFLICTO DETECTADO en tarea:', {
+                      taskId: localTask.id,
+                      dbUpdatedAt: dbTask.updated_at,
+                      localUpdatedAt: localTask.updated_at
+                    });
+
+                    conflicts.push({
+                      table: 'tasks',
+                      recordId: localTask.id,
+                      currentData: dbTask,
+                      yourData: localTask
+                    });
+                  }
+                }
+              });
             }
           }
         }
-      }
 
-      // Guardar/actualizar configuraciones de proyectos
-      for (const projectId in data.includeWeekendsByProject) {
-        const includeWeekends = data.includeWeekendsByProject[projectId];
-
-        // Verificar si el projectId es un UUID válido
-        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-        if (!uuidRegex.test(projectId)) {
-          supabaseLogger.data(`⚠️ Saltando configuración para proyecto con ID inválido: ${projectId}`);
-          continue;
+        // Si hay conflictos, retornar sin guardar
+        if (conflicts.length > 0) {
+          supabaseLogger.warn(`⚠️ ${conflicts.length} conflicto(s) detectado(s). Abortando guardado.`);
+          return {
+            success: false,
+            conflicts: conflicts
+          };
         }
 
-        const configToUpsert = {
-          project_id: projectId,
-          include_weekends: includeWeekends,
-          owner_id: this.currentUser.id
-        };
+        // ========================================
+        // GUARDADO HÍBRIDO: Atómico para tablas limpias
+        // ========================================
 
-        // Primero intentar insertar, si falla por duplicado, actualizar
-        const { error: insertError } = await this.supabase
-          .from('project_configurations')
-          .insert(configToUpsert);
+        supabaseLogger.save('💾 Usando guardado atómico híbrido...');
 
-        let configError = null;
-        if (insertError && insertError.code === '23505') {
-          // Si es error de duplicado, actualizar
-          const { error: updateError } = await this.supabase
-            .from('project_configurations')
-            .update(configToUpsert)
-            .eq('project_id', projectId);
-          configError = updateError;
-        } else {
-          configError = insertError;
-        }
+        // 1. Preparar datos de tablas limpias
+        const cleanData = this.prepareCleanTablesForAtomic(data);
 
-        if (configError) {
-          supabaseLogger.warning(`⚠️ Error guardando configuración para proyecto ${projectId}:`, configError);
-          supabaseLogger.warning(`⚠️ Detalles del error de configuración:`, {
-            code: configError.code,
-            message: configError.message,
-            details: configError.details,
-            hint: configError.hint
+        supabaseLogger.data('📦 Datos preparados para guardado atómico:', {
+          projects: cleanData.projects?.length || 0,
+          tasks: cleanData.tasks?.length || 0,
+          contracts: cleanData.contracts?.length || 0,
+          resources: cleanData.resources?.length || 0,
+          resource_assignments: cleanData.resource_assignments?.length || 0,
+          risks: cleanData.risks?.length || 0,
+          purchase_orders: cleanData.purchase_orders?.length || 0,
+          advances: cleanData.advances?.length || 0,
+          invoices: cleanData.invoices?.length || 0
+        });
+
+        // 2. Llamar función atómica COMPLETA (9 tablas)
+        const { data: atomicResult, error: atomicError } = await this.supabase
+          .rpc('save_portfolio_atomic_full', {
+            p_user_id: this.currentUser.id,
+            p_organization_id: this.organizationId,
+            p_data: cleanData
           });
-        } else {
-          supabaseLogger.data(`✅ Configuración guardada para proyecto ${projectId}`);
+
+        if (atomicError) {
+          supabaseLogger.error('❌ Error en guardado atómico:', atomicError);
+          throw atomicError;
         }
+
+        if (!atomicResult?.success) {
+          supabaseLogger.error('❌ Guardado atómico falló:', atomicResult);
+          throw new Error(atomicResult?.error || 'Error desconocido en guardado atómico');
+        }
+
+        supabaseLogger.success('✅ Guardado atómico completo exitoso (9 tablas)');
+        supabaseLogger.data('📊 Registros guardados:', atomicResult.counts);
+
+        // ========================================
+        // GUARDADO ADICIONAL: Alertas corporativas
+        // ========================================
+
+        supabaseLogger.save('💾 Guardando alertas corporativas...');
+
+        // Guardar/actualizar alertas corporativas (no incluidas en atomic)
+        if (data.corporateAlerts && data.corporateAlerts.length > 0) {
+          const alertsToUpsert = data.corporateAlerts.map(alert => ({
+            ...alert,
+            organization_id: this.organizationId,
+            owner_id: this.currentUser.id,
+            updated_at: new Date().toISOString()
+          }));
+
+          const { error: alertsError } = await this.supabase
+            .from('corporate_alerts')
+            .upsert(alertsToUpsert, { onConflict: 'id' });
+
+          if (alertsError) {
+            supabaseLogger.warning('⚠️ Error guardando alertas:', alertsError);
+          }
+        }
+
+        // NOTA: Los logs de auditoría se guardan en localStorage solamente
+        // La tabla 'audit_logs' en Supabase no tiene la estructura correcta
+        // Los logs se manejan a través de useAuditLog hook y localStorage
+        if (data.auditLogsByProject) {
+          supabaseLogger.data(`📋 Audit logs detectados pero no se guardan en Supabase (se usan localStorage)`);
+        }
+
+        // Guardar/actualizar minutas por proyecto
+        if (data.minutasByProject) {
+          for (const projectId in data.minutasByProject) {
+            const minutas = data.minutasByProject[projectId];
+            if (minutas && minutas.length > 0) {
+              supabaseLogger.data(`📋 Guardando minutas para proyecto ${projectId}: ${minutas.length} minutas`);
+
+              try {
+                // Usar upsert para manejar duplicados sin eliminar minutas existentes
+                const result = await this.saveMinutas(projectId, minutas);
+                if (!result.success) {
+                  supabaseLogger.warning(`⚠️ Error guardando minutas para proyecto ${projectId}:`, result.error);
+                  supabaseLogger.warning(`⚠️ Continuando con el guardado de otros datos...`);
+                  // NO lanzar error - continuar con el resto del guardado
+                } else {
+                  supabaseLogger.data(`✅ Minutas guardadas exitosamente para proyecto ${projectId}`);
+                }
+              } catch (minutasError) {
+                supabaseLogger.error(`❌ Error inesperado guardando minutas para proyecto ${projectId}:`, minutasError);
+                supabaseLogger.warning(`⚠️ Continuando con el guardado de otros datos...`);
+                // NO lanzar error - continuar con el resto del guardado
+              }
+            }
+          }
+        }
+
+        // Guardar/actualizar configuraciones de proyectos
+        for (const projectId in data.includeWeekendsByProject) {
+          const includeWeekends = data.includeWeekendsByProject[projectId];
+
+          // Verificar si el projectId es un UUID válido
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+          if (!uuidRegex.test(projectId)) {
+            supabaseLogger.data(`⚠️ Saltando configuración para proyecto con ID inválido: ${projectId}`);
+            continue;
+          }
+
+          const configToUpsert = {
+            project_id: projectId,
+            include_weekends: includeWeekends,
+            owner_id: this.currentUser.id
+          };
+
+          // Primero intentar insertar, si falla por duplicado, actualizar
+          const { error: insertError } = await this.supabase
+            .from('project_configurations')
+            .insert(configToUpsert);
+
+          let configError = null;
+          if (insertError && insertError.code === '23505') {
+            // Si es error de duplicado, actualizar
+            const { error: updateError } = await this.supabase
+              .from('project_configurations')
+              .update(configToUpsert)
+              .eq('project_id', projectId);
+            configError = updateError;
+          } else {
+            configError = insertError;
+          }
+
+          if (configError) {
+            supabaseLogger.warning(`⚠️ Error guardando configuración para proyecto ${projectId}:`, configError);
+            supabaseLogger.warning(`⚠️ Detalles del error de configuración:`, {
+              code: configError.code,
+              message: configError.message,
+              details: configError.details,
+              hint: configError.hint
+            });
+          } else {
+            supabaseLogger.data(`✅ Configuración guardada para proyecto ${projectId}`);
+          }
+        }
+
+        supabaseLogger.success(' Datos del portafolio guardados en Supabase');
+
+        // Disparar evento de guardado exitoso
+        const saveSuccessEvent = new CustomEvent('supabaseDataSaved', {
+          detail: {
+            timestamp: new Date().toISOString(),
+            message: 'Datos guardados exitosamente en Supabase',
+            dataSize: JSON.stringify(data).length,
+            path: 'Supabase Cloud'
+          }
+        });
+        window.dispatchEvent(saveSuccessEvent);
+        supabaseLogger.success(`✅ Guardado exitoso en ${Date.now() - saveStartTime}ms`);
+
+        return { success: true };
+
+      } catch (error) {
+        supabaseLogger.error('❌ Error guardando datos del portafolio:', error);
+
+        // Disparar evento de error
+        const errorEvent = new CustomEvent('supabaseError', {
+          detail: {
+            timestamp: new Date().toISOString(),
+            message: `Error guardando en Supabase: ${error.message}`,
+            error: error
+          }
+        });
+        window.dispatchEvent(errorEvent);
+
+        return { success: false, error: error.message };
+      } finally {
+        // Disparar evento de fin de sincronización
+        const syncEndEvent = new CustomEvent('supabaseSynced', {
+          detail: {
+            timestamp: new Date().toISOString(),
+            message: 'Sincronización con Supabase completada'
+          }
+        });
+        window.dispatchEvent(syncEndEvent);
       }
-
-      supabaseLogger.success(' Datos del portafolio guardados en Supabase');
-
-      // Disparar evento de guardado exitoso
-      const saveSuccessEvent = new CustomEvent('supabaseDataSaved', {
-        detail: {
-          timestamp: new Date().toISOString(),
-          message: 'Datos guardados exitosamente en Supabase',
-          dataSize: JSON.stringify(data).length,
-          path: 'Supabase Cloud'
-        }
-      });
-      window.dispatchEvent(saveSuccessEvent);
-
-      return true;
-
-    } catch (error) {
-      supabaseLogger.error(' Error guardando datos del portafolio:', error);
-
-      // Disparar evento de error
-      const errorEvent = new CustomEvent('supabaseError', {
-        detail: {
-          timestamp: new Date().toISOString(),
-          message: `Error guardando en Supabase: ${error.message}`,
-          error: error
-        }
-      });
-      window.dispatchEvent(errorEvent);
-
-      return false;
-    } finally {
-      // Liberar flag de guardado
-      this.isSaving = false;
-      supabaseLogger.data('🔓 Flag de guardado liberado');
-
-      // Disparar evento de fin de sincronización
-      const syncEndEvent = new CustomEvent('supabaseSynced', {
-        detail: {
-          timestamp: new Date().toISOString(),
-          message: 'Sincronización con Supabase completada'
-        }
-      });
-      window.dispatchEvent(syncEndEvent);
-    }
+    }); // Cierre de saveWithLock
   }
 
   // Obtener usuario actual
