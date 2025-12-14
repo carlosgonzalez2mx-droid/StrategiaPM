@@ -1,31 +1,27 @@
-import { logger } from '../utils/logger';
-
 import React from 'react';
+import { logger } from '../utils/logger';
 import supabaseService from '../services/SupabaseService';
 import usePermissions from '../hooks/usePermissions';
 import SaveButton from './SaveButton';
+import { cn } from '../lib/utils'; // Import helper
 
 const Sidebar = ({
   activeSection,
   onSectionChange,
   projects,
   currentProjectId,
-  setCurrentProjectId,
-  workPackages = [], // Nuevo prop para work packages
-  risks = [], // Nuevo prop para riesgos
-  evmMetrics = {}, // Nuevo prop para métricas EVM
-  isCollapsed = false, // Prop para estado colapsado
-  onToggleCollapse, // Función para alternar el estado
-  // Props para SaveButton
+  workPackages = [],
+  risks = [],
+  evmMetrics = {},
+  isCollapsed = false,
+  onToggleCollapse,
   onSave,
   hasUnsavedChanges = false,
   isSaving = false,
   lastSaved = null
 }) => {
 
-  // Hook de permisos
-  const { permissions, isReadOnly } = usePermissions();
-
+  const { isReadOnly } = usePermissions();
 
   const allNavigation = [
     { id: 'portfolio', name: 'Portafolio de Proyectos', icon: '🏢', requiresEdit: true },
@@ -35,235 +31,153 @@ const Sidebar = ({
     { id: 'help', name: 'Ayuda', icon: '📖', requiresEdit: false, isHelp: true }
   ];
 
-  // Filtrar navegación basado en permisos del usuario
   const navigation = allNavigation.filter(section => {
-    if (section.requiresEdit && isReadOnly()) {
-      return false; // Ocultar secciones que requieren edición para usuarios de solo lectura
-    }
+    if (section.requiresEdit && isReadOnly()) return false;
     return true;
   });
 
   const getSectionDescription = (sectionId) => {
     switch (sectionId) {
-      case 'portfolio': return 'Gestión estratégica de proyectos con Business Case, TIR y presupuestos';
-      case 'project-management': return 'Control operativo con módulos de riesgos, cronograma y finanzas';
-      case 'executive': return 'KPIs consolidados y métricas ejecutivas de todos los proyectos activos';
-      case 'user-management': return 'Gestionar usuarios, roles y permisos de la organización';
-      case 'help': return 'Descargar manual de usuario y documentación';
+      case 'portfolio': return 'Gestión estratégica y presupuestos';
+      case 'project-management': return 'Control operativo de proyectos';
+      case 'executive': return 'KPIs y métricas consolidadas';
+      case 'user-management': return 'Gestión de usuarios y roles';
+      case 'help': return 'Ayuda y documentación';
       default: return '';
     }
   };
 
-  // Función para abrir el manual de usuario
   const handleDownloadManual = () => {
-    // Abrir el PDF en una nueva pestaña (más confiable que forzar descarga)
     window.open('/Manual_StrategiaPM_v1.0.pdf', '_blank');
   };
 
-  const currentProject = projects?.find(p => p.id === currentProjectId);
+  const currentUser = supabaseService.getCurrentUser();
 
   return (
     <>
-      {/* Botón flotante con logo para expandir cuando está colapsado */}
+      {/* Mobile / Collapsed Trigger */}
       {isCollapsed && (
         <button
           onClick={onToggleCollapse}
-          className="fixed top-0 left-0 w-16 z-50 bg-transparent hover:opacity-80 transition-all duration-200 flex items-center justify-center"
-          style={{ height: '60px' }}
+          className="fixed top-4 left-4 z-50 p-2 bg-white rounded-xl shadow-soft hover:shadow-soft-md transition-all duration-200 border border-slate-100"
           title="Expandir menú"
         >
-          <img
-            src="/logo_icon_only.svg"
-            alt="StrategiaPM"
-            className="h-10 w-10"
-          />
+          <img src="/logo_icon_only.svg" alt="StrategiaPM" className="h-8 w-8" />
         </button>
       )}
 
-      <div className={`
-        fixed top-0 left-0 h-full bg-white shadow-xl z-40 
-        ${isCollapsed ? 'w-16' : 'w-80 lg:w-72'} 
-        border-r border-gray-200
-        transition-all duration-300
-      `}>
+      <div className={cn(
+        "fixed top-0 left-0 h-full bg-white border-r border-slate-200 z-40 transition-all duration-300 ease-in-out flex flex-col shadow-soft-lg",
+        isCollapsed ? "w-0 -translate-x-full opacity-0 overflow-hidden" : "w-72 translate-x-0 opacity-100"
+      )}>
         {/* Header */}
-        <div className={`border-b border-gray-200 ${isCollapsed ? 'p-2' : 'p-4'}`}>
-          <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
-            {!isCollapsed && (
-              <img
-                src="/logo_strategiapm.svg"
-                alt="StrategiaPM"
-                className="h-10 w-auto mb-2"
-              />
-            )}
-            <button
-              onClick={onToggleCollapse}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors duration-200 z-10 relative"
-              title={isCollapsed ? 'Expandir sidebar' : 'Colapsar sidebar'}
-              style={{ minWidth: '40px', minHeight: '40px' }}
-            >
-              <span className="text-xl font-bold">
-                {isCollapsed ? '→' : '←'}
-              </span>
-            </button>
-          </div>
-
-          {!isCollapsed && (
-            <div className="text-sm text-gray-600 space-y-2">
-              <p className="font-medium">Gestión de Proyectos</p>
-              {/* Usuario activo */}
-              <div className="flex items-center space-x-2 px-2 py-1 bg-blue-50 rounded-lg border border-blue-200">
-                <span className="text-blue-600">👤</span>
-                <div className="flex flex-col">
-                  <span className="text-xs font-medium text-blue-800">
-                    {supabaseService.getCurrentUser()?.email || 'Usuario no autenticado'}
-                  </span>
-                  <span className="text-xs text-blue-600">
-                    {supabaseService.getCurrentUser() ? '🟢 Conectado' : '🔴 Desconectado'}
-                  </span>
-                </div>
-              </div>
-
-              {/* Indicador de modo solo lectura */}
-              {isReadOnly() && (
-                <div className="flex items-center space-x-2 px-2 py-1 bg-orange-50 rounded-lg border border-orange-200">
-                  <span className="text-orange-600">👀</span>
-                  <div className="flex flex-col">
-                    <span className="text-xs font-medium text-orange-800">
-                      Modo Solo Lectura
-                    </span>
-                    <span className="text-xs text-orange-600">
-                      Acceso limitado a visualización
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Botones de Conexión */}
-              <div className="space-y-2">
-                {/* Botón Desconectar Usuario - Solo si hay usuario conectado */}
-                {supabaseService.getCurrentUser() && (
-                  <button
-                    onClick={async () => {
-                      if (window.confirm('¿Estás seguro de que quieres desconectarte?\n\nEsto cerrará completamente tu sesión por seguridad.')) {
-                        logger.debug('🚪 Cerrando sesión de Supabase...');
-
-                        try {
-                          // LOGOUT REAL DE SUPABASE para seguridad
-                          const result = await supabaseService.signOut();
-
-                          if (result.success) {
-                            logger.debug('✅ Logout completo exitoso');
-
-                            // Verificar que realmente no hay usuario
-                            const stillLoggedIn = supabaseService.getCurrentUser();
-                            if (stillLoggedIn) {
-                              logger.warn('⚠️ Usuario aún detectado después del logout, forzando recarga...');
-                            }
-
-                            // Pequeña pausa para asegurar que el logout se procesó
-                            setTimeout(() => {
-                              logger.debug('🔄 Recargando página para limpiar estado...');
-                              window.location.reload();
-                            }, 500);
-                          } else {
-                            logger.error('❌ Error cerrando sesión:', result.error);
-                            alert('❌ Error al cerrar sesión. Inténtalo de nuevo.');
-                          }
-                        } catch (error) {
-                          logger.error('❌ Error inesperado:', error);
-                          alert('❌ Error inesperado al cerrar sesión.');
-                        }
-                      }
-                    }}
-                    className="w-full flex items-center justify-center space-x-2 px-2 py-2 bg-red-50 hover:bg-red-100 border border-red-200 rounded-lg transition-colors duration-200"
-                  >
-                    <span className="text-red-600">🚪</span>
-                    <span className="text-xs font-medium text-red-800">
-                      Desconectar Usuario
-                    </span>
-                  </button>
-                )}
-
-                {/* Botón Conectar Usuario - Solo si NO hay usuario conectado */}
-                {!supabaseService.getCurrentUser() && (
-                  <button
-                    onClick={() => {
-                      logger.debug('🔑 Abriendo modal de autenticación...');
-                      // Disparar evento para abrir modal de autenticación
-                      window.dispatchEvent(new CustomEvent('requestSupabaseAuth', {
-                        detail: { action: 'login' }
-                      }));
-                    }}
-                    className="w-full flex items-center justify-center space-x-2 px-2 py-2 bg-green-50 hover:bg-green-100 border border-green-200 rounded-lg transition-colors duration-200"
-                  >
-                    <span className="text-green-600">🔑</span>
-                    <span className="text-xs font-medium text-green-800">
-                      Conectar Usuario
-                    </span>
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+          <img
+            src="/logo_strategiapm.svg"
+            alt="StrategiaPM"
+            className="h-8 w-auto object-contain"
+          />
+          <button
+            onClick={onToggleCollapse}
+            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+              <path d="M9 3v18" />
+            </svg>
+          </button>
         </div>
 
-        {/* Navigation */}
+        {/* User Info (Compact) */}
         {!isCollapsed && (
-          <nav className="p-2">
-            <ul className="space-y-0.5">
-              {navigation.map(section => (
-                <li key={section.id}>
-                  <button
-                    onClick={() => section.isHelp ? handleDownloadManual() : onSectionChange(section.id)}
-                    className={`
-                      w-full flex items-center px-2 py-1.5 text-left rounded-lg transition-colors
-                      ${activeSection === section.id
-                        ? 'bg-blue-100 text-blue-700 border-l-4 border-blue-500'
-                        : 'text-gray-700 hover:bg-gray-100'
-                      }
-                    `}
-                  >
-                    <span className="text-lg mr-2">{section.icon}</span>
-                    <div>
-                      <div className="font-medium text-sm">{section.name}</div>
-                      <div className="text-xs text-gray-500">
-                        {getSectionDescription(section.id)}
-                      </div>
-                    </div>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </nav>
+          <div className="px-4 py-4">
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center gap-3">
+              <div className="h-8 w-8 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 font-bold border border-brand-200">
+                {currentUser?.email?.[0]?.toUpperCase() || 'U'}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-slate-900 truncate">
+                  {currentUser?.email || 'Usuario'}
+                </p>
+                <div className="flex items-center gap-1.5">
+                  <span className={cn("h-2 w-2 rounded-full", currentUser ? "bg-emerald-500" : "bg-red-500")} />
+                  <span className="text-xs text-slate-500">
+                    {currentUser ? 'Conectado' : 'Desconectado'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
 
-        {/* Footer con botón de guardado */}
-        {!isReadOnly() && onSave && (
-          <div className={`border-t border-gray-200 mt-auto ${isCollapsed ? 'p-2' : 'p-4'}`}>
-            {!isCollapsed ? (
+        {/* Navigation */}
+        <nav className="flex-1 overflow-y-auto px-4 py-2 space-y-1">
+          {navigation.map(section => {
+            const isActive = activeSection === section.id;
+            return (
+              <button
+                key={section.id}
+                onClick={() => section.isHelp ? handleDownloadManual() : onSectionChange(section.id)}
+                className={cn(
+                  "w-full flex items-start p-3 rounded-xl transition-all duration-200 group text-left",
+                  isActive
+                    ? "bg-slate-900 text-white shadow-soft-md"
+                    : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                )}
+              >
+                <span className={cn(
+                  "text-xl mr-3 transition-colors",
+                  isActive ? "text-brand-400" : "text-slate-400 group-hover:text-slate-600"
+                )}>
+                  {section.icon}
+                </span>
+                <div>
+                  <div className={cn("font-medium text-sm", isActive ? "text-white" : "")}>
+                    {section.name}
+                  </div>
+                  <div className={cn("text-xs mt-0.5", isActive ? "text-slate-400" : "text-slate-400")}>
+                    {getSectionDescription(section.id)}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Footer Actions */}
+        <div className="p-4 border-t border-slate-100 space-y-2 bg-slate-50/30">
+          {currentUser ? (
+            <button
+              onClick={async () => {
+                if (window.confirm('¿Deseas cerrar sesión?')) {
+                  await supabaseService.signOut();
+                  window.location.reload();
+                }
+              }}
+              className="w-full flex items-center justify-center space-x-2 p-2 text-xs font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors border border-transparent hover:border-slate-200"
+            >
+              <span>Cerrar Sesión</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => window.dispatchEvent(new CustomEvent('requestSupabaseAuth', { detail: { action: 'login' } }))}
+              className="w-full flex items-center justify-center space-x-2 p-2 text-xs font-medium text-brand-700 bg-brand-50 hover:bg-brand-100 rounded-lg transition-colors border border-brand-200"
+            >
+              <span>Conectar</span>
+            </button>
+          )}
+
+          {!isReadOnly() && onSave && (
+            <div className="pt-2">
               <SaveButton
                 onSave={onSave}
                 hasUnsavedChanges={hasUnsavedChanges}
                 isSaving={isSaving}
                 lastSaved={lastSaved}
               />
-            ) : (
-              /* Botón colapsado */
-              <button
-                onClick={onSave}
-                disabled={!hasUnsavedChanges || isSaving}
-                className={`w-full p-3 rounded-lg transition-colors duration-200 flex items-center justify-center ${hasUnsavedChanges && !isSaving
-                  ? 'bg-blue-600 hover:bg-blue-700 text-white'
-                  : 'bg-gray-300 cursor-not-allowed text-gray-500'
-                  }`}
-                title={isSaving ? 'Guardando...' : hasUnsavedChanges ? 'Guardar (Ctrl+S)' : 'No hay cambios'}
-              >
-                <span className="text-lg">{isSaving ? '⏳' : '💾'}</span>
-              </button>
-            )}
-          </div>
-        )}
+            </div>
+          )}
+        </div>
       </div>
     </>
   );

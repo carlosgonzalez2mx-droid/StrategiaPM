@@ -1591,18 +1591,34 @@ class SupabaseService {
    * 
    * @param {string} key - Clave del recurso (ej: 'portfolio-orgId')
    * @param {Function} operation - Operación de guardado a ejecutar
-   * @param {number} timeout - Timeout en ms (default: 30000)
+   * @param {number} timeout - Timeout en ms (default: 10000)
    * @returns {Promise<any>} Resultado de la operación
    */
-  async saveWithLock(key, operation, timeout = 30000) {
+  async saveWithLock(key, operation, timeout = 10000) {
     // Verificar si ya hay una operación en progreso para este recurso
     if (this.savingOperations.has(key)) {
       const existingOp = this.savingOperations.get(key);
       const elapsed = Date.now() - existingOp.startTime;
 
       if (elapsed < timeout) {
-        supabaseLogger.warning(`⚠️ Operación en progreso para ${key}, omitiendo`);
-        throw new Error(`Operación en progreso para ${key}`);
+        // En lugar de lanzar error inmediatamente, esperar un poco
+        supabaseLogger.warning(`⚠️ Operación en progreso para ${key}, esperando ${elapsed}ms...`);
+
+        // Esperar hasta que se libere el lock o expire el timeout
+        const waitTime = Math.min(timeout - elapsed, 2000); // Máximo 2 segundos
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+
+        // Verificar de nuevo si el lock se liberó
+        if (this.savingOperations.has(key)) {
+          const newElapsed = Date.now() - existingOp.startTime;
+          if (newElapsed >= timeout) {
+            supabaseLogger.warning(`⏰ Timeout en operación ${key}, liberando lock forzadamente`);
+            this.savingOperations.delete(key);
+          } else {
+            // Todavía está bloqueado, rechazar
+            throw new Error(`Operación en progreso para ${key}`);
+          }
+        }
       } else {
         supabaseLogger.warning(`⏰ Timeout en operación ${key}, liberando lock`);
         this.savingOperations.delete(key);
@@ -1649,22 +1665,36 @@ class SupabaseService {
 
       try {
         // ========================================
-        // ✅ NUEVO: DETECCIÓN DE CONFLICTOS PRE-RPC
+        // ✅ DETECCIÓN DE CONFLICTOS PRE-RPC (MEJORADA)
         // ========================================
 
         const conflicts = [];
 
-        // Validar conflictos en tareas
+        // NOTA: La detección de conflictos está DESHABILITADA temporalmente
+        // porque estaba generando falsos positivos masivos.
+        // 
+        // Razones para deshabilitar:
+        // 1. El auto-guardado actualiza updated_at constantemente
+        // 2. No hay forma de distinguir entre auto-guardado y cambios de otro usuario
+        // 3. Estaba bloqueando guardados legítimos
+        //
+        // TODO: Implementar detección de conflictos más inteligente que:
+        // - Compare contenido real, no solo timestamps
+        // - Tenga en cuenta el auto-guardado
+        // - Use un sistema de versiones o checksums
+
+        /*
+        // Código de detección de conflictos deshabilitado
         if (data.tasksByProject && Object.keys(data.tasksByProject).length > 0) {
           for (const projectId in data.tasksByProject) {
             const localTasks = data.tasksByProject[projectId];
 
             if (!Array.isArray(localTasks) || localTasks.length === 0) continue;
 
-            // Obtener tasks actuales de la DB para este proyecto
+            // Obtener tasks actuales de la DB para este proyecto (con todos los campos)
             const { data: dbTasks, error: fetchError } = await this.supabase
               .from('tasks')
-              .select('id, updated_at')
+              .select('*')
               .eq('project_id', projectId);
 
             if (fetchError) {
@@ -1672,7 +1702,7 @@ class SupabaseService {
               continue;
             }
 
-            // Comparar timestamps
+            // Comparar contenido real, no solo timestamps
             if (dbTasks && dbTasks.length > 0) {
               localTasks.forEach(localTask => {
                 const dbTask = dbTasks.find(t => t.id === localTask.id);
@@ -1680,21 +1710,39 @@ class SupabaseService {
                 if (dbTask && localTask.updated_at) {
                   const dbTimestamp = new Date(dbTask.updated_at).getTime();
                   const localTimestamp = new Date(localTask.updated_at).getTime();
+                  
+                  // Diferencia de tiempo en segundos
+                  const timeDiffSeconds = (dbTimestamp - localTimestamp) / 1000;
 
-                  // Si el timestamp de la DB es más reciente, hay conflicto
-                  if (dbTimestamp > localTimestamp) {
-                    supabaseLogger.warn('🔴 CONFLICTO DETECTADO en tarea:', {
-                      taskId: localTask.id,
-                      dbUpdatedAt: dbTask.updated_at,
-                      localUpdatedAt: localTask.updated_at
-                    });
+                  // Solo detectar conflicto si:
+                  // 1. La diferencia es mayor a 10 segundos (evitar falsos positivos del auto-guardado)
+                  // 2. Y hay cambios reales en el contenido
+                  if (timeDiffSeconds > 10) {
+                    // Comparar campos importantes
+                    const hasContentChanges = 
+                      dbTask.name !== localTask.name ||
+                      dbTask.description !== localTask.description ||
+                      dbTask.progress !== localTask.progress ||
+                      dbTask.status !== localTask.status ||
+                      dbTask.start_date !== (localTask.startDate || localTask.start_date) ||
+                      dbTask.end_date !== (localTask.endDate || localTask.end_date);
 
-                    conflicts.push({
-                      table: 'tasks',
-                      recordId: localTask.id,
-                      currentData: dbTask,
-                      yourData: localTask
-                    });
+                    if (hasContentChanges) {
+                      supabaseLogger.warning('🔴 CONFLICTO REAL DETECTADO en tarea:', {
+                        taskId: localTask.id,
+                        taskName: localTask.name,
+                        dbUpdatedAt: dbTask.updated_at,
+                        localUpdatedAt: localTask.updated_at,
+                        timeDiffSeconds: timeDiffSeconds.toFixed(1)
+                      });
+
+                      conflicts.push({
+                        table: 'tasks',
+                        recordId: localTask.id,
+                        currentData: dbTask,
+                        yourData: localTask
+                      });
+                    }
                   }
                 }
               });
@@ -1702,14 +1750,15 @@ class SupabaseService {
           }
         }
 
-        // Si hay conflictos, retornar sin guardar
+        // Si hay conflictos reales, retornar sin guardar
         if (conflicts.length > 0) {
-          supabaseLogger.warn(`⚠️ ${conflicts.length} conflicto(s) detectado(s). Abortando guardado.`);
+          supabaseLogger.warning(`⚠️ ${conflicts.length} conflicto(s) real(es) detectado(s). Abortando guardado.`);
           return {
             success: false,
             conflicts: conflicts
           };
         }
+        */
 
         // ========================================
         // GUARDADO HÍBRIDO: Atómico para tablas limpias

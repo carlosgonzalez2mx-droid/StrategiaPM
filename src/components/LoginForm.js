@@ -1,24 +1,23 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { ROLE_PERMISSIONS } from '../contexts/AuthContext';
+import { cn } from '../lib/utils';
+import { Button } from './ui/Button';
 
 const LoginForm = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [showDemoUsers, setShowDemoUsers] = useState(false);
-  
+
   const { login, loading } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    
     try {
       await login(email, password);
-      // Redirigir después del login exitoso
       navigate('/');
     } catch (error) {
       setError(error.message);
@@ -29,11 +28,8 @@ const LoginForm = () => {
     setEmail(demoEmail);
     setPassword(demoPassword);
     setError('');
-    
     try {
-      // Llamar directamente a la función de login
       await login(demoEmail, demoPassword);
-      // Redirigir después del login exitoso
       navigate('/');
     } catch (error) {
       setError(error.message);
@@ -41,222 +37,99 @@ const LoginForm = () => {
   };
 
   const demoUsers = [
-    {
-      email: "pm@strategiapm.com",
-      password: "pm123",
-      role: "project_manager",
-      name: "Project Manager",
-      description: "Acceso completo al sistema"
-    },
-    {
-      email: "ejecutivo@strategiapm.com",
-      password: "ejec123",
-      role: "executive_manager",
-      name: "Gestor Ejecutivo",
-      description: "Solo dashboards y reportes"
-    },
-    {
-      email: "asistente@strategiapm.com",
-      password: "asis123",
-      role: "pmo_assistant",
-      name: "Asistente de PMO",
-      description: "Gestión de proyectos"
-    },
-    {
-      email: "financiero@strategiapm.com",
-      password: "fin123",
-      role: "financial_analyst",
-      name: "Analista Financiero",
-      description: "Módulos financieros"
-    }
+    { email: "pm@strategiapm.com", password: "pm123", role: "project_manager", name: "Project Manager", description: "Acceso completo" },
+    { email: "ejecutivo@strategiapm.com", password: "ejec123", role: "executive_manager", name: "Gestor Ejecutivo", description: "Solo dashboards" },
+    { email: "asistente@strategiapm.com", password: "asis123", role: "pmo_assistant", name: "Asistente de PMO", description: "Gestión básica" },
+    { email: "financiero@strategiapm.com", password: "fin123", role: "financial_analyst", name: "Analista Financiero", description: "Finanzas" }
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-8 text-center">
-          {/* Logo StrategiaPM */}
-          <div className="flex items-center justify-center mb-6">
-            <div className="flex items-center space-x-4">
-              {/* Icono del logo */}
-              <div className="w-16 h-16 bg-white rounded-lg flex items-center justify-center shadow-lg">
-                <svg 
-                  width="40" 
-                  height="40" 
-                  viewBox="0 0 40 40" 
-                  fill="none" 
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="text-blue-600"
-                >
-                  {/* Clipboard base */}
-                  <rect 
-                    x="6" 
-                    y="4" 
-                    width="28" 
-                    height="32" 
-                    rx="3" 
-                    stroke="currentColor" 
-                    strokeWidth="2" 
-                    fill="none"
-                  />
-                  {/* Clipboard clip */}
-                  <rect 
-                    x="14" 
-                    y="2" 
-                    width="12" 
-                    height="6" 
-                    rx="2" 
-                    fill="currentColor"
-                  />
-                  {/* Bar chart inside clipboard */}
-                  <rect x="10" y="16" width="3" height="8" fill="currentColor" opacity="0.7"/>
-                  <rect x="15" y="12" width="3" height="12" fill="currentColor" opacity="0.7"/>
-                  <rect x="20" y="8" width="3" height="16" fill="currentColor" opacity="0.7"/>
-                  {/* Line graph overlay */}
-                  <path 
-                    d="M10 24 L15 20 L20 16 L25 12 L30 8" 
-                    stroke="currentColor" 
-                    strokeWidth="2" 
-                    fill="none"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  {/* Arrow pointing up */}
-                  <path 
-                    d="M28 8 L30 6 L32 8" 
-                    stroke="currentColor" 
-                    strokeWidth="2" 
-                    fill="none"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </div>
-              {/* Texto del logo */}
-              <div className="text-left">
-                <h1 className="text-3xl font-bold text-white leading-tight">
-                  Strategia<span className="text-blue-200">PM</span>
-                </h1>
-                <p className="text-blue-100 text-sm">
-                  Sistema de Gestión de Oficina de Proyectos
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
+      {/* Brand Header */}
+      <div className="mb-8 text-center">
+        <img src="/logo_strategiapm.svg" alt="StrategiaPM" className="h-16 w-auto mx-auto mb-4 drop-shadow-sm" />
+        <h2 className="text-2xl font-semibold text-slate-900">Bienvenido de nuevo</h2>
+        <p className="text-slate-500 text-sm mt-2">Sistema de Gestión de Oficina de Proyectos</p>
+      </div>
 
-        {/* Formulario */}
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-soft-lg border border-slate-100 overflow-hidden">
         <div className="p-8">
-          <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center">
-            Iniciar Sesión
-          </h2>
-
-          <form id="login-form" onSubmit={handleSubmit} className="space-y-6">
-            {/* Email */}
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                📧 Correo Electrónico
-              </label>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Correo Electrónico</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                placeholder="usuario@empresa.com"
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all font-sans"
+                placeholder="nombre@empresa.com"
                 required
               />
             </div>
 
-            {/* Password */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                🔒 Contraseña
-              </label>
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Contraseña</label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all font-sans"
                 placeholder="••••••••"
                 required
               />
             </div>
 
-            {/* Error Message */}
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                <p className="text-red-600 text-sm">{error}</p>
+              <div className="p-3 bg-red-50 border border-red-100 rounded-lg text-sm text-red-600 flex items-center">
+                <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                {error}
               </div>
             )}
 
-            {/* Login Button */}
-            <button
+            <Button
               type="submit"
-              disabled={loading}
-              className={`w-full py-3 rounded-xl font-medium text-white transition-all duration-200 ${
-                loading 
-                  ? 'bg-gray-400 cursor-not-allowed' 
-                  : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-lg hover:shadow-xl'
-              }`}
+              className="w-full bg-slate-900 hover:bg-slate-800 text-white shadow-md py-2.5 h-auto text-base"
+              isLoading={loading}
             >
-              {loading ? (
-                <div className="flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                  Iniciando sesión...
-                </div>
-              ) : (
-                '🚀 Iniciar Sesión'
-              )}
-            </button>
+              Iniciar Sesión
+            </Button>
           </form>
 
-          {/* Demo Users Section */}
-          <div className="mt-8">
+          <div className="mt-8 pt-6 border-t border-slate-100">
             <button
               onClick={() => setShowDemoUsers(!showDemoUsers)}
-              className="w-full text-center text-sm text-gray-500 hover:text-gray-700 transition-colors"
+              className="w-full text-center text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors flex items-center justify-center gap-2"
             >
-              {showDemoUsers ? '👁️ Ocultar' : '👥 Ver'} Usuarios de Demo
+              {showDemoUsers ? 'Ocultar' : 'Mostrar'} Usuarios Demo
             </button>
-            
+
             {showDemoUsers && (
-              <div className="mt-4 space-y-3">
-                <p className="text-xs text-gray-500 text-center">
-                  Usa estas credenciales para probar diferentes roles:
-                </p>
-                {demoUsers.map((demoUser) => (
-                  <div
-                    key={demoUser.role}
-                    className="bg-gray-50 rounded-lg p-3 cursor-pointer hover:bg-gray-100 transition-colors"
-                    onClick={() => handleDemoLogin(demoUser.email, demoUser.password)}
+              <div className="mt-4 grid grid-cols-1 gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                {demoUsers.map((u) => (
+                  <button
+                    key={u.role}
+                    onClick={() => handleDemoLogin(u.email, u.password)}
+                    className="flex items-center justify-between w-full p-3 text-left bg-slate-50 hover:bg-slate-100 border border-slate-100 rounded-lg transition-all group"
                   >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="font-medium text-gray-800 text-sm">
-                          {demoUser.name}
-                        </div>
-                        <div className="text-xs text-gray-600">
-                          {demoUser.description}
-                        </div>
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {demoUser.email}
-                      </div>
+                    <div>
+                      <div className="font-medium text-slate-900 text-sm group-hover:text-brand-700 transition-colors">{u.name}</div>
+                      <div className="text-xs text-slate-500">{u.role === 'project_manager' ? 'Admin' : 'Usuario'}</div>
                     </div>
-                  </div>
+                    <div className="text-xs font-mono text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-100">
+                      Demo
+                    </div>
+                  </button>
                 ))}
               </div>
             )}
           </div>
-
-          {/* Footer */}
-          <div className="mt-8 text-center">
-            <p className="text-xs text-gray-500">
-              © 2025 StrategiaPM - Sistema PMO Profesional
-            </p>
-          </div>
         </div>
+      </div>
+
+      <div className="mt-8 text-center text-xs text-slate-400">
+        &copy; 2025 StrategiaPM. Todos los derechos reservados.
       </div>
     </div>
   );

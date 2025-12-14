@@ -1,7 +1,9 @@
 import React from 'react';
+import { Card, CardHeader, CardTitle, CardContent } from './ui/Card';
+import { cn } from '../lib/utils';
 
 const CorporateAlerts = ({ projects, portfolioMetrics = {} }) => {
-  
+
   // Identificar proyectos críticos
   const criticalProjects = projects.filter(project => {
     // Aquí deberíamos tener las métricas EVM de cada proyecto
@@ -93,68 +95,68 @@ const CorporateAlerts = ({ projects, portfolioMetrics = {} }) => {
   }
 
   const getAlertColor = (color) => {
-    switch(color) {
-      case 'red': return 'bg-red-50 border-red-500 text-red-700';
-      case 'yellow': return 'bg-yellow-50 border-yellow-500 text-yellow-700';
-      case 'blue': return 'bg-blue-50 border-blue-500 text-blue-700';
-      case 'purple': return 'bg-purple-50 border-purple-500 text-purple-700';
-      case 'green': return 'bg-green-50 border-green-500 text-green-700';
-      default: return 'bg-gray-50 border-gray-500 text-gray-700';
+    switch (color) {
+      case 'red': return 'bg-red-50 border-red-200 text-red-800';
+      case 'yellow': return 'bg-amber-50 border-amber-200 text-amber-800';
+      case 'blue': return 'bg-blue-50 border-blue-200 text-blue-800';
+      case 'purple': return 'bg-purple-50 border-purple-200 text-purple-800';
+      case 'green': return 'bg-emerald-50 border-emerald-200 text-emerald-800';
+      default: return 'bg-slate-50 border-slate-200 text-slate-800';
     }
   };
 
   const getIconColor = (color) => {
-    switch(color) {
-      case 'red': return 'text-red-500';
-      case 'yellow': return 'text-yellow-500';
-      case 'blue': return 'text-blue-500';
-      case 'purple': return 'text-purple-500';
-      case 'green': return 'text-green-500';
-      default: return 'text-gray-500';
+    switch (color) {
+      case 'red': return 'text-red-600';
+      case 'yellow': return 'text-amber-600';
+      case 'blue': return 'text-blue-600';
+      case 'purple': return 'text-purple-600';
+      case 'green': return 'text-emerald-600';
+      default: return 'text-slate-600';
     }
   };
 
   if (alerts.length === 0) {
     return (
-      <div className="bg-white rounded-lg shadow-sm p-6">
-        <h3 className="text-lg font-semibold mb-4">🔔 Alertas Corporativas</h3>
-        <div className="text-center py-8 text-gray-500">
-          <div className="text-4xl mb-2">✅</div>
-          <div>No hay alertas activas</div>
-          <div className="text-sm mt-1">El portfolio está funcionando correctamente</div>
-        </div>
-      </div>
+      <Card>
+        <CardContent className="p-8 text-center text-slate-500">
+          <div className="text-4xl mb-3 opacity-30">✅</div>
+          <p className="font-medium text-slate-700">No hay alertas activas</p>
+          <p className="text-sm mt-1">El portfolio está funcionando correctamente</p>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm p-6">
-      <h3 className="text-lg font-semibold mb-4 flex items-center">
-        🔔 Alertas Corporativas
-        <span className="ml-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full">
-          {alerts.filter(a => a.type === 'critical').length}
-        </span>
-      </h3>
-      
-      <div className="space-y-4">
+    <Card>
+      <CardHeader className="border-b border-slate-100 bg-slate-50/50">
+        <CardTitle className="flex items-center text-lg">
+          🔔 Alertas Corporativas
+          <span className="ml-3 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+            {alerts.filter(a => a.type === 'critical').length}
+          </span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-6 space-y-4">
         {alerts.map((alert, index) => (
           <div
             key={index}
-            className={`border-l-4 p-4 rounded-lg ${getAlertColor(alert.color)}`}
+            className={cn("border rounded-lg p-4 transition-all hover:shadow-sm", getAlertColor(alert.color))}
           >
-            <div className="flex items-start">
-              <span className={`text-xl mr-3 ${getIconColor(alert.color)}`}>
+            <div className="flex items-start gap-4">
+              <span className={cn("text-2xl mt-0.5", getIconColor(alert.color))}>
                 {alert.icon}
               </span>
               <div className="flex-1">
                 <div className="font-semibold mb-1">{alert.title}</div>
-                <div className="text-sm mb-2">{alert.message}</div>
-                
+                <div className="text-sm mb-3 opacity-90">{alert.message}</div>
+
                 {alert.details && alert.details.length > 0 && (
-                  <div className="text-xs space-y-1">
+                  <div className="text-xs space-y-1.5 opacity-80">
                     {alert.details.map((detail, detailIndex) => (
-                      <div key={detailIndex} className="flex items-center">
-                        <span className="w-2 h-2 bg-current rounded-full mr-2 opacity-50"></span>
+                      <div key={detailIndex} className="flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 bg-current rounded-full"></span>
                         {detail}
                       </div>
                     ))}
@@ -164,26 +166,24 @@ const CorporateAlerts = ({ projects, portfolioMetrics = {} }) => {
             </div>
           </div>
         ))}
-      </div>
 
-      {/* Resumen de alertas */}
-      <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-        <div className="flex items-center justify-between text-sm">
-          <span className="font-medium text-gray-700">Resumen de Alertas:</span>
-          <div className="flex space-x-4">
-            <span className="text-red-600">
+        {/* Resumen de alertas */}
+        <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between text-sm">
+          <span className="font-medium text-slate-600">Resumen de Alertas:</span>
+          <div className="flex gap-4">
+            <span className="text-red-600 font-medium">
               🚨 {alerts.filter(a => a.type === 'critical').length} Críticas
             </span>
-            <span className="text-yellow-600">
+            <span className="text-amber-600 font-medium">
               ⚠️ {alerts.filter(a => a.color === 'yellow').length} Advertencias
             </span>
-            <span className="text-blue-600">
+            <span className="text-blue-600 font-medium">
               ℹ️ {alerts.filter(a => a.color === 'blue').length} Informativas
             </span>
           </div>
         </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 };
 

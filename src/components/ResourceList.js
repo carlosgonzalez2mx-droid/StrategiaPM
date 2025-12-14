@@ -1,8 +1,11 @@
 import React, { useState, useMemo } from 'react';
+import { Card, CardHeader, CardTitle, CardContent } from './ui/Card';
+import { Button } from './ui/Button';
+import { cn } from '../lib/utils';
 
-const ResourceList = ({ 
-  globalResources, 
-  setGlobalResources 
+const ResourceList = ({
+  globalResources,
+  setGlobalResources
 }) => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -30,14 +33,14 @@ const ResourceList = ({
   // Filtrar recursos
   const filteredResources = useMemo(() => {
     return globalResources.filter(resource => {
-      const matchesSearch = !searchTerm || 
+      const matchesSearch = !searchTerm ||
         resource.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         resource.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (resource.email && resource.email.toLowerCase().includes(searchTerm.toLowerCase()));
-      
+
       const matchesRole = roleFilter === 'all' || resource.role === roleFilter;
       const matchesStatus = statusFilter === 'all' || resource.status === statusFilter;
-      
+
       return matchesSearch && matchesRole && matchesStatus;
     });
   }, [globalResources, searchTerm, roleFilter, statusFilter]);
@@ -54,7 +57,7 @@ const ResourceList = ({
     const activeResources = globalResources.filter(r => r.status === 'active').length;
     const inactiveResources = globalResources.filter(r => r.status === 'inactive').length;
     const onLeaveResources = globalResources.filter(r => r.status === 'on-leave').length;
-    
+
     const totalCost = globalResources.reduce((sum, r) => {
       const monthlyHours = r.availability * 160; // 160 horas por mes
       return sum + (monthlyHours * r.hourlyRate);
@@ -82,17 +85,13 @@ const ResourceList = ({
       certifications: newResource.certifications ? newResource.certifications.split(',').map(s => s.trim()).filter(s => s) : [],
       notes: newResource.notes
     };
-    
-    console.log('➕ Agregando nuevo recurso:', resource);
-    console.log('➕ Recursos actuales antes de agregar:', globalResources);
-    
+
     setGlobalResources(prev => {
       const newResources = prev.slice();
       newResources.push(resource);
-      console.log('➕ Nuevos recursos después de agregar:', newResources);
       return newResources;
     });
-    
+
     setShowAddModal(false);
     setNewResource({
       name: '',
@@ -156,228 +155,202 @@ const ResourceList = ({
 
   // Obtener color de estado
   const getStatusColor = (status) => {
-    switch(status) {
-      case 'active': return 'bg-green-100 text-green-800';
-      case 'inactive': return 'bg-gray-100 text-gray-800';
-      case 'on-leave': return 'bg-yellow-100 text-yellow-800';
-      case 'terminated': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+    switch (status) {
+      case 'active': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      case 'inactive': return 'bg-slate-50 text-slate-700 border-slate-200';
+      case 'on-leave': return 'bg-amber-50 text-amber-700 border-amber-200';
+      case 'terminated': return 'bg-red-50 text-red-700 border-red-200';
+      default: return 'bg-slate-50 text-slate-700 border-slate-200';
     }
   };
 
   // Obtener icono de estado
   const getStatusIcon = (status) => {
-    switch(status) {
+    switch (status) {
       case 'active': return '✅';
       case 'inactive': return '⏸️';
       case 'on-leave': return '🏖️';
       case 'terminated': return '❌';
-      default: return '⏸️';
+      default: return '⚪';
     }
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center mb-6">
-        <div className="bg-blue-100 rounded-2xl p-3 mr-4 shadow-sm">
-          <span className="text-3xl">👥</span>
-        </div>
-        <div>
-          <p className="text-gray-600 text-lg">Gestión global de recursos humanos del portafolio</p>
-        </div>
-      </div>
-
+    <div className="space-y-6 animate-in fade-in duration-300">
       {/* Métricas de Recursos */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <div className="bg-white rounded-xl p-4 border border-blue-200 hover:shadow-md transition-all duration-300">
-          <div className="flex items-center space-x-2 mb-2">
-            <span className="text-lg">👥</span>
-            <span className="text-sm font-medium text-blue-600">Total Recursos</span>
-          </div>
-          <div className="text-2xl font-bold text-gray-800">{resourceMetrics.totalResources}</div>
-        </div>
+        <Card className="border-l-4 border-l-blue-500 shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2 mb-2">
+              <span className="text-lg">👥</span>
+              <span className="text-xs font-bold text-slate-500 uppercase">Total</span>
+            </div>
+            <div className="text-2xl font-bold text-slate-900">{resourceMetrics.totalResources}</div>
+          </CardContent>
+        </Card>
 
-        <div className="bg-white rounded-xl p-4 border border-green-200 hover:shadow-md transition-all duration-300">
-          <div className="flex items-center space-x-2 mb-2">
-            <span className="text-lg">✅</span>
-            <span className="text-sm font-medium text-green-600">Activos</span>
-          </div>
-          <div className="text-2xl font-bold text-gray-800">{resourceMetrics.activeResources}</div>
-        </div>
+        <Card className="border-l-4 border-l-emerald-500 shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2 mb-2">
+              <span className="text-lg">✅</span>
+              <span className="text-xs font-bold text-slate-500 uppercase">Activos</span>
+            </div>
+            <div className="text-2xl font-bold text-slate-900">{resourceMetrics.activeResources}</div>
+          </CardContent>
+        </Card>
 
-        <div className="bg-white rounded-xl p-4 border border-gray-200 hover:shadow-md transition-all duration-300">
-          <div className="flex items-center space-x-2 mb-2">
-            <span className="text-lg">⏸️</span>
-            <span className="text-sm font-medium text-gray-600">Inactivos</span>
-          </div>
-          <div className="text-2xl font-bold text-gray-800">{resourceMetrics.inactiveResources}</div>
-        </div>
+        <Card className="border-l-4 border-l-slate-400 shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2 mb-2">
+              <span className="text-lg">⏸️</span>
+              <span className="text-xs font-bold text-slate-500 uppercase">Inactivos</span>
+            </div>
+            <div className="text-2xl font-bold text-slate-900">{resourceMetrics.inactiveResources}</div>
+          </CardContent>
+        </Card>
 
-        <div className="bg-white rounded-xl p-4 border border-yellow-200 hover:shadow-md transition-all duration-300">
-          <div className="flex items-center space-x-2 mb-2">
-            <span className="text-lg">🏖️</span>
-            <span className="text-sm font-medium text-yellow-600">En Licencia</span>
-          </div>
-          <div className="text-2xl font-bold text-gray-800">{resourceMetrics.onLeaveResources}</div>
-        </div>
+        <Card className="border-l-4 border-l-amber-500 shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2 mb-2">
+              <span className="text-lg">🏖️</span>
+              <span className="text-xs font-bold text-slate-500 uppercase">Licencia</span>
+            </div>
+            <div className="text-2xl font-bold text-slate-900">{resourceMetrics.onLeaveResources}</div>
+          </CardContent>
+        </Card>
 
-        <div className="bg-white rounded-xl p-4 border border-purple-200 hover:shadow-md transition-all duration-300">
-          <div className="flex items-center space-x-2 mb-2">
-            <span className="text-lg">💰</span>
-            <span className="text-sm font-medium text-purple-600">Costo Mensual</span>
-          </div>
-          <div className="text-2xl font-bold text-gray-800">${(resourceMetrics.totalCost / 1000).toFixed(0)}K</div>
-        </div>
+        <Card className="border-l-4 border-l-violet-500 shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2 mb-2">
+              <span className="text-lg">💰</span>
+              <span className="text-xs font-bold text-slate-500 uppercase">Costo Mensual</span>
+            </div>
+            <div className="text-2xl font-bold text-slate-900">${(resourceMetrics.totalCost / 1000).toFixed(0)}K</div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Controles */}
-      <div className="bg-white rounded-xl p-4 border border-blue-200">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0">
-          <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
-            <input
-              type="text"
-              placeholder="Buscar recursos..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            
-            <select
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="all">Todos los roles</option>
-              {uniqueRoles.map(role => (
-                <option key={role} value={role}>{role}</option>
-              ))}
-            </select>
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0 gap-4">
+            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4 flex-1">
+              <input
+                type="text"
+                placeholder="Buscar recursos..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none transition-all"
+              />
 
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="all">Todos los estados</option>
-              <option value="active">Activo</option>
-              <option value="inactive">Inactivo</option>
-              <option value="on-leave">En licencia</option>
-              <option value="terminated">Terminado</option>
-            </select>
-          </div>
-          
-          <div className="flex space-x-2">
-            <button
+              <select
+                value={roleFilter}
+                onChange={(e) => setRoleFilter(e.target.value)}
+                className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none cursor-pointer"
+              >
+                <option value="all">Todos los roles</option>
+                {uniqueRoles.map(role => (
+                  <option key={role} value={role}>{role}</option>
+                ))}
+              </select>
+
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none cursor-pointer"
+              >
+                <option value="all">Todos los estados</option>
+                <option value="active">Activo</option>
+                <option value="inactive">Inactivo</option>
+                <option value="on-leave">En licencia</option>
+                <option value="terminated">Terminado</option>
+              </select>
+            </div>
+
+            <Button
               onClick={() => setShowAddModal(true)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+              className="bg-brand-600 hover:bg-brand-700 text-white shadow-brand-500/20 shadow-lg shrink-0"
             >
-              <span>➕</span>
-              <span>Agregar Recurso</span>
-            </button>
+              ➕ Agregar Recurso
+            </Button>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
       {/* Tabla de Recursos */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200">
+      <Card className="overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-slate-100">
+            <thead className="bg-slate-50/50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Recurso
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Rol
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Disponibilidad
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Costo/Hora
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Estado
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Acciones
-                </th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Recurso</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Rol</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Disponibilidad</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Costo/Hora</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Estado</th>
+                <th className="px-6 py-4 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">Acciones</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white divide-y divide-slate-100">
               {filteredResources.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan="6" className="px-6 py-12 text-center text-slate-500">
                     <div className="flex flex-col items-center">
-                      <span className="text-4xl mb-2">👥</span>
-                      <p className="text-lg font-medium">No hay recursos registrados</p>
-                      <p className="text-sm">Agrega tu primer recurso para comenzar</p>
+                      <span className="text-4xl mb-3 opacity-20">👥</span>
+                      <p className="text-base font-medium">No hay recursos encontrados</p>
+                      <p className="text-sm mt-1">Intenta ajustar los filtros o agrega uno nuevo</p>
                     </div>
                   </td>
                 </tr>
               ) : (
                 filteredResources.map((resource) => (
-                  <tr key={resource.id} className="hover:bg-gray-50">
+                  <tr key={resource.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-10 w-10">
-                          <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                            <span className="text-sm font-medium text-blue-700">
-                              {resource.name.split(' ').map(n => n[0]).join('')}
-                            </span>
+                          <div className="h-10 w-10 rounded-full bg-brand-50 flex items-center justify-center text-brand-600 font-bold border border-brand-100">
+                            {resource.name.split(' ').map(n => n[0]).join('').substring(0, 2)}
                           </div>
                         </div>
                         <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">
-                            {resource.name}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {resource.email || 'Sin email'}
-                          </div>
+                          <div className="text-sm font-medium text-slate-900">{resource.name}</div>
+                          <div className="text-sm text-slate-400">{resource.email || 'Sin email'}</div>
                         </div>
                       </div>
                     </td>
-                    
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded-full">
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
                         {resource.role}
                       </span>
                     </td>
-                    
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {resource.availability}%
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <span className="text-sm text-slate-600">{resource.availability}%</span>
+                        <div className="ml-2 w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                          <div
+                            className={cn("h-full rounded-full", resource.availability > 80 ? "bg-emerald-500" : resource.availability > 50 ? "bg-amber-500" : "bg-red-500")}
+                            style={{ width: `${resource.availability}%` }}
+                          />
+                        </div>
+                      </div>
                     </td>
-                    
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-slate-600">
                       ${resource.hourlyRate}/h
                     </td>
-                    
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(resource.status)}`}>
-                        {getStatusIcon(resource.status)} {resource.status === 'active' ? 'Activo' :
-                         resource.status === 'inactive' ? 'Inactivo' :
-                         resource.status === 'on-leave' ? 'Licencia' :
-                         'Terminado'}
+                      <span className={cn("px-2.5 py-0.5 rounded-full text-xs font-medium border flex items-center w-fit gap-1.5", getStatusColor(resource.status))}>
+                        {getStatusIcon(resource.status)}
+                        <span className="capitalize">{resource.status === 'on-leave' ? 'Licencia' : resource.status === 'active' ? 'Activo' : resource.status === 'inactive' ? 'Inactivo' : 'Terminado'}</span>
                       </span>
                     </td>
-                    
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => openEditModal(resource)}
-                          className="text-blue-600 hover:text-blue-900"
-                          title="Editar recurso"
-                        >
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="flex justify-end space-x-1">
+                        <Button size="icon" variant="ghost" onClick={() => openEditModal(resource)} title="Editar">
                           ✏️
-                        </button>
-                        <button
-                          onClick={() => handleDeleteResource(resource.id)}
-                          className="text-red-600 hover:text-red-900"
-                          title="Eliminar recurso"
-                        >
+                        </Button>
+                        <Button size="icon" variant="ghost" onClick={() => handleDeleteResource(resource.id)} className="text-slate-400 hover:text-red-600" title="Eliminar">
                           🗑️
-                        </button>
+                        </Button>
                       </div>
                     </td>
                   </tr>
@@ -386,147 +359,126 @@ const ResourceList = ({
             </tbody>
           </table>
         </div>
-      </div>
+      </Card>
 
-      {/* Modal para agregar recurso */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Agregar Nuevo Recurso</h3>
-              
+      {/* Modal Agregar/Editar (Reutilizable) */}
+      {(showAddModal || (showEditModal && editingResource)) && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <Card className="w-full max-w-md shadow-2xl border-0 animate-in fade-in zoom-in-95 duration-200">
+            <CardHeader className="border-b border-slate-100 bg-slate-50/50">
+              <div className="flex justify-between items-center">
+                <CardTitle>{showAddModal ? 'Agregar Nuevo Recurso' : 'Editar Recurso'}</CardTitle>
+                <Button size="icon" variant="ghost" onClick={() => { setShowAddModal(false); setShowEditModal(false); setEditingResource(null); }}>✕</Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6">
               <div className="space-y-4">
+                {/* Nombre */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Nombre *</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Nombre *</label>
                   <input
                     type="text"
-                    value={newResource.name}
-                    onChange={(e) => setNewResource({
-                      id: newResource.id,
-                      role: newResource.role,
-                      email: newResource.email,
-                      skills: newResource.skills,
-                      availability: newResource.availability,
-                      hourlyRate: newResource.hourlyRate,
-                      status: newResource.status,
-                      name: e.target.value})}
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={showAddModal ? newResource.name : editingResource?.name}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (showAddModal) setNewResource(prev => ({ ...prev, name: val }));
+                      else setEditingResource(prev => ({ ...prev, name: val }));
+                    }}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none"
                     placeholder="Nombre completo"
                   />
                 </div>
-                
+
+                {/* Rol */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Rol *</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Rol *</label>
                   <input
                     type="text"
-                    value={newResource.role}
-                    onChange={(e) => setNewResource({
-                      id: newResource.id,
-                      name: newResource.name,
-                      email: newResource.email,
-                      skills: newResource.skills,
-                      availability: newResource.availability,
-                      hourlyRate: newResource.hourlyRate,
-                      status: newResource.status,
-                      role: e.target.value})}
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Ej: Project Manager, Desarrollador, etc."
+                    value={showAddModal ? newResource.role : editingResource?.role}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (showAddModal) setNewResource(prev => ({ ...prev, role: val }));
+                      else setEditingResource(prev => ({ ...prev, role: val }));
+                    }}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none"
+                    placeholder="Ej. Project Manager"
                   />
                 </div>
-                
+
+                {/* Email */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Email</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
                   <input
                     type="email"
-                    value={newResource.email}
-                    onChange={(e) => setNewResource({
-                      id: newResource.id,
-                      name: newResource.name,
-                      role: newResource.role,
-                      skills: newResource.skills,
-                      availability: newResource.availability,
-                      hourlyRate: newResource.hourlyRate,
-                      status: newResource.status,
-                      email: e.target.value})}
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={showAddModal ? newResource.email : editingResource?.email}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (showAddModal) setNewResource(prev => ({ ...prev, email: val }));
+                      else setEditingResource(prev => ({ ...prev, email: val }));
+                    }}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none"
                     placeholder="email@empresa.com"
                   />
                 </div>
-                
+
+                {/* Habilidades */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Habilidades (separadas por comas)</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Habilidades</label>
                   <input
                     type="text"
-                    value={newResource.skills}
-                    onChange={(e) => setNewResource({
-                      id: newResource.id,
-                      name: newResource.name,
-                      role: newResource.role,
-                      email: newResource.email,
-                      availability: newResource.availability,
-                      hourlyRate: newResource.hourlyRate,
-                      status: newResource.status,
-                      skills: e.target.value})}
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="React, JavaScript, PMBOK, etc."
+                    value={showAddModal ? newResource.skills : editingResource?.skills}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (showAddModal) setNewResource(prev => ({ ...prev, skills: val }));
+                      else setEditingResource(prev => ({ ...prev, skills: val }));
+                    }}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none"
+                    placeholder="Ej: React, SQL, Liderazgo"
                   />
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Disponibilidad (%)</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Disp. (%)</label>
                     <input
                       type="number"
                       min="0"
                       max="100"
-                      value={newResource.availability}
-                      onChange={(e) => setNewResource({
-                      id: newResource.id,
-                      name: newResource.name,
-                      role: newResource.role,
-                      email: newResource.email,
-                      skills: newResource.skills,
-                      hourlyRate: newResource.hourlyRate,
-                      status: newResource.status,
-                      availability: Number(e.target.value)})}
-                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      value={showAddModal ? newResource.availability : editingResource?.availability}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        if (showAddModal) setNewResource(prev => ({ ...prev, availability: val }));
+                        else setEditingResource(prev => ({ ...prev, availability: val }));
+                      }}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none"
                     />
                   </div>
-                  
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Costo por Hora ($)</label>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Costo/Hora ($)</label>
                     <input
                       type="number"
                       min="0"
-                      value={newResource.hourlyRate}
-                      onChange={(e) => setNewResource({
-                      id: newResource.id,
-                      name: newResource.name,
-                      role: newResource.role,
-                      email: newResource.email,
-                      skills: newResource.skills,
-                      availability: newResource.availability,
-                      status: newResource.status,
-                      hourlyRate: Number(e.target.value)})}
-                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      value={showAddModal ? newResource.hourlyRate : editingResource?.hourlyRate}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        if (showAddModal) setNewResource(prev => ({ ...prev, hourlyRate: val }));
+                        else setEditingResource(prev => ({ ...prev, hourlyRate: val }));
+                      }}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Estado</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Estado</label>
                   <select
-                    value={newResource.status}
-                    onChange={(e) => setNewResource({
-                      id: newResource.id,
-                      name: newResource.name,
-                      role: newResource.role,
-                      email: newResource.email,
-                      skills: newResource.skills,
-                      availability: newResource.availability,
-                      hourlyRate: newResource.hourlyRate,
-                      status: e.target.value})}
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={showAddModal ? newResource.status : editingResource?.status}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (showAddModal) setNewResource(prev => ({ ...prev, status: val }));
+                      else setEditingResource(prev => ({ ...prev, status: val }));
+                    }}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none"
                   >
                     <option value="active">Activo</option>
                     <option value="inactive">Inactivo</option>
@@ -535,189 +487,20 @@ const ResourceList = ({
                   </select>
                 </div>
               </div>
-              
-              <div className="flex justify-end space-x-3 mt-6">
-                <button
-                  onClick={() => setShowAddModal(false)}
-                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleAddResource}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                >
-                  Agregar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* Modal para editar recurso */}
-      {showEditModal && editingResource && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Editar Recurso</h3>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Nombre *</label>
-                  <input
-                    type="text"
-                    value={editingResource.name}
-                    onChange={(e) => setEditingResource({
-                      id: editingResource.id,
-                      role: editingResource.role,
-                      email: editingResource.email,
-                      skills: editingResource.skills,
-                      availability: editingResource.availability,
-                      hourlyRate: editingResource.hourlyRate,
-                      status: editingResource.status,
-                      name: e.target.value})}
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Rol *</label>
-                  <input
-                    type="text"
-                    value={editingResource.role}
-                    onChange={(e) => setEditingResource({
-                      id: editingResource.id,
-                      name: editingResource.name,
-                      email: editingResource.email,
-                      skills: editingResource.skills,
-                      availability: editingResource.availability,
-                      hourlyRate: editingResource.hourlyRate,
-                      status: editingResource.status,
-                      role: e.target.value})}
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Email</label>
-                  <input
-                    type="email"
-                    value={editingResource.email}
-                    onChange={(e) => setEditingResource({
-                      id: editingResource.id,
-                      name: editingResource.name,
-                      role: editingResource.role,
-                      skills: editingResource.skills,
-                      availability: editingResource.availability,
-                      hourlyRate: editingResource.hourlyRate,
-                      status: editingResource.status,
-                      email: e.target.value})}
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Habilidades (separadas por comas)</label>
-                  <input
-                    type="text"
-                    value={editingResource.skills}
-                    onChange={(e) => setEditingResource({
-                      id: editingResource.id,
-                      name: editingResource.name,
-                      role: editingResource.role,
-                      email: editingResource.email,
-                      availability: editingResource.availability,
-                      hourlyRate: editingResource.hourlyRate,
-                      status: editingResource.status,
-                      skills: e.target.value})}
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Disponibilidad (%)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={editingResource.availability}
-                      onChange={(e) => setEditingResource({
-                      id: editingResource.id,
-                      name: editingResource.name,
-                      role: editingResource.role,
-                      email: editingResource.email,
-                      skills: editingResource.skills,
-                      hourlyRate: editingResource.hourlyRate,
-                      status: editingResource.status,
-                      availability: Number(e.target.value)})}
-                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Costo por Hora ($)</label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={editingResource.hourlyRate}
-                      onChange={(e) => setEditingResource({
-                      id: editingResource.id,
-                      name: editingResource.name,
-                      role: editingResource.role,
-                      email: editingResource.email,
-                      skills: editingResource.skills,
-                      availability: editingResource.availability,
-                      status: editingResource.status,
-                      hourlyRate: Number(e.target.value)})}
-                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Estado</label>
-                  <select
-                    value={editingResource.status}
-                    onChange={(e) => setEditingResource({
-                      id: editingResource.id,
-                      name: editingResource.name,
-                      role: editingResource.role,
-                      email: editingResource.email,
-                      skills: editingResource.skills,
-                      availability: editingResource.availability,
-                      hourlyRate: editingResource.hourlyRate,
-                      status: e.target.value})}
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="active">Activo</option>
-                    <option value="inactive">Inactivo</option>
-                    <option value="on-leave">En licencia</option>
-                    <option value="terminated">Terminado</option>
-                  </select>
-                </div>
-              </div>
-              
-              <div className="flex justify-end space-x-3 mt-6">
-                <button
-                  onClick={() => {
-                    setShowEditModal(false);
-                    setEditingResource(null);
-                  }}
-                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors"
-                >
+              <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-slate-100">
+                <Button variant="ghost" onClick={() => { setShowAddModal(false); setShowEditModal(false); setEditingResource(null); }}>
                   Cancelar
-                </button>
-                <button
-                  onClick={handleEditResource}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                </Button>
+                <Button
+                  onClick={showAddModal ? handleAddResource : handleEditResource}
+                  className="bg-brand-600 hover:bg-brand-700 text-white"
                 >
-                  Guardar Cambios
-                </button>
+                  {showAddModal ? 'Agregar Recurso' : 'Guardar Cambios'}
+                </Button>
               </div>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>
