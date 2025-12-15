@@ -264,7 +264,28 @@ function MainApp() {
   ]);
 
   // Hook para detectar cambios sin guardar
-  const { hasUnsavedChanges, markAsSaved } = useUnsavedChanges(currentData);
+  const { hasUnsavedChanges, markAsSaved, getChangedFields } = useUnsavedChanges(currentData);
+
+  // 🔍 DIAGNÓSTICO: Deshabilitado - problema identificado y corregido
+  // Los contextos (ProjectsContext, FinancialContext, TasksContext) recrean objetos
+  // con nuevas referencias al cambiar de proyecto. Fix aplicado en línea ~907
+  /*
+  useEffect(() => {
+    if (hasUnsavedChanges) {
+      const changed = getChangedFields();
+      console.group('🔍 DIAGNÓSTICO: Cambios sin guardar detectados');
+      console.log('📝 Campos modificados:', changed);
+      console.log('📊 currentProjectId:', currentProjectId);
+      console.log('⏰ Timestamp:', new Date().toISOString());
+      console.log('📋 Detalles de currentData:', {
+        projectsCount: currentData.projects?.length,
+        tasksCount: Object.keys(currentData.tasksByProject || {}).length,
+        risksCount: Object.keys(currentData.risksByProject || {}).length,
+      });
+      console.groupEnd();
+    }
+  }, [hasUnsavedChanges, currentProjectId, currentData]);
+  */
 
   // NOTA: Script de diagnóstico deshabilitado temporalmente
   // useEffect(() => {
@@ -886,6 +907,22 @@ function MainApp() {
 
     loadData();
   }, []);
+
+  // 🔧 FIX: Marcar como guardado después de que los contextos se estabilicen
+  // Esto previene falsos positivos cuando los contextos (ProjectsContext, FinancialContext, TasksContext)
+  // recrean objetos/arrays con nuevas referencias aunque los valores sean iguales
+  // IMPORTANTE: NO incluir hasUnsavedChanges en dependencias para evitar resetear cambios reales
+  useEffect(() => {
+    if (dataLoaded && currentProjectId) {
+      // Esperar un tick para que todos los contextos terminen de actualizarse
+      const timer = setTimeout(() => {
+        logger.debug('🔧 Marcando como guardado después de estabilización de contextos');
+        markAsSaved();
+      }, 100);
+
+      return () => clearTimeout(timer);
+    }
+  }, [dataLoaded, currentProjectId, markAsSaved]);
 
   // SOLUCIÓN PERMANENTE: Recargar datos desde Supabase cuando cambie el proyecto actual
   useEffect(() => {

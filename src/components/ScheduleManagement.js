@@ -4522,12 +4522,42 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
             if (error) {
               console.error('❌ Error actualizando tarea en Supabase:', error);
               console.error('Campo:', field, 'Valor:', newValue);
+
+              // ✅ NUEVO: Notificar al usuario del error
+              alert(`⚠️ Error al guardar automáticamente\n\nCampo: ${field}\nError: ${error.message}\n\nPor favor, guarda manualmente usando Ctrl+S o el botón de guardar.`);
+
+              // ✅ NUEVO: Disparar evento para marcar como "sin guardar"
+              const unsavedEvent = new CustomEvent('dataChange', {
+                detail: {
+                  type: 'autoSaveFailed',
+                  taskId,
+                  field,
+                  error: error.message,
+                  timestamp: new Date().toISOString()
+                }
+              });
+              window.dispatchEvent(unsavedEvent);
             } else {
               console.log(`✅ Campo "${field}" actualizado en Supabase exitosamente`);
             }
           })
           .catch(error => {
             console.error('❌ Error inesperado actualizando en Supabase:', error);
+
+            // ✅ NUEVO: Notificar al usuario del error inesperado
+            alert(`⚠️ Error inesperado al guardar\n\nPor favor, guarda manualmente usando Ctrl+S o el botón de guardar.`);
+
+            // ✅ NUEVO: Disparar evento para marcar como "sin guardar"
+            const unsavedEvent = new CustomEvent('dataChange', {
+              detail: {
+                type: 'autoSaveFailed',
+                taskId,
+                field,
+                error: error.message,
+                timestamp: new Date().toISOString()
+              }
+            });
+            window.dispatchEvent(unsavedEvent);
           });
       }
     }
