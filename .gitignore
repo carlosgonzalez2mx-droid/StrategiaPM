@@ -32,6 +32,7 @@ executable/
 !stripe-setup.md
 !PR_DESCRIPTION.md
 !WBS_GUIA_PROGRAMADORES.md
+!DISABLED_FEATURES.md
 *.txt
 !public/robots.txt
 .DS_Store
