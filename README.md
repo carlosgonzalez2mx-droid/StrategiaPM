@@ -13,6 +13,8 @@ Aplicación web de gestión de portafolio de proyectos empresariales con metodol
 - **Sistema de Suscripciones**: Planes Free y Professional con Stripe
 - **Autenticación**: Supabase Auth con roles granulares (Owner, Admin, Member)
 
+> **Nota:** Algunas funcionalidades están temporalmente deshabilitadas. Ver [DISABLED_FEATURES.md](./DISABLED_FEATURES.md) para detalles.
+
 ## Stack Tecnológico
 
 - **Frontend**: React 19, Tailwind CSS, Chart.js, Recharts
