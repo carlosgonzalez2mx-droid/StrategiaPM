@@ -5942,18 +5942,6 @@ const ScheduleManagement = ({ tasks, setTasks, importTasks, projectData, onSched
                 <span>📊</span>
                 <span>Importar</span>
               </button>
-              <button
-                onClick={() => setShowAIWizard(true)}
-                disabled={isReadOnlyMode}
-                className={`px-2 py-1.5 rounded text-xs flex items-center space-x-1 ${isReadOnlyMode
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700'
-                  }`}
-                title={isReadOnlyMode ? "No disponible (modo solo lectura)" : "Generar cronograma automáticamente con Asistente de IA"}
-              >
-                <span>🤖</span>
-                <span>IA</span>
-              </button>
 
               {/* Input de archivo oculto */}
               <input
